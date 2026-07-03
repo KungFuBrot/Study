@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RPG Fable Web</title>
+<style>
+  body {
+    margin: 0; padding: 16px;
+    background: #101018; color: #d8d4c8;
+    font-family: system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  h1 { font-size: 22px; margin: 6px 0 12px; letter-spacing: 2px; color: #e8dfc0; }
+  canvas {
+    image-rendering: pixelated;
+    width: min(96vw, 960px);
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border: 2px solid #4a463c; border-radius: 6px;
+  }
+  .hilfe { font-size: 14px; color: #8f8ba0; margin-top: 10px; }
+</style>
+</head>
+<body>
+<h1>RPG FABLE</h1>
+<canvas id="spiel" width="640" height="360"></canvas>
+<p class="hilfe">Bewegen: Pfeiltasten / WASD &nbsp;·&nbsp; Bestätigen / Sprechen: E, Enter, Leertaste &nbsp;·&nbsp; Abbrechen: Esc &nbsp;·&nbsp; Ton an/aus: M</p>
+<script src="js/maps.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/field.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
