@@ -22,6 +22,7 @@ var menu_box: VBoxContainer
 var party_box: VBoxContainer
 var cursor: Polygon2D
 var cam: Camera2D
+var ui_layer: CanvasLayer
 
 func _ready() -> void:
 	_build_scene()
@@ -51,28 +52,30 @@ func _build_scene() -> void:
 		stone.position = Vector2(40 + i * 39.0, 350 + fmod(i * 61.3, 160.0))
 		add_child(stone)
 
+	# Alle Kämpfer starten außerhalb des Bildes und marschieren in _run_battle ein.
 	for i in GameState.party.size():
 		var data: Dictionary = GameState.party[i]
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.character(data["id"], "side", 0)
 		s.flip_h = true
 		s.scale = Vector2(5, 5)
-		s.position = Vector2(700 + i * 40, 230 + i * 90)
+		var home := Vector2(700 + i * 40, 230 + i * 90)
+		s.position = home + Vector2(340, 0)
 		add_child(s)
-		heroes.append({"data": data, "sprite": s, "home": s.position})
-		_idle_bob(s, 2.0 + i * 0.3)
+		heroes.append({"data": data, "sprite": s, "home": home})
 
 	for i in enemy_ids.size():
+		var is_boss: bool = enemy_ids[i] == "boss"
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		s.scale = Vector2(5, 5)
-		s.position = Vector2(230 + (i % 2) * 90, 200 + i * 85)
+		s.scale = Vector2(7, 7) if is_boss else Vector2(5, 5)
+		var home := Vector2(260, 250) if is_boss else Vector2(230 + (i % 2) * 90, 200 + i * 85)
+		s.position = home - Vector2(400, 0)
 		add_child(s)
 		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"],
-			"sprite": s, "home": s.position, "alive": true})
-		_idle_bob(s, 1.6 + i * 0.25)
+			"sprite": s, "home": home, "alive": true, "is_boss": is_boss, "acts": 0})
 
 func _idle_bob(s: Sprite2D, period: float) -> void:
 	var tw := create_tween().set_loops()
@@ -84,6 +87,7 @@ func _idle_bob(s: Sprite2D, period: float) -> void:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	ui_layer = layer
 	var panel := PanelContainer.new()
 	panel.position = Vector2(20, 410)
 	panel.custom_minimum_size = Vector2(920, 115)
@@ -117,6 +121,11 @@ func _build_ui() -> void:
 	cursor.color = Color(1.0, 0.9, 0.3)
 	cursor.visible = false
 	add_child(cursor)
+	var pulse := create_tween().set_loops()
+	pulse.tween_property(cursor, "scale", Vector2(1.3, 1.3), 0.35) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(cursor, "scale", Vector2.ONE, 0.35) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_refresh_party()
 
 func _refresh_party() -> void:
@@ -133,8 +142,21 @@ func _say(text: String) -> void:
 ## ---------- Rundenablauf ----------
 
 func _run_battle() -> void:
-	await get_tree().create_timer(0.4).timeout
-	_say("Monster greifen an!")
+	# Einmarsch: alle gleiten an ihre Position, dann beginnt das Idle-Wippen.
+	await get_tree().create_timer(0.15).timeout
+	var intro := create_tween().set_parallel(true)
+	for u in heroes + enemies:
+		intro.tween_property(u["sprite"], "position", u["home"], 0.5) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await intro.finished
+	for i in heroes.size():
+		_idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
+	for i in enemies.size():
+		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
+	if enemy_ids.has("boss"):
+		await _boss_entrance()
+	else:
+		_say("Monster greifen an!")
 	await get_tree().create_timer(0.9).timeout
 	while true:
 		for h in heroes:
@@ -158,8 +180,7 @@ func _run_battle() -> void:
 func _hero_turn(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
 	while true:
-		var special: Dictionary = d["special"]
-		var cmd: int = await _menu([d["name"] + ":  Angriff", special["name"] + " (%d MP)" % special["cost"], "Item", "Fliehen"], h)
+		var cmd: int = await _menu([d["name"] + ":  Angriff", "Fähigkeit", "Item", "Fliehen"], h)
 		match cmd:
 			0:
 				var t := await _pick_enemy()
@@ -167,17 +188,8 @@ func _hero_turn(h: Dictionary) -> bool:
 				await _hero_attack(h, enemies[t])
 				return false
 			1:
-				if d["mp"] < special["cost"]:
-					_say("Nicht genug MP!")
-					AudioManager.play_sfx("error")
-					continue
-				if special["target"] == "all":
-					await _hero_special_all(h)
-					return false
-				var t2 := await _pick_enemy()
-				if t2 < 0: continue
-				await _hero_special_one(h, enemies[t2])
-				return false
+				var used_ab: bool = await _ability_menu(h)
+				if used_ab: return false
 			2:
 				var used: bool = await _item_menu(h)
 				if used: return false
@@ -193,6 +205,43 @@ func _hero_turn(h: Dictionary) -> bool:
 				await get_tree().create_timer(0.7).timeout
 				return false
 	return false
+
+## Untermenü: eine der Fähigkeiten des Helden wählen und ausführen.
+func _ability_menu(h: Dictionary) -> bool:
+	var d: Dictionary = h["data"]
+	var abilities: Array = d["abilities"]
+	var entries := []
+	for ab in abilities:
+		entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
+	entries.append("Zurück")
+	var pick: int = await _menu(entries, h)
+	if pick >= abilities.size():
+		return false
+	var ab: Dictionary = abilities[pick]
+	if d["mp"] < ab["cost"]:
+		_say("Nicht genug MP!")
+		AudioManager.play_sfx("error")
+		return false
+	match ab["target"]:
+		"all":
+			d["mp"] -= ab["cost"]
+			_refresh_party()
+			await _whirl_all(h, ab)
+		"one":
+			var t: int = await _pick_enemy()
+			if t < 0: return false
+			d["mp"] -= ab["cost"]
+			_refresh_party()
+			if ab["kind"] == "magic":
+				await _fireball(h, ab, enemies[t])
+			else:
+				await _pierce(h, ab, enemies[t])
+		"ally":
+			var a: int = await _menu(["Für Serena", "Für Milo"], h)
+			d["mp"] -= ab["cost"]
+			_refresh_party()
+			await _heal_ally(h, ab, heroes[a])
+	return true
 
 ## ---------- Menüs (await auf Spieler-Eingabe) ----------
 
@@ -320,6 +369,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	await tw.finished
 	AudioManager.play_sfx("slash")
 	_slash_arc(es.position)
+	_sparks(es.position, Color(1.0, 0.9, 0.5))
 	var dmg: int = int(h["data"]["atk"] * randf_range(0.9, 1.2)) - e["def"]
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
@@ -327,11 +377,9 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
 
-func _hero_special_all(h: Dictionary) -> void:
+func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	d["mp"] -= d["special"]["cost"]
-	_refresh_party()
-	_say("%s entfesselt %s!" % [d["name"], d["special"]["name"]])
+	_say("%s entfesselt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var tw := create_tween()
 	tw.tween_property(s, "position", Vector2(420, 260), 0.25).set_trans(Tween.TRANS_QUAD)
@@ -346,17 +394,15 @@ func _hero_special_all(h: Dictionary) -> void:
 	await spin.finished
 	for e in enemies:
 		if e["alive"]:
-			var dmg: int = int((d["special"]["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
+			var dmg: int = int((ab["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
 			await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.25)
 	await back.finished
 
-func _hero_special_one(h: Dictionary, e: Dictionary) -> void:
+func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	d["mp"] -= d["special"]["cost"]
-	_refresh_party()
-	_say("%s wirkt %s!" % [d["name"], d["special"]["name"]])
+	_say("%s wirkt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 14.0, 0.2)
@@ -375,8 +421,59 @@ func _hero_special_one(h: Dictionary, e: Dictionary) -> void:
 	ball.queue_free()
 	_explosion(e["sprite"].position)
 	AudioManager.play_sfx("boom")
-	var dmg: int = int((d["special"]["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
+	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.2)
+	await back.finished
+
+## Fokusstoß: schneller Sturmangriff, drei Hiebe, ignoriert die Verteidigung.
+func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	_say("%s setzt %s ein!" % [d["name"], ab["name"]])
+	var s: Sprite2D = h["sprite"]
+	var es: Sprite2D = e["sprite"]
+	var tw := create_tween()
+	tw.tween_property(s, "position", es.position + Vector2(70, 0), 0.14) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tw.finished
+	for i in 3:
+		AudioManager.play_sfx("slash")
+		_slash_arc(es.position + Vector2(randf_range(-14, 14), randf_range(-14, 14)))
+		_sparks(es.position, Color(1.0, 0.95, 0.6))
+		await get_tree().create_timer(0.11).timeout
+	var dmg: int = int((ab["power"] + d["atk"]) * randf_range(0.95, 1.15))
+	await _damage_enemy(e, maxi(dmg, 1))
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.22) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+
+## Heillicht: grüner Lichtring + Funken, heilt einen Verbündeten.
+func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var td: Dictionary = target["data"]
+	_say("%s wirkt %s auf %s!" % [d["name"], ab["name"], td["name"]])
+	var s: Sprite2D = h["sprite"]
+	var raise := create_tween()
+	raise.tween_property(s, "position:y", s.position.y - 12.0, 0.2)
+	await raise.finished
+	AudioManager.play_sfx("heal")
+	var ring := Sprite2D.new()
+	ring.texture = SpriteFactory.circle(30, Color(0.45, 1.0, 0.55, 0.7))
+	ring.position = target["sprite"].position
+	ring.scale = Vector2(0.2, 0.2)
+	add_child(ring)
+	var rt := create_tween()
+	rt.tween_property(ring, "scale", Vector2(2.2, 2.2), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	rt.parallel().tween_property(ring, "modulate:a", 0.0, 0.5)
+	rt.tween_callback(ring.queue_free)
+	_sparkle(target["sprite"].position, Color(0.5, 1.0, 0.6))
+	var amount := int(ab["power"] + d["mag"] * 0.5)
+	td["hp"] = mini(td["hp"] + amount, td["max_hp"])
+	_float_text(target["sprite"].position, "+%d" % amount, Color(0.5, 1.0, 0.6))
+	_refresh_party()
+	await get_tree().create_timer(0.7).timeout
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.2)
 	await back.finished
@@ -388,15 +485,52 @@ func _enemy_turn(e: Dictionary) -> void:
 			alive_heroes.append(h)
 	if alive_heroes.is_empty():
 		return
+	e["acts"] += 1
+	# Kurzes Aufladen (Anspannen + rote Färbung) vor jeder Gegner-Aktion.
+	var es: Sprite2D = e["sprite"]
+	var base_scale: Vector2 = es.scale
+	var windup := create_tween()
+	windup.tween_property(es, "scale", base_scale * 1.15, 0.16)
+	windup.parallel().tween_property(es, "modulate", Color(1.3, 0.8, 0.8), 0.16)
+	windup.tween_property(es, "scale", base_scale, 0.12)
+	windup.parallel().tween_property(es, "modulate", Color.WHITE, 0.12)
+	await windup.finished
+	if e["is_boss"] and e["acts"] % 3 == 0:
+		await _boss_aoe(e, alive_heroes)
+		return
 	var target: Dictionary = alive_heroes[randi() % alive_heroes.size()]
 	_say("%s greift %s an!" % [e["name"], target["data"]["name"]])
-	var es: Sprite2D = e["sprite"]
 	var tw := create_tween()
 	tw.tween_property(es, "position", target["sprite"].position + Vector2(-60, 0), 0.22) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await tw.finished
 	AudioManager.play_sfx("hit")
 	var dmg := maxi(int(e["atk"] * randf_range(0.85, 1.15)) - target["data"]["def"], 1)
+	_damage_hero(target, dmg)
+	var back := create_tween()
+	back.tween_property(es, "position", e["home"], 0.25).set_trans(Tween.TRANS_QUAD)
+	await back.finished
+	await get_tree().create_timer(0.25).timeout
+
+## Boss-Spezial: Knochensturm — trifft die ganze Gruppe, Bildschirm blitzt rot.
+func _boss_aoe(e: Dictionary, targets: Array) -> void:
+	_say("%s beschwört den Knochensturm!" % e["name"])
+	AudioManager.play_sfx("roar")
+	var es: Sprite2D = e["sprite"]
+	var pump := create_tween()
+	pump.tween_property(es, "scale", es.scale * 1.3, 0.35).set_trans(Tween.TRANS_QUAD)
+	pump.tween_property(es, "scale", es.scale, 0.15)
+	await pump.finished
+	_flash_screen(Color(1.0, 0.15, 0.1, 0.45))
+	AudioManager.play_sfx("boom")
+	_shake_camera()
+	for t in targets:
+		var dmg := maxi(int(e["atk"] * randf_range(0.7, 0.9)) - t["data"]["def"], 1)
+		_sparks(t["sprite"].position, Color(0.9, 0.4, 0.9))
+		_damage_hero(t, dmg)
+	await get_tree().create_timer(0.7).timeout
+
+func _damage_hero(target: Dictionary, dmg: int) -> void:
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)
 	_float_text(target["sprite"].position, str(dmg), Color(1.0, 0.45, 0.35))
 	_shake(target["sprite"])
@@ -406,10 +540,6 @@ func _enemy_turn(e: Dictionary) -> void:
 		var faint := create_tween()
 		faint.tween_property(target["sprite"], "modulate", Color(0.4, 0.4, 0.55, 0.6), 0.4)
 		faint.parallel().tween_property(target["sprite"], "rotation", -PI / 2, 0.4)
-	var back := create_tween()
-	back.tween_property(es, "position", e["home"], 0.25).set_trans(Tween.TRANS_QUAD)
-	await back.finished
-	await get_tree().create_timer(0.25).timeout
 
 func _damage_enemy(e: Dictionary, dmg: int) -> void:
 	e["hp"] -= dmg
@@ -419,9 +549,10 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 	if e["hp"] <= 0:
 		e["alive"] = false
 		AudioManager.play_sfx("die")
+		var s: Sprite2D = e["sprite"]
 		var tw := create_tween()
-		tw.tween_property(e["sprite"], "modulate:a", 0.0, 0.45)
-		tw.parallel().tween_property(e["sprite"], "scale", Vector2(6.5, 0.5), 0.45)
+		tw.tween_property(s, "modulate:a", 0.0, 0.45)
+		tw.parallel().tween_property(s, "scale", s.scale * Vector2(1.3, 0.08), 0.45)
 		await tw.finished
 		(e["sprite"] as Sprite2D).visible = false
 	else:
@@ -480,6 +611,54 @@ func _explosion(pos: Vector2) -> void:
 		tw.parallel().tween_property(p, "modulate:a", 0.0, 0.4)
 		tw.tween_callback(p.queue_free)
 
+## Kleine Funken, die bei Treffern nach außen spritzen.
+func _sparks(pos: Vector2, color: Color) -> void:
+	for i in 7:
+		var p := Sprite2D.new()
+		p.texture = SpriteFactory.circle(3, color)
+		p.position = pos
+		add_child(p)
+		var dir := Vector2.RIGHT.rotated(randf() * TAU) * randf_range(35, 90)
+		var tw := create_tween()
+		tw.tween_property(p, "position", pos + dir, 0.25) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(p, "modulate:a", 0.0, 0.25)
+		tw.tween_callback(p.queue_free)
+
+## Kurzer Vollbild-Blitz (z. B. beim Knochensturm des Bosses).
+func _flash_screen(color: Color) -> void:
+	var rect := ColorRect.new()
+	rect.color = color
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_layer.add_child(rect)
+	var tw := create_tween()
+	tw.tween_property(rect, "modulate:a", 0.0, 0.45)
+	tw.tween_callback(rect.queue_free)
+
+## Boss-Auftritt: Brüllen, Kamerabeben, Namensbanner.
+func _boss_entrance() -> void:
+	AudioManager.play_sfx("roar")
+	_shake_camera()
+	_flash_screen(Color(0.8, 0.1, 0.1, 0.3))
+	var banner := Label.new()
+	banner.text = "☠  KNOCHENKÖNIG  ☠"
+	banner.add_theme_font_size_override("font_size", 44)
+	banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	banner.add_theme_color_override("font_outline_color", Color(0.3, 0.05, 0.05))
+	banner.add_theme_constant_override("outline_size", 10)
+	banner.set_anchors_preset(Control.PRESET_CENTER)
+	banner.position = Vector2(300, 140)
+	banner.modulate.a = 0.0
+	ui_layer.add_child(banner)
+	var tw := create_tween()
+	tw.tween_property(banner, "modulate:a", 1.0, 0.35)
+	tw.tween_interval(1.2)
+	tw.tween_property(banner, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(banner.queue_free)
+	_say("Der Herrscher der Finsterhöhle erhebt sich!")
+	await get_tree().create_timer(1.4).timeout
+
 func _sparkle(pos: Vector2, color: Color) -> void:
 	for i in 8:
 		var p := Sprite2D.new()
@@ -505,7 +684,23 @@ func _victory() -> void:
 		gold += e["gold"]
 	GameState.gold += gold
 	AudioManager.play_music("victory")
-	_say("Sieg!  %d Gold erbeutet!" % gold)
+	if enemy_ids.has("boss"):
+		GameState.boss_defeated = true
+		_say("Der Knochenkönig ist besiegt!  %d Gold erbeutet!" % gold)
+	else:
+		_say("Sieg!  %d Gold erbeutet!" % gold)
+	# Münzregen über den Helden
+	for i in 14:
+		var coin := Sprite2D.new()
+		coin.texture = SpriteFactory.circle(4, Color(1.0, 0.85, 0.25))
+		coin.position = Vector2(randf_range(600, 820), randf_range(-40, 60))
+		add_child(coin)
+		var ct := create_tween()
+		ct.tween_interval(randf_range(0.0, 0.5))
+		ct.tween_property(coin, "position:y", 360.0, randf_range(0.5, 0.9)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		ct.tween_property(coin, "modulate:a", 0.0, 0.25)
+		ct.tween_callback(coin.queue_free)
 	for h in heroes:
 		if h["data"]["hp"] > 0:
 			var s: Sprite2D = h["sprite"]

@@ -49,7 +49,7 @@ func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	battle.finished.connect(_on_battle_finished)
 	add_child(battle)
 	current_screen = battle
-	AudioManager.play_music("battle")
+	AudioManager.play_music("boss" if enemy_ids.has("boss") else "battle")
 	await _fade(0.0, 0.35)
 
 func _on_battle_finished(victory: bool) -> void:

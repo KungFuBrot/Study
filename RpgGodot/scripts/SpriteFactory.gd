@@ -184,6 +184,29 @@ const ENEMY_ART := {
 			"..a......a..",
 			".aa......aa.",
 		]},
+	"boss": {
+		"map": {"a": Color(0.88, 0.86, 0.78), "d": Color(0.10, 0.09, 0.12), "e": Color(1.0, 0.20, 0.15),
+			"g": Color(0.95, 0.78, 0.20), "c": Color(0.45, 0.10, 0.15)},
+		"rows": [
+			".....g..g..g..g.....",
+			".....gggggggggg.....",
+			"....aaaaaaaaaaaa....",
+			"....aaaaaaaaaaaa....",
+			"....aaeeaaaaeeaa....",
+			"....aaeeaaaaeeaa....",
+			"....aaaaaddaaaaa....",
+			"....adadadadadaa....",
+			".....aaaaaaaaaa.....",
+			"..ccaaaaaaaaaaaacc..",
+			".ccaadadadadadaaacc.",
+			".ccaaaaaaaaaaaaaacc.",
+			".cc.aadadadadaa..cc.",
+			".cc..aaaaaaaaaa..cc.",
+			".....aadaadaa.......",
+			".....aaa..aaa.......",
+			".....aa....aa.......",
+			"....aaa....aaa......",
+		]},
 }
 
 static func enemy(id: String) -> Texture2D:

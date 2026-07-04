@@ -65,6 +65,21 @@ func _spawn_npcs() -> void:
 		s.z_index = 5
 		add_child(s)
 		npc_nodes[npc["pos"]] = npc
+	# Boss thront hinten in der Finsterhöhle, bis er besiegt ist.
+	if map_id == "dungeon" and not GameState.boss_defeated:
+		var boss_tile := Vector2i(18, 10)
+		var bs := Sprite2D.new()
+		bs.texture = SpriteFactory.enemy("boss")
+		bs.centered = false
+		bs.position = Vector2(boss_tile.x * TILE - 2, boss_tile.y * TILE - 4)
+		bs.z_index = 5
+		add_child(bs)
+		var bob := create_tween().set_loops()
+		bob.tween_property(bs, "position:y", bs.position.y - 2.0, 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		bob.tween_property(bs, "position:y", bs.position.y, 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		npc_nodes[boss_tile] = {"boss": true, "name": "Knochenkönig", "pos": boss_tile}
 
 func _spawn_party() -> void:
 	if exact_pos.x >= 0:
@@ -174,6 +189,10 @@ func _try_interact() -> void:
 	if not npc_nodes.has(target):
 		return
 	var npc: Dictionary = npc_nodes[target]
+	if npc.get("boss", false):
+		state = "locked"
+		GameState.main.start_battle(["boss"], map_id, player_tile)
+		return
 	dialog_lines = (npc["lines"] as Array).duplicate()
 	dialog_after_shop = npc.get("shop", false)
 	dialog_name.text = npc["name"]

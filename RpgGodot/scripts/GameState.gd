@@ -6,6 +6,7 @@ var main: Node = null
 var gold := 120
 var inventory := {}  # name -> anzahl
 var party := []      # Array aus Dictionaries (siehe reset_party)
+var boss_defeated := false  # bleibt auch nach einer Niederlage bestehen
 
 const ITEMS := {
 	"Trank": {"price": 20, "desc": "Heilt 30 LP.", "hp": 30, "mp": 0},
@@ -16,6 +17,7 @@ const ENEMIES := {
 	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "sprite": "slime"},
 	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "sprite": "bat"},
 	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "sprite": "skeleton"},
+	"boss": {"name": "Knochenkönig", "hp": 170, "atk": 17, "def": 5, "gold": 200, "sprite": "boss"},
 }
 
 # Zufalls-Begegnungen im Dungeon (Gruppen von Gegner-IDs).
@@ -37,21 +39,27 @@ func reset_party() -> void:
 			"id": "serena", "name": "Serena", "class": "Schwertkämpferin",
 			"hp": 60, "max_hp": 60, "mp": 10, "max_mp": 10,
 			"atk": 14, "mag": 4, "def": 6,
-			"special": {
-				"name": "Klingenwirbel", "cost": 4, "target": "all",
-				"power": 10, "kind": "phys",
-				"desc": "Wirbelangriff, trifft alle Gegner.",
-			},
+			"abilities": [
+				{"name": "Klingenwirbel", "cost": 4, "target": "all",
+					"power": 10, "kind": "phys",
+					"desc": "Trifft alle Gegner."},
+				{"name": "Fokusstoß", "cost": 3, "target": "one",
+					"power": 16, "kind": "pierce",
+					"desc": "Durchbohrt die Verteidigung."},
+			],
 		},
 		{
 			"id": "milo", "name": "Milo", "class": "Zauberer",
 			"hp": 42, "max_hp": 42, "mp": 24, "max_mp": 24,
 			"atk": 6, "mag": 16, "def": 4,
-			"special": {
-				"name": "Feuerball", "cost": 5, "target": "one",
-				"power": 26, "kind": "magic",
-				"desc": "Mächtiger Feuerzauber gegen einen Gegner.",
-			},
+			"abilities": [
+				{"name": "Feuerball", "cost": 5, "target": "one",
+					"power": 26, "kind": "magic",
+					"desc": "Starker Feuerzauber."},
+				{"name": "Heillicht", "cost": 4, "target": "ally",
+					"power": 28, "kind": "heal",
+					"desc": "Heilt einen Verbündeten."},
+			],
 		},
 	]
 
