@@ -104,8 +104,8 @@ func _render_track(mix: PackedFloat32Array, notes: Array, spb: float, vol: float
 						return
 					var t := float(i) / RATE
 					var ph := fmod(t * f, 1.0)
-					var v := (0.7 if ph < 0.5 else -0.7) if wave == "square" \
-						else (4.0 * abs(ph - 0.5) - 1.0)
+					var v: float = (0.7 if ph < 0.5 else -0.7) if wave == "square" \
+						else (4.0 * absf(ph - 0.5) - 1.0)
 					var env := 1.0
 					if i < attack: env = float(i) / attack
 					elif i > body: env = maxf(1.0 - float(i - body) / (length - body), 0.0)

@@ -320,7 +320,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	await tw.finished
 	AudioManager.play_sfx("slash")
 	_slash_arc(es.position)
-	var dmg := int(h["data"]["atk"] * randf_range(0.9, 1.2)) - e["def"]
+	var dmg: int = int(h["data"]["atk"] * randf_range(0.9, 1.2)) - e["def"]
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.25) \
@@ -346,7 +346,7 @@ func _hero_special_all(h: Dictionary) -> void:
 	await spin.finished
 	for e in enemies:
 		if e["alive"]:
-			var dmg := int((d["special"]["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
+			var dmg: int = int((d["special"]["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
 			await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.25)
@@ -375,7 +375,7 @@ func _hero_special_one(h: Dictionary, e: Dictionary) -> void:
 	ball.queue_free()
 	_explosion(e["sprite"].position)
 	AudioManager.play_sfx("boom")
-	var dmg := int((d["special"]["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
+	var dmg: int = int((d["special"]["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.2)

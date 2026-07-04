@@ -68,7 +68,7 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			if y % 4 == 0 or (x + (y / 4) * 2) % 6 == 0: return Color(0.12, 0.11, 0.16)
 			return Color(0.20, 0.18, 0.26)
 		"mount":
-			var ridge := abs(float(x) - 8.0) + float(15 - y) * 0.8
+			var ridge := absf(float(x) - 8.0) + float(15 - y) * 0.8
 			if ridge < 6.0: return Color(0.55, 0.50, 0.46) if n > 0.3 else Color(0.62, 0.58, 0.54)
 			return Color(0.40, 0.36, 0.34)
 		"cave":
