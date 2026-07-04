@@ -4,11 +4,31 @@ Ein Mini-JRPG im Stil von *Final Fantasy VI / Octopath Traveler*, gebaut mit **G
 Alles ist prozedural: Pixel-Art, Karten, Musik und Soundeffekte werden zur Laufzeit
 per GDScript erzeugt — das Projekt braucht **keine einzigen Binär-Assets**.
 
-## Starten
+## Ausführen
 
-1. [Godot 4.3+](https://godotengine.org/download) installieren (Standard-Version, kein .NET nötig).
-2. In Godot: **Importieren** → Ordner `RpgGodot/` bzw. die `project.godot` auswählen.
-3. **F5** drücken (Hauptszene `scenes/Main.tscn` ist bereits eingestellt).
+### 1. Godot installieren (einmalig)
+
+Benötigt wird **Godot 4.3 oder neuer** (Standard-Version, kein .NET nötig). Am einfachsten unter Windows per winget:
+
+```powershell
+winget install GodotEngine.GodotEngine
+```
+
+Danach ein **neues** Terminal öffnen, damit der Befehl `godot` verfügbar ist.
+(Alternativ von [godotengine.org/download](https://godotengine.org/download) laden — Godot ist eine portable EXE ohne Installer.)
+
+### 2. Spiel starten
+
+**Direkt per Kommandozeile** (im Ordner oberhalb von `RpgGodot/`):
+
+```powershell
+godot --path RpgGodot
+```
+
+**Oder über den Editor:**
+
+1. Godot starten → **Importieren** → die Datei `RpgGodot/project.godot` auswählen.
+2. **F5** drücken (Hauptszene `scenes/Main.tscn` ist bereits eingestellt).
 
 > Hinweis: Beim ersten Betreten eines Bereichs wird dessen Musik einmalig
 > gerendert — ein kurzer Moment Rechenzeit ist normal.
