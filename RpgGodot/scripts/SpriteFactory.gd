@@ -664,7 +664,7 @@ static func gradient(w: int, h: int, top: Color, bottom: Color) -> Texture2D:
 
 ## Vignette: dunkler Rand, transparente Mitte — moderner Kino-Look.
 static func vignette(w: int, h: int, strength := 0.55) -> Texture2D:
-	var key := "vig_%d_%d" % [w, h]
+	var key := "vig_%d_%d_%.2f" % [w, h, strength]
 	if _cache.has(key):
 		return _cache[key]
 	var img := _img(w, h)

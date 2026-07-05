@@ -310,10 +310,35 @@ func _advance_dialogue() -> void:
 
 ## ---------- UI ----------
 
+# Color-Grade je Karte: [oben (Licht), unten (Schatten)] — HD-2D-Filmlook.
+const GRADES := {
+	"town": [Color(1.0, 0.85, 0.55, 0.08), Color(0.15, 0.10, 0.35, 0.12)],
+	"world": [Color(1.0, 0.90, 0.65, 0.06), Color(0.10, 0.12, 0.35, 0.10)],
+	"dungeon": [Color(0.55, 0.35, 0.75, 0.07), Color(0.05, 0.03, 0.15, 0.20)],
+	"dungeon2": [Color(0.60, 0.85, 1.0, 0.09), Color(0.02, 0.08, 0.30, 0.18)],
+}
+
 func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	ui.layer = 10
 	add_child(ui)
+
+	# Filmisches Color-Grading + Vignette über der ganzen Karte
+	var g: Array = GRADES.get(map_id, GRADES["world"])
+	var grade := TextureRect.new()
+	grade.texture = SpriteFactory.gradient(8, 64, g[0], g[1])
+	grade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	grade.stretch_mode = TextureRect.STRETCH_SCALE
+	grade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(grade)
+	var vig := TextureRect.new()
+	vig.texture = SpriteFactory.vignette(240, 135, 0.45)
+	vig.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	vig.stretch_mode = TextureRect.STRETCH_SCALE
+	vig.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(vig)
 
 	hud = Label.new()
 	hud.position = Vector2(12, 8)

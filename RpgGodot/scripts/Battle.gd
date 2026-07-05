@@ -48,6 +48,10 @@ func _palette() -> Dictionary:
 			"stone": Color(0.34, 0.44, 0.58), "stal": Color(0.14, 0.22, 0.36, 0.9),
 			"flame": Color(0.35, 0.80, 1.0), "glow": Color(0.25, 0.70, 1.0, 0.35),
 			"fog": Color(0.70, 0.85, 1.0, 0.09), "hit": Color(0.55, 0.85, 1.0),
+			"ray": Color(0.60, 0.85, 1.0, 0.05), "dust": Color(0.75, 0.92, 1.0, 0.55),
+			"grade_top": Color(0.65, 0.85, 1.0, 0.08), "grade_bottom": Color(0.03, 0.10, 0.35, 0.20),
+			"pool_hero": Color(0.65, 0.90, 1.0, 0.11), "pool_enemy": Color(0.45, 0.80, 1.0, 0.11),
+			"fg": Color(0.02, 0.04, 0.09),
 		}
 	var boss_fight := not boss_def.is_empty()
 	return {
@@ -57,6 +61,10 @@ func _palette() -> Dictionary:
 		"stone": Color(0.28, 0.24, 0.34), "stal": Color(0.09, 0.06, 0.13, 0.85),
 		"flame": Color(1.0, 0.60, 0.15), "glow": Color(1.0, 0.55, 0.15, 0.35),
 		"fog": Color(0.55, 0.50, 0.75, 0.07), "hit": Color(1.0, 0.4, 0.3),
+		"ray": Color(1.0, 0.80, 0.50, 0.05), "dust": Color(1.0, 0.85, 0.55, 0.50),
+		"grade_top": Color(0.95, 0.65, 0.35, 0.07), "grade_bottom": Color(0.08, 0.10, 0.35, 0.17),
+		"pool_hero": Color(1.0, 0.85, 0.55, 0.12), "pool_enemy": Color(0.70, 0.50, 1.0, 0.10),
+		"fg": Color(0.03, 0.02, 0.06),
 	}
 
 ## ---------- Aufbau ----------
@@ -102,7 +110,10 @@ func _build_scene() -> void:
 		add_child(stone)
 	_add_torch(Vector2(70, 160), pal)
 	_add_torch(Vector2(890, 160), pal)
+	_add_god_rays(pal)
 	_add_fog(pal)
+	_add_dust_motes(pal)
+	_add_foreground_blur(pal)
 	if arena_theme == "frost":
 		_add_snow()
 
@@ -112,9 +123,12 @@ func _build_scene() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.hero_battle(data["id"])
 		s.scale = Vector2(5, 5)
-		var home := Vector2(700 + i * 45, 225 + i * 95)
+		var home := Vector2(692 + i * 56, 205 + i * 133)
 		s.position = home + Vector2(340, 0)
-		_attach_shadow(s, 11, 3, s.texture.get_height() * 0.5 - 1.0)
+		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
+		_attach_shadow(s, 11, 3, foot_h)
+		_attach_glow_pool(s, foot_h, pal["pool_hero"])
+		_attach_reflection(s, foot_h)
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false})
 
@@ -124,19 +138,25 @@ func _build_scene() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
 		s.scale = Vector2(7, 7) if is_boss else Vector2(6, 6)
-		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 190 + i * 90)
+		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
+		var refl: Sprite2D
 		if is_boss:
 			var foot: float = s.texture.get_height() * 0.5 + 0.5
 			_attach_shadow(s, 13, 3, foot)
+			_attach_glow_pool(s, foot, pal["pool_enemy"])
+			refl = _attach_reflection(s, foot, 0.10)
 			_attach_boss_aura(s, def.get("theme", "bone"))
 		else:
-			_attach_shadow(s, 9, 3, s.texture.get_height() * 0.5 - 1.0)
+			var foot_e: float = s.texture.get_height() * 0.5 - 1.0
+			_attach_shadow(s, 9, 3, foot_e)
+			_attach_glow_pool(s, foot_e, pal["pool_enemy"])
+			refl = _attach_reflection(s, foot_e)
 		add_child(s)
 		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"],
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
-			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false})
+			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl})
 
 ## Weicher Schatten unter einem Kämpfer (als Kind, skaliert also mit).
 func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
@@ -147,6 +167,33 @@ func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
 	sh.z_index = -1
 	sh.show_behind_parent = true
 	s.add_child(sh)
+
+## Additiver Lichtkreis unter dem Kämpfer — hebt ihn wie ein Spot hervor.
+func _attach_glow_pool(s: Sprite2D, foot_y: float, color: Color) -> void:
+	var pool := Sprite2D.new()
+	pool.texture = SpriteFactory.circle(20, color)
+	pool.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	pool.position = Vector2(0, foot_y)
+	pool.scale = Vector2(1.6, 0.5)
+	pool.z_index = -1
+	pool.show_behind_parent = true
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	pool.material = mat
+	s.add_child(pool)
+
+## Gespiegeltes Abbild unter den Füßen — der „nasse Boden“-Look aus HD-2D-Spielen.
+func _attach_reflection(s: Sprite2D, foot_y: float, alpha := 0.15) -> Sprite2D:
+	var r := Sprite2D.new()
+	r.texture = s.texture
+	r.flip_v = true
+	r.flip_h = s.flip_h
+	r.position = Vector2(0, foot_y * 2.0 + 1.0)
+	r.modulate = Color(1, 1, 1, alpha)
+	r.z_index = -2
+	r.show_behind_parent = true
+	s.add_child(r)
+	return r
 
 ## Pulsierende Aura + aufsteigende Glut hinter dem Boss (rot bzw. eisblau).
 func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
@@ -218,6 +265,69 @@ func _add_torch(pos: Vector2, pal: Dictionary) -> void:
 	flame.z_index = -8
 	add_child(flame)
 
+## Lichtschächte von oben (HD-2D-Look): additive Keile, die sanft pulsieren.
+func _add_god_rays(pal: Dictionary) -> void:
+	for i in 4:
+		var ray := Polygon2D.new()
+		var w := 55.0 + (i % 2) * 45.0
+		ray.polygon = PackedVector2Array([Vector2(-w * 0.25, 0), Vector2(w * 0.25, 0),
+			Vector2(w, 580), Vector2(-w, 580)])
+		ray.color = pal["ray"]
+		ray.position = Vector2(150 + i * 220.0, -20)
+		ray.rotation = 0.14 - i * 0.07
+		ray.z_index = -3
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		ray.material = mat
+		add_child(ray)
+		var pulse := ray.create_tween().set_loops()
+		pulse.tween_property(ray, "modulate:a", 0.35, 2.2 + i * 0.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		pulse.tween_property(ray, "modulate:a", 1.0, 2.2 + i * 0.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+## Im Licht schwebende Staubkörnchen (additiv, sehr subtil).
+func _add_dust_motes(pal: Dictionary) -> void:
+	var dust := CPUParticles2D.new()
+	dust.position = Vector2(480, 300)
+	dust.amount = 26
+	dust.lifetime = 9.0
+	dust.preprocess = 9.0
+	dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	dust.emission_rect_extents = Vector2(500, 260)
+	dust.direction = Vector2(0.3, -1)
+	dust.spread = 40.0
+	dust.gravity = Vector2.ZERO
+	dust.initial_velocity_min = 3.0
+	dust.initial_velocity_max = 9.0
+	dust.scale_amount_min = 0.4
+	dust.scale_amount_max = 1.0
+	dust.color = pal["dust"]
+	dust.texture = SpriteFactory.circle(2, Color.WHITE)
+	dust.z_index = -2
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	dust.material = mat
+	add_child(dust)
+
+## Unscharfe dunkle Vordergrund-Silhouetten unten im Bild (Tilt-Shift-Illusion).
+func _add_foreground_blur(pal: Dictionary) -> void:
+	var spots := [Vector2(70, 545), Vector2(500, 570), Vector2(900, 550)]
+	for i in spots.size():
+		var blob := Sprite2D.new()
+		blob.texture = SpriteFactory.circle(60, pal["fg"])
+		blob.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		blob.position = spots[i]
+		blob.scale = Vector2(3.6 + i * 0.6, 1.5)
+		blob.modulate.a = 0.75
+		blob.z_index = 15
+		add_child(blob)
+		var drift := blob.create_tween().set_loops()
+		drift.tween_property(blob, "position:x", blob.position.x + 18.0 + i * 6.0, 6.0 + i * 1.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		drift.tween_property(blob, "position:x", blob.position.x, 6.0 + i * 1.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
 ## Träge dahinziehende Nebelschwaden geben dem Bild Tiefe.
 func _add_fog(pal: Dictionary) -> void:
 	for i in 4:
@@ -265,7 +375,10 @@ func _start_idle_animations() -> void:
 		for e in enemies:
 			if e["alive"] and not e["is_boss"] and SpriteFactory.enemy_has_anim(e["id"]):
 				e["frame"] = 1 - e["frame"]
-				(e["sprite"] as Sprite2D).texture = SpriteFactory.enemy_frame(e["id"], e["frame"]))
+				var tex := SpriteFactory.enemy_frame(e["id"], e["frame"])
+				(e["sprite"] as Sprite2D).texture = tex
+				if is_instance_valid(e["refl"]):
+					(e["refl"] as Sprite2D).texture = tex)
 	add_child(frame_timer)
 	var glint_timer := Timer.new()
 	glint_timer.wait_time = 2.6
@@ -302,6 +415,15 @@ func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	ui_layer = layer
+	# Filmisches Color-Grading: warmes Licht oben, kühle Schatten unten.
+	var pal := _palette()
+	var grade := TextureRect.new()
+	grade.texture = SpriteFactory.gradient(8, 64, pal["grade_top"], pal["grade_bottom"])
+	grade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	grade.stretch_mode = TextureRect.STRETCH_SCALE
+	grade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(grade)
 	# Vignette für den Kino-Look
 	var vig := TextureRect.new()
 	vig.texture = SpriteFactory.vignette(240, 135)
@@ -346,7 +468,7 @@ func _build_ui() -> void:
 		h["hp_fill"] = _make_bar(bars, BAR_W, 10, Color(0.35, 0.95, 0.45))
 		h["mp_fill"] = _make_bar(bars, 110, 10, Color(0.35, 0.55, 1.0))
 	msg_label = Label.new()
-	msg_label.position = Vector2(30, 18)
+	msg_label.position = Vector2(30, 84)
 	msg_label.add_theme_font_size_override("font_size", 22)
 	msg_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	msg_label.add_theme_constant_override("outline_size", 6)
