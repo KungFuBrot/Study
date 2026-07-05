@@ -184,35 +184,103 @@ const ENEMY_ART := {
 			"..a......a..",
 			".aa......aa.",
 		]},
-	"boss": {
-		"map": {"a": Color(0.88, 0.86, 0.78), "d": Color(0.10, 0.09, 0.12), "e": Color(1.0, 0.20, 0.15),
-			"g": Color(0.95, 0.78, 0.20), "c": Color(0.45, 0.10, 0.15)},
-		"rows": [
-			".....g..g..g..g.....",
-			".....gggggggggg.....",
-			"....aaaaaaaaaaaa....",
-			"....aaaaaaaaaaaa....",
-			"....aaeeaaaaeeaa....",
-			"....aaeeaaaaeeaa....",
-			"....aaaaaddaaaaa....",
-			"....adadadadadaa....",
-			".....aaaaaaaaaa.....",
-			"..ccaaaaaaaaaaaacc..",
-			".ccaadadadadadaaacc.",
-			".ccaaaaaaaaaaaaaacc.",
-			".cc.aadadadadaa..cc.",
-			".cc..aaaaaaaaaa..cc.",
-			".....aadaadaa.......",
-			".....aaa..aaa.......",
-			".....aa....aa.......",
-			"....aaa....aaa......",
-		]},
 }
+
+## Der Knochenkönig wird prozedural gezeichnet: 28x36, gehörnter Schädel mit
+## glühenden Augen, Krone, Schulterpanzern, zerfetztem Umhang und Klauen.
+static func _boss_img() -> Image:
+	var img := _img(28, 36)
+	var bone := Color(0.92, 0.90, 0.82)
+	var bone2 := Color(0.66, 0.62, 0.54)
+	var dark := Color(0.07, 0.05, 0.10)
+	var gold := Color(0.95, 0.78, 0.20)
+	var gold2 := Color(0.72, 0.56, 0.12)
+	var cape := Color(0.38, 0.06, 0.11)
+	var cape2 := Color(0.55, 0.11, 0.16)
+	var horn := Color(0.30, 0.26, 0.34)
+	var eye := Color(1.0, 0.15, 0.05)
+	var eye2 := Color(1.0, 0.75, 0.25)
+	# Umhang (hinter allem), unten zerfetzt
+	img.fill_rect(Rect2i(3, 18, 22, 12), cape)
+	for x in range(3, 25):
+		var frays := (x * 7 + 3) % 5
+		for i in frays:
+			img.set_pixel(x, 30 + i, cape)
+	# Schulterpanzer
+	img.fill_rect(Rect2i(2, 17, 7, 3), cape2)
+	img.fill_rect(Rect2i(19, 17, 7, 3), cape2)
+	img.fill_rect(Rect2i(2, 16, 2, 1), cape2)
+	img.fill_rect(Rect2i(24, 16, 2, 1), cape2)
+	# Brustkorb mit Rippen und Wirbelsäule
+	img.fill_rect(Rect2i(9, 20, 10, 7), dark)
+	for ry in [20, 22, 24]:
+		img.fill_rect(Rect2i(9, ry, 10, 1), bone)
+	for sy in [21, 23, 25]:
+		img.fill_rect(Rect2i(13, sy, 2, 1), bone2)
+	# Arme mit Klauen
+	img.fill_rect(Rect2i(6, 20, 2, 8), bone)
+	img.fill_rect(Rect2i(20, 20, 2, 8), bone)
+	img.set_pixel(6, 23, bone2)
+	img.set_pixel(21, 23, bone2)
+	img.fill_rect(Rect2i(5, 28, 4, 1), bone)
+	img.fill_rect(Rect2i(19, 28, 4, 1), bone)
+	for fx in [5, 7, 20, 22]:
+		img.set_pixel(fx, 29, bone)
+	# Gürtel mit glühendem Juwel
+	img.fill_rect(Rect2i(9, 27, 10, 1), gold)
+	img.fill_rect(Rect2i(13, 27, 2, 1), eye)
+	# Beine und Füße
+	img.fill_rect(Rect2i(10, 28, 2, 6), bone)
+	img.fill_rect(Rect2i(16, 28, 2, 6), bone)
+	img.set_pixel(10, 30, bone2)
+	img.set_pixel(17, 30, bone2)
+	img.fill_rect(Rect2i(9, 34, 4, 1), bone)
+	img.fill_rect(Rect2i(16, 34, 4, 1), bone)
+	# Hals + Schädel
+	img.fill_rect(Rect2i(12, 17, 4, 1), bone2)
+	img.fill_rect(Rect2i(7, 6, 14, 11), bone)
+	img.fill_rect(Rect2i(19, 7, 1, 9), bone2)
+	for p in [Vector2i(7, 6), Vector2i(20, 6), Vector2i(7, 16), Vector2i(20, 16)]:
+		img.set_pixel(p.x, p.y, Color(0, 0, 0, 0))
+	# Maul: grimmige Linie + Zahnreihe
+	img.fill_rect(Rect2i(8, 14, 12, 1), dark)
+	for tx in range(8, 20, 2):
+		img.set_pixel(tx, 15, dark)
+	# Nasenhöhle
+	img.fill_rect(Rect2i(13, 12, 2, 2), dark)
+	# Augenhöhlen mit Glut-Pupillen
+	img.fill_rect(Rect2i(9, 9, 4, 3), dark)
+	img.fill_rect(Rect2i(15, 9, 4, 3), dark)
+	img.fill_rect(Rect2i(10, 10, 2, 1), eye)
+	img.fill_rect(Rect2i(16, 10, 2, 1), eye)
+	img.set_pixel(11, 10, eye2)
+	img.set_pixel(17, 10, eye2)
+	# Krone
+	img.fill_rect(Rect2i(8, 4, 12, 1), gold)
+	img.fill_rect(Rect2i(8, 5, 12, 1), gold2)
+	for sx in [8, 13, 18]:
+		img.fill_rect(Rect2i(sx, 2, 2, 2), gold)
+	# Geschwungene Hörner, an den Schädel angebunden
+	for i in 7:
+		var hx := 6 - i / 2
+		var hy := 6 - i
+		img.set_pixel(hx, hy, horn)
+		img.set_pixel(hx + 1, hy, horn)
+		img.set_pixel(27 - hx, hy, horn)
+		img.set_pixel(26 - hx, hy, horn)
+		if i < 2:
+			img.set_pixel(hx + 2, hy, horn)
+			img.set_pixel(25 - hx, hy, horn)
+	return img
 
 static func enemy(id: String) -> Texture2D:
 	var key := "enemy_" + id
 	if _cache.has(key):
 		return _cache[key]
+	if id == "boss":
+		var bt := _tex(_boss_img())
+		_cache[key] = bt
+		return bt
 	var art: Dictionary = ENEMY_ART[id]
 	var rows: Array = art["rows"]
 	var w: int = rows[0].length()
@@ -243,4 +311,62 @@ static func circle(radius: int, color: Color) -> Texture2D:
 				img.set_pixel(x, y, c)
 	var t := _tex(img)
 	_cache[key] = t
+	return t
+
+## Weicher Bodenschatten (Ellipse) — gibt Kämpfern optische Tiefe.
+static func shadow(rx: int, ry: int) -> Texture2D:
+	var key := "shadow_%d_%d" % [rx, ry]
+	if _cache.has(key):
+		return _cache[key]
+	var img := _img(rx * 2, ry * 2)
+	for y in ry * 2:
+		for x in rx * 2:
+			var d := Vector2((x - rx + 0.5) / rx, (y - ry + 0.5) / ry).length()
+			if d < 1.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0.4 * (1.0 - d * d)))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
+## Vertikaler Farbverlauf für stimmungsvolle Hintergründe.
+static func gradient(w: int, h: int, top: Color, bottom: Color) -> Texture2D:
+	var key := "grad_%d_%d_%s_%s" % [w, h, top.to_html(), bottom.to_html()]
+	if _cache.has(key):
+		return _cache[key]
+	var img := _img(w, h)
+	for y in h:
+		var c := top.lerp(bottom, float(y) / (h - 1))
+		for x in w:
+			img.set_pixel(x, y, c)
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
+## Vignette: dunkler Rand, transparente Mitte — moderner Kino-Look.
+static func vignette(w: int, h: int, strength := 0.55) -> Texture2D:
+	var key := "vig_%d_%d" % [w, h]
+	if _cache.has(key):
+		return _cache[key]
+	var img := _img(w, h)
+	var center := Vector2(w / 2.0, h / 2.0)
+	for y in h:
+		for x in w:
+			var d := (Vector2(x, y) - center).length() / (center.length())
+			var a: float = clampf((d - 0.55) / 0.45, 0.0, 1.0)
+			img.set_pixel(x, y, Color(0, 0, 0, a * a * strength))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
+## Kleiner Knochen für den Knochensturm des Bosses.
+static func bone() -> Texture2D:
+	if _cache.has("bone"):
+		return _cache["bone"]
+	var img := _img(10, 4)
+	var c := Color(0.92, 0.90, 0.82)
+	img.fill_rect(Rect2i(1, 1, 8, 2), c)
+	for p in [Vector2i(0, 0), Vector2i(0, 3), Vector2i(9, 0), Vector2i(9, 3)]:
+		img.set_pixel(p.x, p.y, c)
+	var t := _tex(img)
+	_cache["bone"] = t
 	return t

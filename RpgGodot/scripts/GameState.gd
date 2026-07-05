@@ -17,7 +17,7 @@ const ENEMIES := {
 	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "sprite": "slime"},
 	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "sprite": "bat"},
 	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "sprite": "skeleton"},
-	"boss": {"name": "Knochenkönig", "hp": 170, "atk": 17, "def": 5, "gold": 200, "sprite": "boss"},
+	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "sprite": "boss"},
 }
 
 # Zufalls-Begegnungen im Dungeon (Gruppen von Gegner-IDs).
@@ -30,6 +30,12 @@ const DUNGEON_ENCOUNTERS := [
 ]
 
 func _ready() -> void:
+	reset_party()
+
+## Kompletter Neustart (nach dem Abspann): alles zurück auf Anfang.
+func reset_all() -> void:
+	gold = 120
+	boss_defeated = false
 	reset_party()
 
 func reset_party() -> void:

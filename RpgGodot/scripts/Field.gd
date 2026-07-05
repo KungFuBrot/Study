@@ -71,9 +71,21 @@ func _spawn_npcs() -> void:
 		var bs := Sprite2D.new()
 		bs.texture = SpriteFactory.enemy("boss")
 		bs.centered = false
-		bs.position = Vector2(boss_tile.x * TILE - 2, boss_tile.y * TILE - 4)
+		bs.position = Vector2(boss_tile.x * TILE - 6, boss_tile.y * TILE - 19)
 		bs.z_index = 5
 		add_child(bs)
+		# Rotes Glühen unter dem Boss macht schon von Weitem klar: Gefahr!
+		var glow := Sprite2D.new()
+		glow.texture = SpriteFactory.circle(16, Color(1.0, 0.15, 0.05, 0.35))
+		glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		glow.position = Vector2(boss_tile.x * TILE + 8, boss_tile.y * TILE + 12)
+		glow.z_index = 4
+		add_child(glow)
+		var pulse := glow.create_tween().set_loops()
+		pulse.tween_property(glow, "scale", Vector2(1.6, 1.0), 0.9) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		pulse.tween_property(glow, "scale", Vector2(1.1, 0.7), 0.9) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		var bob := create_tween().set_loops()
 		bob.tween_property(bs, "position:y", bs.position.y - 2.0, 1.1) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)

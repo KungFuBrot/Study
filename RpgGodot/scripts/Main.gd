@@ -7,6 +7,7 @@ var fade_rect: ColorRect
 
 # Merker, um nach einem Kampf an dieselbe Stelle zurückzukehren.
 var field_return := {"map": "town", "spawn": "start", "pos": Vector2i(-1, -1)}
+var last_battle_was_boss := false
 
 func _ready() -> void:
 	GameState.main = self
@@ -35,6 +36,7 @@ func goto_map(map_id: String, spawn_id: String, exact_pos := Vector2i(-1, -1)) -
 
 func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	field_return = {"map": from_map, "spawn": "", "pos": pos}
+	last_battle_was_boss = enemy_ids.has("boss")
 	AudioManager.play_sfx("encounter")
 	# Kurzes Aufblitzen als Kampf-Übergang.
 	for i in 2:
@@ -56,8 +58,24 @@ func _on_battle_finished(victory: bool) -> void:
 	if not victory:
 		GameState.reset_party()
 		goto_map("town", "start")
+	elif last_battle_was_boss and GameState.boss_defeated:
+		_show_ending()
 	else:
 		goto_map(field_return["map"], "", field_return["pos"])
+
+## Der Boss ist gefallen — das Spiel endet mit dem Abspann.
+func _show_ending() -> void:
+	await _fade(1.0, 0.6)
+	_clear_screen()
+	var ending := Ending.new()
+	ending.restart.connect(_on_ending_restart)
+	add_child(ending)
+	current_screen = ending
+	await _fade(0.0, 0.8)
+
+func _on_ending_restart() -> void:
+	GameState.reset_all()
+	goto_map("town", "start")
 
 func _clear_screen() -> void:
 	if is_instance_valid(current_screen):
