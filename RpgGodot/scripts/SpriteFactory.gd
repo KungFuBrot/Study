@@ -122,11 +122,121 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 ## ---------- Charaktere (12x16, prozedural, 2 Laufframes) ----------
 
 const HERO_PALETTES := {
-	"serena": {"hair": Color(0.85, 0.65, 0.25), "body": Color(0.72, 0.18, 0.22), "trim": Color(0.90, 0.80, 0.60), "skin": Color(0.95, 0.80, 0.66)},
-	"milo": {"hair": Color(0.35, 0.30, 0.55), "body": Color(0.20, 0.30, 0.70), "trim": Color(0.75, 0.75, 0.95), "skin": Color(0.93, 0.78, 0.64)},
-	"npc_elder": {"hair": Color(0.85, 0.85, 0.85), "body": Color(0.45, 0.40, 0.30), "trim": Color(0.70, 0.65, 0.50), "skin": Color(0.90, 0.75, 0.62)},
-	"npc_kid": {"hair": Color(0.40, 0.25, 0.12), "body": Color(0.25, 0.55, 0.35), "trim": Color(0.85, 0.85, 0.60), "skin": Color(0.95, 0.80, 0.66)},
-	"npc_shop": {"hair": Color(0.55, 0.20, 0.35), "body": Color(0.60, 0.45, 0.20), "trim": Color(0.95, 0.90, 0.70), "skin": Color(0.94, 0.79, 0.65)},
+	"serena": {"hair": Color(0.85, 0.65, 0.25), "body": Color(0.72, 0.18, 0.22), "trim": Color(0.90, 0.80, 0.60), "skin": Color(0.95, 0.80, 0.66), "pants": Color(0.38, 0.26, 0.16)},
+	"milo": {"hair": Color(0.35, 0.30, 0.55), "body": Color(0.20, 0.30, 0.70), "trim": Color(0.75, 0.75, 0.95), "skin": Color(0.93, 0.78, 0.64), "pants": Color(0.24, 0.22, 0.45)},
+	"npc_elder": {"hair": Color(0.85, 0.85, 0.85), "body": Color(0.45, 0.40, 0.30), "trim": Color(0.70, 0.65, 0.50), "skin": Color(0.90, 0.75, 0.62), "pants": Color(0.32, 0.29, 0.24)},
+	"npc_kid": {"hair": Color(0.40, 0.25, 0.12), "body": Color(0.25, 0.55, 0.35), "trim": Color(0.85, 0.85, 0.60), "skin": Color(0.95, 0.80, 0.66), "pants": Color(0.30, 0.34, 0.30)},
+	"npc_shop": {"hair": Color(0.55, 0.20, 0.35), "body": Color(0.60, 0.45, 0.20), "trim": Color(0.95, 0.90, 0.70), "skin": Color(0.94, 0.79, 0.65), "pants": Color(0.40, 0.28, 0.22)},
+}
+
+# Figuren-Schablone 12x16, wird pro Charakter mit seiner Palette eingefärbt.
+# h/H Haar, s/S Haut, e Auge, b/B Oberteil, t Borte, l/L Hose, o Stiefel.
+const CHAR_TPL := {
+	"down": [[
+		"...hhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhhhhh..",
+		"..hssssssH..",
+		"..ssessess..",
+		"...SssssS...",
+		"..tttttttt..",
+		".bbbbbbbbbb.",
+		".bbbttttbbb.",
+		".sbbbbbbbbS.",
+		"..BttttttB..",
+		"..llllllll..",
+		"..lll..lll..",
+		"..Lll..ll...",
+		"..oo...oo...",
+		"..oo........",
+	], [
+		"...hhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhhhhh..",
+		"..hssssssH..",
+		"..ssessess..",
+		"...SssssS...",
+		"..tttttttt..",
+		".bbbbbbbbbb.",
+		".bbbttttbbb.",
+		".Sbbbbbbbbs.",
+		"..BttttttB..",
+		"..llllllll..",
+		"..lll..lll..",
+		"...ll..llL..",
+		"...oo...oo..",
+		"........oo..",
+	]],
+	"side": [[
+		"...hhhhh....",
+		"..hhhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhssss..",
+		"..Hhhhsses..",
+		"...Hhhssss..",
+		"..tttttt....",
+		"..bbbbbbb...",
+		"..bbbtbbb...",
+		"..Bbbsbbb...",
+		"..tttttt....",
+		"..lllllll...",
+		"...lll.ll...",
+		"...ll...ll..",
+		"...oo...oo..",
+		"...oo...oo..",
+	], [
+		"...hhhhh....",
+		"..hhhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhssss..",
+		"..Hhhhsses..",
+		"...Hhhssss..",
+		"..tttttt....",
+		"..bbbbbbb...",
+		"..bbbtbbb...",
+		"..Bbbsbbb...",
+		"..tttttt....",
+		"..lllllll...",
+		"...llll.....",
+		"....ll......",
+		"....oo......",
+		"....oo......",
+	]],
+	"up": [[
+		"...hhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhhhhh..",
+		"..hHhhhhHh..",
+		"..hhhhhhhh..",
+		"...hhhhhh...",
+		"..tttttttt..",
+		".bbbbbbbbbb.",
+		".bbbbbbbbbb.",
+		".sbbbbbbbbS.",
+		"..BttttttB..",
+		"..llllllll..",
+		"..lll..lll..",
+		"..Lll..ll...",
+		"..oo...oo...",
+		"..oo........",
+	], [
+		"...hhhhhh...",
+		"..hhhhhhhh..",
+		"..hhhhhhhh..",
+		"..hHhhhhHh..",
+		"..hhhhhhhh..",
+		"...hhhhhh...",
+		"..tttttttt..",
+		".bbbbbbbbbb.",
+		".bbbbbbbbbb.",
+		".Sbbbbbbbbs.",
+		"..BttttttB..",
+		"..llllllll..",
+		"..lll..lll..",
+		"...ll..llL..",
+		"...oo...oo..",
+		"........oo..",
+	]],
 }
 
 static func character(id: String, dir: String, frame: int) -> Texture2D:
@@ -134,147 +244,129 @@ static func character(id: String, dir: String, frame: int) -> Texture2D:
 	if _cache.has(key):
 		return _cache[key]
 	var p: Dictionary = HERO_PALETTES.get(id, HERO_PALETTES["npc_kid"])
-	var img := _img(12, 16)
 	var hair: Color = p["hair"]
 	var body: Color = p["body"]
-	var trim: Color = p["trim"]
 	var skin: Color = p["skin"]
-	var dark := Color(0.1, 0.1, 0.12)
-	# Kopf
-	img.fill_rect(Rect2i(3, 2, 6, 5), skin)
-	# Haare je Blickrichtung
-	img.fill_rect(Rect2i(2, 1, 8, 2), hair)
-	if dir == "up":
-		img.fill_rect(Rect2i(3, 3, 6, 3), hair)
-	elif dir == "side":
-		img.fill_rect(Rect2i(2, 2, 3, 3), hair)
-		img.set_pixel(7, 4, dark)  # ein Auge seitlich
-	else:
-		img.set_pixel(4, 4, dark)
-		img.set_pixel(7, 4, dark)
-	# Körper
-	img.fill_rect(Rect2i(3, 7, 6, 5), body)
-	img.fill_rect(Rect2i(3, 7, 6, 1), trim)
-	# Arme
-	img.fill_rect(Rect2i(2, 8, 1, 3), body)
-	img.fill_rect(Rect2i(9, 8, 1, 3), body)
-	# Beine mit Laufanimation
-	var off := 1 if frame == 1 else 0
-	img.fill_rect(Rect2i(4, 12 + off, 2, 3 - off), dark)
-	img.fill_rect(Rect2i(6, 12 + (1 - off), 2, 3 - (1 - off)), dark)
+	var pants: Color = p.get("pants", body.darkened(0.35))
+	var pal := {
+		"h": hair, "H": hair.darkened(0.30),
+		"s": skin, "S": skin.darkened(0.18),
+		"e": Color(0.10, 0.08, 0.12),
+		"b": body, "B": body.darkened(0.28),
+		"t": p["trim"],
+		"l": pants, "L": pants.darkened(0.30),
+		"o": Color(0.28, 0.19, 0.11),
+	}
+	var rows: Array = CHAR_TPL[dir][clampi(frame, 0, 1)]
+	var img := _img(12, 16)
+	for y in rows.size():
+		var row: String = rows[y]
+		for x in mini(row.length(), 12):
+			if pal.has(row[x]):
+				img.set_pixel(x, y, pal[row[x]])
 	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t
 
 ## ---------- Detaillierte Kampf-Sprites der Helden (blicken nach links) ----------
 
-## Serena: Schwertkämpferin mit erhobener Klinge, Goldhaar und rotem Harnisch.
-static func _serena_battle_img() -> Image:
-	var img := _img(26, 28)
-	var hair := Color(0.92, 0.74, 0.28)
-	var hair2 := Color(0.74, 0.56, 0.18)
-	var skin := Color(0.96, 0.80, 0.66)
-	var armor := Color(0.76, 0.20, 0.24)
-	var armor2 := Color(0.55, 0.12, 0.16)
-	var gold := Color(0.95, 0.82, 0.35)
-	var dark := Color(0.16, 0.14, 0.18)
-	var boot := Color(0.42, 0.28, 0.15)
-	var blade := Color(0.86, 0.91, 0.98)
-	var blade2 := Color(0.60, 0.68, 0.80)
-	# Wehendes Haar hinten
-	img.fill_rect(Rect2i(16, 2, 8, 3), hair)
-	img.fill_rect(Rect2i(18, 5, 7, 3), hair2)
-	img.fill_rect(Rect2i(20, 8, 5, 2), hair)
-	img.fill_rect(Rect2i(22, 10, 3, 2), hair2)
-	# Umhang hinter dem Körper
-	img.fill_rect(Rect2i(17, 10, 5, 10), armor2)
-	for cx in range(17, 22):
-		if (cx % 2) == 0:
-			img.set_pixel(cx, 20, armor2)
-	# Kopf mit Pony
-	img.fill_rect(Rect2i(9, 2, 8, 7), skin)
-	img.fill_rect(Rect2i(8, 1, 10, 2), hair)
-	img.fill_rect(Rect2i(8, 2, 2, 4), hair)
-	img.set_pixel(10, 5, dark)
-	# Körper: Harnisch mit Kragen, Gürtel, Schulterplatte
-	img.fill_rect(Rect2i(10, 9, 8, 8), armor)
-	img.fill_rect(Rect2i(10, 9, 8, 1), gold)
-	img.fill_rect(Rect2i(16, 10, 2, 7), armor2)
-	img.fill_rect(Rect2i(10, 13, 8, 1), gold)
-	img.fill_rect(Rect2i(14, 9, 5, 3), gold)
-	# Vorderer Arm mit Hand am Schwert
-	img.fill_rect(Rect2i(7, 10, 4, 2), armor)
-	img.fill_rect(Rect2i(6, 11, 2, 2), skin)
-	# Erhobene Klinge (diagonal nach vorn-oben) mit Parierstange
-	img.fill_rect(Rect2i(5, 10, 1, 3), gold)
-	for i in 8:
-		var bx := 5 - i / 2
-		var by := 9 - i
-		img.set_pixel(bx, by, blade)
-		img.set_pixel(bx + 1, by, blade2)
-	img.set_pixel(2, 1, Color(1, 1, 1))
-	# Beine im Ausfallschritt + Stiefel
-	img.fill_rect(Rect2i(10, 17, 3, 7), dark)
-	img.fill_rect(Rect2i(14, 17, 3, 7), dark)
-	img.fill_rect(Rect2i(9, 24, 4, 3), boot)
-	img.fill_rect(Rect2i(14, 24, 4, 3), boot)
-	return img
-
-## Milo: Zauberer mit Spitzhut, Schal und Stab samt glühendem Orb.
-static func _milo_battle_img() -> Image:
-	var img := _img(26, 28)
-	var robe := Color(0.24, 0.34, 0.72)
-	var robe2 := Color(0.16, 0.23, 0.52)
-	var trim := Color(0.78, 0.80, 0.96)
-	var hat := Color(0.30, 0.26, 0.60)
-	var hat2 := Color(0.20, 0.17, 0.44)
-	var skin := Color(0.94, 0.79, 0.65)
-	var scarf := Color(0.62, 0.30, 0.62)
-	var wood := Color(0.48, 0.32, 0.16)
-	var orb := Color(0.35, 0.90, 1.0)
-	var dark := Color(0.14, 0.12, 0.18)
-	var gold := Color(0.95, 0.82, 0.35)
-	# Spitzhut mit Knick und Stern
-	img.fill_rect(Rect2i(14, 0, 3, 2), hat2)
-	img.fill_rect(Rect2i(13, 2, 4, 2), hat)
-	img.fill_rect(Rect2i(11, 4, 7, 2), hat)
-	img.fill_rect(Rect2i(9, 6, 11, 1), hat2)
-	img.fill_rect(Rect2i(7, 7, 14, 2), hat)
-	img.set_pixel(12, 4, gold)
-	# Kopf unter der Krempe
-	img.fill_rect(Rect2i(10, 9, 7, 5), skin)
-	img.set_pixel(11, 11, dark)
-	img.fill_rect(Rect2i(16, 9, 2, 3), Color(0.35, 0.30, 0.55))
-	# Schal
-	img.fill_rect(Rect2i(10, 14, 7, 2), scarf)
-	img.fill_rect(Rect2i(15, 16, 3, 4), scarf)
-	# Robe, unten weiter werdend, mit Saum und Gürtel
-	img.fill_rect(Rect2i(10, 16, 8, 5), robe)
-	img.fill_rect(Rect2i(9, 21, 10, 5), robe)
-	img.fill_rect(Rect2i(16, 16, 2, 10), robe2)
-	img.fill_rect(Rect2i(9, 25, 10, 1), trim)
-	img.fill_rect(Rect2i(10, 20, 8, 1), gold)
-	# Arm nach vorn zur Stabhand
-	img.fill_rect(Rect2i(7, 16, 4, 2), robe)
-	img.fill_rect(Rect2i(6, 17, 2, 2), skin)
-	# Stab mit glühendem Orb
-	img.fill_rect(Rect2i(4, 9, 2, 18), wood)
-	img.fill_rect(Rect2i(3, 5, 4, 4), orb)
-	img.fill_rect(Rect2i(4, 6, 2, 2), Color(0.95, 1.0, 1.0))
-	img.set_pixel(2, 6, orb)
-	img.set_pixel(7, 6, orb)
-	img.set_pixel(4, 3, orb)
-	# Füße unter der Robe
-	img.fill_rect(Rect2i(10, 26, 3, 1), dark)
-	img.fill_rect(Rect2i(14, 26, 3, 1), dark)
-	return img
+# Kampf-Sprites als Row-Art (26x28, blicken nach links), mit voller Schattierung.
+const HERO_BATTLE_ART := {
+	"serena": {
+		# H/h Haar, s/S Haut, e Auge, r/R Harnisch, g Gold, w/W Klinge,
+		# l/L Hose, b/B Stiefel
+		"map": {"H": Color(0.95, 0.78, 0.32), "h": Color(0.72, 0.54, 0.18),
+			"s": Color(0.96, 0.81, 0.67), "S": Color(0.80, 0.63, 0.50),
+			"e": Color(0.20, 0.30, 0.55), "r": Color(0.78, 0.22, 0.26),
+			"R": Color(0.54, 0.13, 0.17), "g": Color(0.94, 0.80, 0.38),
+			"w": Color(0.88, 0.93, 1.0), "W": Color(0.62, 0.70, 0.84),
+			"l": Color(0.34, 0.29, 0.27), "L": Color(0.24, 0.20, 0.19),
+			"b": Color(0.42, 0.28, 0.16), "B": Color(0.30, 0.19, 0.10)},
+		"rows": [
+			"...ww.....................",
+			"...wW.....HHHHHH..........",
+			"...wW....HHHHHHHHH........",
+			"...wW...HHHHHHHHHHHh......",
+			"...wW...HHssssssHhHHh.....",
+			"....wW..Hsessssh.hHHh.....",
+			"....wW..Hssssssh..hHh.....",
+			".....wW..SssssS...hh......",
+			".....wW..gggggg...hh......",
+			"....ggggg.rrrrrr..Rh......",
+			"......gssrrrrrrrR.RR......",
+			"......gssrrgggrrrR.RR.....",
+			"........rrrrrrrrR.RR......",
+			"........grrrrrrgR.RR......",
+			"........gggggggg.RR.......",
+			"........RrrrrrrR.RR.......",
+			"........RrrrrrrR..R.......",
+			".........ll..ll...........",
+			".........ll..ll...........",
+			".........ll..ll...........",
+			".........Ll..lL...........",
+			".........Ll..lL...........",
+			"........bbb.bbb...........",
+			"........bbb.bbb...........",
+			"......bbbbb.bbbb..........",
+			"......BbbbB.BbbB..........",
+			"..........................",
+			"..........................",
+		]},
+	"milo": {
+		# p/P Hut, v/V Robe, t Saum, c Schal, o/O Orb, d/D Stab, g Gold
+		"map": {"p": Color(0.32, 0.28, 0.66), "P": Color(0.20, 0.17, 0.46),
+			"v": Color(0.26, 0.36, 0.76), "V": Color(0.17, 0.24, 0.55),
+			"t": Color(0.80, 0.82, 0.96), "c": Color(0.65, 0.32, 0.65),
+			"s": Color(0.94, 0.79, 0.65), "S": Color(0.78, 0.62, 0.48),
+			"e": Color(0.15, 0.20, 0.40), "o": Color(0.35, 0.92, 1.0),
+			"O": Color(0.95, 1.0, 1.0), "d": Color(0.48, 0.32, 0.16),
+			"D": Color(0.34, 0.22, 0.10), "g": Color(0.95, 0.82, 0.35)},
+		"rows": [
+			"...............PP.........",
+			"..............pPP.........",
+			".............ppP..........",
+			"...........ppppp..........",
+			"...oo.....pppppppp........",
+			"..oOOo...PppppppppP.......",
+			"..oOOo..pppppppppppp......",
+			"...oo...PPPPPPPPPPPP......",
+			"....d....sssssssP.........",
+			"....d....sessssSP.........",
+			"....d....ssssssSP.........",
+			"....d...ccccccccc.........",
+			"...sds..vvvvvvvvvc........",
+			"....d...vvvtttvvvc........",
+			"....d...vvvvvvvvvV........",
+			"....d...ggggggggV.........",
+			"....d..vvvvvvvvvvv........",
+			"....d..vvvvvvvvvvv........",
+			"....d..vvvvvvvvvvV........",
+			"....d..vvvvvvvvvvV........",
+			"....d..vvvvvvvvvvV........",
+			"....d.vvvvvvvvvvvvV.......",
+			"....d.vvvvvvvvvvvvV.......",
+			"....d.VvvvvvvvvvvVV.......",
+			"....d.ttttttttttttt.......",
+			".......DD....DD...........",
+			"....D.....................",
+			"..........................",
+		]},
+}
 
 ## Großes Kampf-Sprite eines Helden (mit Kontur, gecacht).
 static func hero_battle(id: String) -> Texture2D:
 	var key := "hero_battle_" + id
 	if _cache.has(key):
 		return _cache[key]
-	var img := _serena_battle_img() if id == "serena" else _milo_battle_img()
+	var art: Dictionary = HERO_BATTLE_ART.get(id, HERO_BATTLE_ART["serena"])
+	var rows: Array = art["rows"]
+	var w: int = rows[0].length()
+	var img := _img(w, rows.size())
+	for y in rows.size():
+		for x in mini(w, (rows[y] as String).length()):
+			var ch: String = rows[y][x]
+			if art["map"].has(ch):
+				img.set_pixel(x, y, art["map"][ch])
 	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t
@@ -283,152 +375,179 @@ static func hero_battle(id: String) -> Texture2D:
 
 const ENEMY_ART := {
 	"slime": {
-		"map": {"a": Color(0.30, 0.75, 0.40), "b": Color(0.18, 0.55, 0.28), "e": Color(0.05, 0.10, 0.06), "w": Color(0.85, 0.98, 0.88)},
+		"map": {"a": Color(0.36, 0.78, 0.42), "b": Color(0.20, 0.55, 0.28), "d": Color(0.12, 0.38, 0.20),
+			"w": Color(0.92, 1.0, 0.94), "e": Color(0.06, 0.12, 0.07), "m": Color(0.10, 0.30, 0.14)},
 		"rows": [
-			"......aaaa......",
-			"....aaaaaaaa....",
-			"...aaaaaaaaaa...",
-			"..aawaaaaaawaa..",
-			"..aaeaaaaaaeaa..",
-			".aaaaaaaaaaaaaa.",
-			".aaaaabbbbaaaaa.",
-			"aaaaaaaaaaaaaaaa",
-			"abaaaaaaaaaaaaba",
-			"abbaaaaaaaaaabba",
-			".abbbbbbbbbbbba.",
-			"..abbbbbbbbbba..",
+			"......aaaaaa......",
+			"....aaaaaaaaaa....",
+			"...aawwaaaaaaaa...",
+			"..aawwwaaaaaaaaa..",
+			"..aawwaaaaaaaaaa..",
+			".aaaaaeaaaaeaaaaa.",
+			".aaaaaeaaaaeaaaab.",
+			".aaaaaaammaaaaaab.",
+			"aaaaaaaaaaaaaaaabb",
+			"aabbaaaaaaaaaabbaa",
+			".abbbbaaaaaabbbba.",
+			".abbbbbbbbbbbbbda.",
+			"..adbbbbbbbbbbd...",
+			"...ddddddddddd....",
 		],
 		"rows2": [
-			"................",
-			"....aaaaaaaa....",
-			"..aaaaaaaaaaaa..",
-			".aawaaaaaawaaaa.",
-			".aaeaaaaaaeaaaa.",
-			"aaaaaaaaaaaaaaaa",
-			"aaaaaabbbbaaaaaa",
-			"aaaaaaaaaaaaaaaa",
-			"abaaaaaaaaaaaaba",
-			"abbaaaaaaaaaabba",
-			"abbbbbbbbbbbbbba",
-			".abbbbbbbbbbbba.",
+			"..................",
+			"......aaaaaa......",
+			"...aaaaaaaaaaaa...",
+			"..aawwaaaaaaaaaa..",
+			".aawwwaaaaaaaaaaa.",
+			".aawwaaaaaaaaaaab.",
+			"aaaaaeaaaaeaaaaaab",
+			"aaaaaeaaaaeaaaaabb",
+			"aaaaaaammmaaaaaabb",
+			"aabbaaaaaaaaaabbaa",
+			"aabbbbaaaaaabbbbaa",
+			".abbbbbbbbbbbbbba.",
+			".addbbbbbbbbbbdda.",
+			"..dddddddddddddd..",
 		]},
 	"bat": {
-		"map": {"a": Color(0.35, 0.25, 0.45), "b": Color(0.22, 0.15, 0.30), "e": Color(0.95, 0.25, 0.25), "f": Color(0.55, 0.40, 0.65)},
+		"map": {"a": Color(0.42, 0.30, 0.55), "b": Color(0.26, 0.17, 0.38), "d": Color(0.16, 0.10, 0.26),
+			"f": Color(0.60, 0.45, 0.75), "e": Color(1.0, 0.30, 0.25), "t": Color(0.95, 0.95, 1.0), "n": Color(0.85, 0.45, 0.55)},
 		"rows": [
-			"b..............b",
-			"bb....a..a....bb",
-			"bbb..aaaaaa..bbb",
-			"bbbb.aeaaea.bbbb",
-			"bbbbbaaaaaabbbbb",
-			"fbbbbaaaaaabbbbf",
-			".fbbbaafaabbbbf.",
-			"..fbbaaaaaabbf..",
-			"...f.aa..aa.f...",
-			".....a....a.....",
+			"......a....a......",
+			"bb....aa..aa....bb",
+			"dbb...anaana...bbd",
+			"ddbb..afaafa..bbdd",
+			"dbbbb.aeaaea.bbbbd",
+			"bbabbbaaaaaabbbabb",
+			".bbbbbaataaabbbbb.",
+			"..dbbbaaaaaabbbd..",
+			"...dbbaaffaabbd...",
+			".....baa..aab.....",
+			"......a....a......",
+			"..................",
 		],
 		"rows2": [
-			"......a..a......",
-			".....aaaaaa.....",
-			"bb...aeaaea...bb",
-			"bbb..aaaaaa..bbb",
-			"bbbbbaaaaaabbbbb",
-			".bbbbaaaaaabbbb.",
-			"..fbbaafaabbf...",
-			"...fbaaaaaabf...",
-			".....aa..aa.....",
-			"................",
+			"......a....a......",
+			"......aa..aa......",
+			"......anaana......",
+			".b....afaafa....b.",
+			"..bb..aeaaea..bb..",
+			"..bbb.aaaaaa.bbb..",
+			"..dbbbaataaabbbd..",
+			"...dbbaaaaaabbd...",
+			"....dbaaffaabd....",
+			".....baa..aab.....",
+			"......a....a......",
+			"..................",
 		]},
 	"frostwolf": {
-		"map": {"a": Color(0.68, 0.80, 0.93), "b": Color(0.36, 0.50, 0.70), "e": Color(0.25, 0.95, 1.0), "w": Color(0.92, 0.97, 1.0)},
+		"map": {"a": Color(0.72, 0.83, 0.94), "b": Color(0.48, 0.62, 0.80), "d": Color(0.28, 0.40, 0.60),
+			"w": Color(0.95, 0.99, 1.0), "e": Color(0.20, 0.95, 1.0), "i": Color(0.65, 0.95, 1.0),
+			"n": Color(0.10, 0.15, 0.25), "t": Color(0.95, 0.99, 1.0)},
 		"rows": [
-			"...........bb...",
-			".b........bab...",
-			".bb......baaab..",
-			".babbbbbaaaaaeb.",
-			"..baaaaaaaaaaab.",
-			"..baaaaaaaaawww.",
-			"...baaaaaaaab...",
-			"...bab..baab....",
-			"...ba....ba.....",
-			"...b.....b......",
+			"............bb....",
+			"....i..i...bbab...",
+			".bb.bbbbbbb.baaab.",
+			"bbbaaaaaaabbbaaaeb",
+			".bbaaaaaaaaaaaaawn",
+			".dbaaaaaaaaaaawtww",
+			"..daaaaaaaaaab.ww.",
+			"..dbaabbbbaab.....",
+			"..dab..dab..bb....",
+			"..dab..dab..bb....",
+			"..dda..dda..bd....",
+			"..................",
 		],
 		"rows2": [
-			".b.........bb...",
-			".bb........bab..",
-			"..b......baaab..",
-			".babbbbbaaaaaeb.",
-			"..baaaaaaaaaaab.",
-			"..baaaaaaaaawww.",
-			"...baaaaaaaab...",
-			"....ab...bab....",
-			"....b....a......",
-			"................",
+			"...........bb.....",
+			"...i..i....bbab...",
+			".bb.bbbbbbb.baaab.",
+			"bbbaaaaaaabbbaaaeb",
+			".bbaaaaaaaaaaaaawn",
+			".dbaaaaaaaaaaawtww",
+			"..daaaaaaaaaab.ww.",
+			"..dbaabbbbaab.....",
+			".dab...dab...bb...",
+			".dab...dab...bb...",
+			".dda...dda...bd...",
+			"..................",
 		]},
 	"eisgeist": {
-		"map": {"a": Color(0.72, 0.85, 0.98, 0.85), "b": Color(0.45, 0.62, 0.85, 0.85), "e": Color(0.20, 0.90, 1.0)},
+		"map": {"a": Color(0.75, 0.87, 0.98, 0.88), "b": Color(0.50, 0.66, 0.88, 0.85), "d": Color(0.32, 0.46, 0.72, 0.80),
+			"i": Color(0.85, 0.97, 1.0), "e": Color(0.25, 0.95, 1.0), "E": Color(0.95, 1.0, 1.0), "m": Color(0.22, 0.34, 0.58, 0.90)},
 		"rows": [
-			"....aaaaaa....",
-			"..aaaaaaaaaa..",
-			".aaaeaaaaeaaa.",
-			".aaaeaaaaeaaa.",
-			".aaaaaaaaaaaa.",
-			"aaaaabaabaaaaa",
-			"aaaaaabbaaaaaa",
-			".aaaaaaaaaaaa.",
-			".aabaaaaaabaa.",
-			"..aa.aaaa.aa..",
-			"..a...aa...a..",
+			"..i..i..i..i....",
+			"...iaaaaaai.....",
+			"..aaaaaaaaaa....",
+			".aaeeaaaaeea....",
+			".aaeEaaaaeEa....",
+			".aaaaaaaaaaaa...",
+			"aaaaaammaaaaaa..",
+			"aaaaaammaaaaaab.",
+			".baaaaaaaaaaab..",
+			".baaaaaaaaaab...",
+			"..baaabaaaab....",
+			"..ba.abba.ba....",
+			"..b...bb...b....",
+			"......ab........",
+			"................",
 		],
 		"rows2": [
-			"....aaaaaa....",
-			"..aaaaaaaaaa..",
-			".aaaeaaaaeaaa.",
-			".aaaeaaaaeaaa.",
-			".aaaaaaaaaaaa.",
-			"aaaaabaabaaaaa",
-			"aaaaaabbaaaaaa",
-			".aaaaaaaaaaaa.",
-			".aabaaaaaabaa.",
-			"...aa.aa..aa..",
-			"....a..aa..a..",
+			".i..i..i..i.....",
+			"...iaaaaaai.....",
+			"..aaaaaaaaaa....",
+			".aaeeaaaaeea....",
+			".aaEeaaaaEea....",
+			".aaaaaaaaaaaa...",
+			"aaaaaammaaaaaa..",
+			"aaaaaammaaaaaab.",
+			".baaaaaaaaaaab..",
+			".baaaaaaaaaab...",
+			"..baaabaaaab....",
+			"...ab.abba.ab...",
+			"....b...bb..b...",
+			"........ba......",
+			"................",
 		]},
 	"skeleton": {
-		"map": {"a": Color(0.88, 0.86, 0.78), "b": Color(0.60, 0.58, 0.50), "e": Color(0.05, 0.05, 0.08), "r": Color(0.55, 0.15, 0.15)},
+		"map": {"a": Color(0.90, 0.88, 0.80), "b": Color(0.65, 0.62, 0.54), "d": Color(0.20, 0.19, 0.16),
+			"e": Color(0.90, 0.20, 0.15), "r": Color(0.55, 0.16, 0.16), "s": Color(0.75, 0.80, 0.88),
+			"S": Color(0.50, 0.55, 0.65), "g": Color(0.85, 0.70, 0.30)},
 		"rows": [
-			"...aaaaaa...",
-			"..aaaaaaaa..",
-			"..aeaaaaea..",
-			"..aaaaaaaa..",
-			"...abbbba...",
-			"....aaaa....",
-			"..raaaaaar..",
-			".raabaabaar.",
-			".a.abaaba.a.",
-			".a.aaaaaa.a.",
-			"...abaaba...",
-			"...abaaba...",
-			"...aa..aa...",
-			"..ba....ab..",
-			"..a......a..",
-			".aa......aa.",
+			"....aaaaaa..s.",
+			"...aaaaaaaa.s.",
+			"...aeaaaaea.s.",
+			"...abababaa.s.",
+			"....aaaaaa..s.",
+			"...raaaaaar.s.",
+			"..raabbbbaaggg",
+			"..a.abbbba.aS.",
+			"..a.abbbba.a..",
+			"..b..aaaa..b..",
+			".....abba.....",
+			"....ab..ba....",
+			"....ab..ba....",
+			"....aa..aa....",
+			"...ba....ab...",
+			"..............",
 		],
 		"rows2": [
-			"...aaaaaa...",
-			"..aaaaaaaa..",
-			"..aeaaaaea..",
-			"..aaaaaaaa..",
-			"...aeeeea...",
-			"....aaaa....",
-			".r.aaaaaa.r.",
-			".raabaabaar.",
-			".a.abaaba.a.",
-			".a.aaaaaa.a.",
-			"...abaaba...",
-			"...abaaba...",
-			"...aa..aa...",
-			"..ba....ab..",
-			"..a......a..",
-			".aa......aa.",
+			"....aaaaaa..s.",
+			"...aaaaaaaa.s.",
+			"...aeaaaaea.s.",
+			"...aaaaaaaa.s.",
+			"....adddda..s.",
+			"...raaaaaar.s.",
+			"..raabbbbaaggg",
+			"..a.abbbba.aS.",
+			"..a.abbbba.a..",
+			"..b..aaaa..b..",
+			".....abba.....",
+			"....ab..ba....",
+			"....ba..ab....",
+			"....aa..aa....",
+			"...ab....ba...",
+			"..............",
 		]},
 }
 
@@ -606,7 +725,7 @@ static func enemy_frame(id: String, frame: int) -> Texture2D:
 		var w: int = rows[0].length()
 		img = _img(w, rows.size())
 		for y in rows.size():
-			for x in w:
+			for x in mini(w, (rows[y] as String).length()):
 				var ch: String = rows[y][x]
 				if art["map"].has(ch):
 					img.set_pixel(x, y, art["map"][ch])
@@ -729,4 +848,124 @@ static func bone() -> Texture2D:
 		img.set_pixel(p.x, p.y, c)
 	var t := _tex(img)
 	_cache["bone"] = t
+	return t
+
+## ---------- Feld-Dekoration (HD-2D-Detailschicht) ----------
+
+# Kleine Requisiten als Row-Art: Wandfackel, Eiskristall, Leuchtpilz.
+const PROP_ART := {
+	"torch": {
+		"map": {"y": Color(1.0, 0.95, 0.55), "o": Color(1.0, 0.62, 0.15),
+			"r": Color(0.85, 0.30, 0.08), "m": Color(0.30, 0.28, 0.32),
+			"h": Color(0.42, 0.28, 0.14), "H": Color(0.30, 0.20, 0.10)},
+		"rows": [
+			"..yy..",
+			".yyoy.",
+			".yooo.",
+			".ooro.",
+			"..rr..",
+			".mmmm.",
+			"..hH..",
+			"..hH..",
+			"..hH..",
+			"..hH..",
+			".mmmm.",
+			"......",
+		]},
+	"crystal": {
+		"map": {"w": Color(0.92, 1.0, 1.0), "c": Color(0.55, 0.88, 1.0),
+			"b": Color(0.25, 0.50, 0.85), "d": Color(0.15, 0.30, 0.60)},
+		"rows": [
+			"....w....",
+			"...cw..c.",
+			"...cc..cw",
+			"..wccc.cc",
+			"..cccc.cc",
+			".ccwcccbc",
+			".ccccbcbc",
+			"ccbccbbc.",
+			"cbbcbbbc.",
+			".bbdbbd..",
+			"..dbbd...",
+			".........",
+		]},
+	"mushroom": {
+		"map": {"v": Color(0.72, 0.45, 0.95), "l": Color(0.90, 0.75, 1.0),
+			"d": Color(0.48, 0.25, 0.70), "s": Color(0.80, 0.78, 0.72)},
+		"rows": [
+			"..lvv..",
+			".vvlvv.",
+			".vdvvd.",
+			"..ss...",
+			"..ss.v.",
+			"....lv.",
+			"....s..",
+		]},
+}
+
+## Requisiten-Sprite; flower0..flower3, tuft, pebble, crack, bones
+## werden direkt gezeichnet, der Rest kommt aus PROP_ART.
+static func prop(kind: String) -> Texture2D:
+	var key := "prop_" + kind
+	if _cache.has(key):
+		return _cache[key]
+	var img: Image
+	if PROP_ART.has(kind):
+		var art: Dictionary = PROP_ART[kind]
+		var rows: Array = art["rows"]
+		img = _img(rows[0].length(), rows.size())
+		for y in rows.size():
+			for x in (rows[y] as String).length():
+				var ch: String = rows[y][x]
+				if art["map"].has(ch):
+					img.set_pixel(x, y, art["map"][ch])
+	elif kind.begins_with("flower"):
+		img = _img(5, 6)
+		var petal: Color = [Color(0.95, 0.92, 0.98), Color(0.90, 0.30, 0.35),
+			Color(0.45, 0.55, 0.95), Color(0.95, 0.55, 0.75)][int(kind.substr(6)) % 4]
+		img.set_pixel(2, 4, Color(0.20, 0.45, 0.20))
+		img.set_pixel(2, 5, Color(0.20, 0.45, 0.20))
+		for p: Vector2i in [Vector2i(2, 0), Vector2i(1, 1), Vector2i(3, 1), Vector2i(2, 2)]:
+			img.set_pixel(p.x, p.y, petal)
+		img.set_pixel(2, 1, Color(0.98, 0.85, 0.30))
+	elif kind == "tuft":
+		img = _img(6, 5)
+		var g1 := Color(0.36, 0.66, 0.30)
+		var g2 := Color(0.24, 0.50, 0.22)
+		for p: Vector2i in [Vector2i(1, 1), Vector2i(1, 2), Vector2i(3, 0), Vector2i(3, 1),
+				Vector2i(3, 2), Vector2i(5, 1), Vector2i(5, 2)]:
+			img.set_pixel(p.x, p.y, g1)
+		for p: Vector2i in [Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(1, 4), Vector2i(3, 4)]:
+			img.set_pixel(p.x, p.y, g2)
+	elif kind == "pebble":
+		img = _img(6, 4)
+		img.fill_rect(Rect2i(1, 1, 3, 2), Color(0.50, 0.47, 0.52))
+		img.set_pixel(2, 0, Color(0.60, 0.57, 0.62))
+		img.fill_rect(Rect2i(4, 2, 2, 2), Color(0.42, 0.39, 0.45))
+	elif kind == "crack":
+		img = _img(9, 6)
+		var dk := Color(0.10, 0.09, 0.14)
+		for p: Vector2i in [Vector2i(0, 1), Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 3),
+				Vector2i(4, 3), Vector2i(5, 2), Vector2i(5, 4), Vector2i(6, 4),
+				Vector2i(7, 5), Vector2i(6, 1), Vector2i(8, 5)]:
+			img.set_pixel(p.x, p.y, dk)
+	elif kind == "bones":
+		img = _img(8, 5)
+		var bc := Color(0.88, 0.86, 0.78)
+		var bd := Color(0.66, 0.63, 0.55)
+		for p: Vector2i in [Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(0, 0), Vector2i(4, 0)]:
+			img.set_pixel(p.x, p.y, bc)
+		for p: Vector2i in [Vector2i(2, 3), Vector2i(3, 3), Vector2i(4, 3), Vector2i(5, 3),
+				Vector2i(6, 2), Vector2i(6, 4)]:
+			img.set_pixel(p.x, p.y, bd)
+	elif kind == "icecrack":
+		img = _img(9, 6)
+		var ic := Color(0.85, 0.95, 1.0, 0.85)
+		for p: Vector2i in [Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 3), Vector2i(3, 3),
+				Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 3), Vector2i(4, 4), Vector2i(7, 4)]:
+			img.set_pixel(p.x, p.y, ic)
+	else:
+		img = _img(2, 2, Color.MAGENTA)
+	var t := _tex(img)
+	_cache[key] = t
 	return t

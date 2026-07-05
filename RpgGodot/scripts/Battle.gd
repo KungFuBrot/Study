@@ -128,7 +128,7 @@ func _build_scene() -> void:
 		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
 		_attach_shadow(s, 11, 3, foot_h)
 		_attach_glow_pool(s, foot_h, pal["pool_hero"])
-		_attach_reflection(s, foot_h)
+		_attach_reflection(s, foot_h, 0.09)
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false})
 
@@ -415,6 +415,8 @@ func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	ui_layer = layer
+	# Tilt-Shift-Tiefenunschärfe (nur die Bühne, UI kommt später obendrauf).
+	layer.add_child(Fx.tilt_shift(3.0, 2.0, 0.45, 0.22))
 	# Filmisches Color-Grading: warmes Licht oben, kühle Schatten unten.
 	var pal := _palette()
 	var grade := TextureRect.new()

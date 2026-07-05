@@ -45,14 +45,85 @@ var shop_gold: Label
 var shop_index := 0
 var hud: Label
 
+# Dunkle Karten: Grundlicht + Laternenfarbe + Wandschmuck (Fackel/Kristall).
+const LIGHTING := {
+	"dungeon": {"ambient": Color(0.42, 0.38, 0.60), "lantern": Color(1.0, 0.78, 0.48),
+		"wall_prop": "torch"},
+	"dungeon2": {"ambient": Color(0.38, 0.48, 0.74), "lantern": Color(0.80, 0.92, 1.0),
+		"wall_prop": "crystal"},
+}
+
+# Kacheln, die einen Kontaktschatten auf den Boden darunter werfen.
+const SOLID_ABOVE := ["t", "m", "R", "W", "D", "#", "I"]
+
 func _ready() -> void:
 	map = MapData.get_map(map_id)
 	_build_tiles()
 	_spawn_npcs()
 	_spawn_party()
+	_add_lighting()
 	_build_ui()
 	_add_barrier_shimmer()
 	_add_ambience()
+
+## CanvasModulate dunkelt dunkle Karten ab; Laterne am Spieler und
+## flackernde Wandlichter bringen das HD-2D-Licht zurück.
+func _add_lighting() -> void:
+	if not LIGHTING.has(map_id):
+		return
+	var cfg: Dictionary = LIGHTING[map_id]
+	var cm := CanvasModulate.new()
+	cm.color = cfg["ambient"]
+	add_child(cm)
+	var lantern := Fx.point_light(cfg["lantern"], 90.0, 1.1)
+	lantern.position = Vector2(6, 8)
+	player.add_child(lantern)
+	# Wandlichter überall dort, wo unter einer Wand freier Boden liegt.
+	var rows: Array = map["rows"]
+	var candidates: Array[Vector2i] = []
+	for y in range(rows.size() - 1):
+		var row: String = rows[y]
+		for x in row.length():
+			var ch := row[x]
+			if (ch == "#" or ch == "I") and MapData.WALKABLE.has((rows[y + 1] as String)[x]):
+				candidates.append(Vector2i(x, y))
+	var step := maxi(2, candidates.size() / 9)
+	var placed := 0
+	for i in range(0, candidates.size(), step):
+		if placed >= 10:
+			break
+		placed += 1
+		var c: Vector2i = candidates[i]
+		var s := Sprite2D.new()
+		s.texture = SpriteFactory.prop(cfg["wall_prop"])
+		s.centered = false
+		s.z_index = 2
+		add_child(s)
+		if cfg["wall_prop"] == "torch":
+			s.position = Vector2(c.x * TILE + 5, c.y * TILE + 3)
+			var l := Fx.point_light(Color(1.0, 0.70, 0.35), 55.0, 1.1)
+			l.position = Vector2(c.x * TILE + 8, c.y * TILE + 6)
+			add_child(l)
+			Fx.flicker(l, 1.1)
+			# Glutschein direkt an der Flamme
+			var halo := Sprite2D.new()
+			halo.texture = SpriteFactory.circle(6, Color(1.0, 0.65, 0.25, 0.45))
+			halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			halo.material = _additive()
+			halo.position = Vector2(c.x * TILE + 8, c.y * TILE + 5)
+			halo.z_index = 3
+			add_child(halo)
+		else:
+			s.position = Vector2(c.x * TILE + 3, c.y * TILE + 4)
+			var l := Fx.point_light(Color(0.55, 0.85, 1.0), 48.0, 0.9)
+			l.position = Vector2(c.x * TILE + 8, c.y * TILE + 10)
+			add_child(l)
+			Fx.pulse(l, 0.9, 1.4 + randf() * 0.8)
+
+static func _additive() -> CanvasItemMaterial:
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return m
 
 ## Versiegelte Portale schimmern eisig, solange sie verschlossen sind.
 func _add_barrier_shimmer() -> void:
@@ -124,6 +195,79 @@ func _build_tiles() -> void:
 			s.centered = false
 			s.position = Vector2(x * TILE, y * TILE)
 			add_child(s)
+	_add_tile_details()
+
+## Detailschicht über den Kacheln: Kontaktschatten unter massiven Kacheln
+## (verankert Wände und Bäume am Boden) plus gestreute Requisiten.
+func _add_tile_details() -> void:
+	var rows: Array = map["rows"]
+	var shade := 0.5 if LIGHTING.has(map_id) else 0.3
+	for y in rows.size():
+		var row: String = rows[y]
+		for x in row.length():
+			var ch := row[x]
+			if MapData.WALKABLE.has(ch) and y > 0 and SOLID_ABOVE.has((rows[y - 1] as String)[x]):
+				var sh := Sprite2D.new()
+				sh.texture = SpriteFactory.gradient(16, 10, Color(0, 0, 0, shade), Color(0, 0, 0, 0))
+				sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+				sh.centered = false
+				sh.position = Vector2(x * TILE, y * TILE)
+				sh.z_index = 1
+				add_child(sh)
+			var n := _tile_noise(x, y)
+			match ch:
+				"g":
+					if n < 0.09:
+						_place_prop("flower%d" % (int(n * 1000.0) % 4), x, y, n)
+					elif n < 0.18:
+						_place_prop("tuft", x, y, n)
+				"f":
+					if n < 0.05:
+						_place_prop("pebble", x, y, n)
+					elif n < 0.09:
+						_place_prop("crack", x, y, n)
+					elif n < 0.115:
+						_place_prop("bones", x, y, n)
+					elif n > 0.975:
+						_place_mushroom(x, y)
+				"i":
+					if n < 0.08:
+						_place_prop("icecrack", x, y, n)
+
+func _tile_noise(x: int, y: int) -> float:
+	return fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
+
+func _place_prop(kind: String, x: int, y: int, n: float) -> void:
+	var s := Sprite2D.new()
+	s.texture = SpriteFactory.prop(kind)
+	s.centered = false
+	# Pseudo-zufälliger Versatz, damit kein Raster entsteht.
+	var ox := 2 + int(n * 977.0) % 6
+	var oy := 3 + int(n * 389.0) % 6
+	s.position = Vector2(x * TILE + ox, y * TILE + oy)
+	s.z_index = 1
+	add_child(s)
+
+## Leuchtpilz mit additivem Schein — kleine Lichtinseln im dunklen Dungeon.
+func _place_mushroom(x: int, y: int) -> void:
+	var s := Sprite2D.new()
+	s.texture = SpriteFactory.prop("mushroom")
+	s.centered = false
+	s.position = Vector2(x * TILE + 4, y * TILE + 7)
+	s.z_index = 1
+	add_child(s)
+	var halo := Sprite2D.new()
+	halo.texture = SpriteFactory.circle(9, Color(0.70, 0.45, 1.0, 0.40))
+	halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	halo.material = _additive()
+	halo.position = Vector2(x * TILE + 7, y * TILE + 10)
+	halo.z_index = 2
+	add_child(halo)
+	var tw := halo.create_tween().set_loops()
+	tw.tween_property(halo, "modulate:a", 0.55, 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(halo, "modulate:a", 1.0, 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _spawn_npcs() -> void:
 	for npc in map["npcs"]:
@@ -133,6 +277,7 @@ func _spawn_npcs() -> void:
 		s.position = Vector2(npc["pos"].x * TILE + 2, npc["pos"].y * TILE)
 		s.z_index = 5
 		add_child(s)
+		_attach_drop_shadow(s)
 		npc_nodes[npc["pos"]] = npc
 	# Boss thront hinten im Dungeon, bis er besiegt ist.
 	if FIELD_BOSSES.has(map_id):
@@ -156,6 +301,17 @@ func _spawn_npcs() -> void:
 		glow.position = Vector2(boss_tile.x * TILE + 8, boss_tile.y * TILE + 12)
 		glow.z_index = 4
 		add_child(glow)
+		# Bodenschatten + echtes Punktlicht in der Bossfarbe
+		var bsh := Sprite2D.new()
+		bsh.texture = SpriteFactory.shadow(11, 3)
+		bsh.position = Vector2(boss_tile.x * TILE + 8, boss_tile.y * TILE + 14)
+		bsh.z_index = 4
+		add_child(bsh)
+		var gc: Color = cfg["glow"]
+		var bl := Fx.point_light(Color(gc.r, gc.g, gc.b), 70.0, 1.2)
+		bl.position = glow.position
+		add_child(bl)
+		Fx.pulse(bl, 1.2, 1.2)
 		var pulse := glow.create_tween().set_loops()
 		pulse.tween_property(glow, "scale", Vector2(1.6, 1.0), 0.9) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -179,10 +335,12 @@ func _spawn_party() -> void:
 	player.centered = false
 	player.z_index = 10
 	add_child(player)
+	_attach_drop_shadow(player)
 	follower = Sprite2D.new()
 	follower.centered = false
 	follower.z_index = 9
 	add_child(follower)
+	_attach_drop_shadow(follower)
 	player.position = _tile_pos(player_tile)
 	follower.position = _tile_pos(follower_tile)
 	_update_sprites()
@@ -202,6 +360,15 @@ func _spawn_party() -> void:
 
 func _tile_pos(t: Vector2i) -> Vector2:
 	return Vector2(t.x * TILE + 2, t.y * TILE)
+
+## Weicher Bodenschatten unter einer 12x16-Figur (verankert sie optisch).
+func _attach_drop_shadow(s: Sprite2D) -> void:
+	var sh := Sprite2D.new()
+	sh.texture = SpriteFactory.shadow(5, 2)
+	sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sh.position = Vector2(6, 15)
+	sh.show_behind_parent = true
+	s.add_child(sh)
 
 func _dir_name(d: Vector2i) -> String:
 	if d.y > 0: return "down"
@@ -242,7 +409,16 @@ func _unhandled_input(event: InputEvent) -> void:
 func _try_step(dir: Vector2i) -> void:
 	facing = dir
 	var target := player_tile + dir
-	if npc_nodes.has(target) or not MapData.is_walkable(map, target):
+	if npc_nodes.has(target):
+		# In den Boss hineinlaufen startet den Kampf direkt (Bestätigen geht weiterhin auch).
+		var npc: Dictionary = npc_nodes[target]
+		if npc.get("boss", false):
+			state = "locked"
+			GameState.main.start_battle([npc["battle_id"]], map_id, player_tile)
+			return
+		_update_sprites()
+		return
+	if not MapData.is_walkable(map, target):
 		_update_sprites()
 		return
 	moving = true
@@ -322,6 +498,9 @@ func _build_ui() -> void:
 	ui = CanvasLayer.new()
 	ui.layer = 10
 	add_child(ui)
+
+	# Tilt-Shift-Tiefenunschärfe zuerst, damit HUD und Textboxen scharf bleiben.
+	ui.add_child(Fx.tilt_shift(4.5, 3.0, 0.5, 0.16))
 
 	# Filmisches Color-Grading + Vignette über der ganzen Karte
 	var g: Array = GRADES.get(map_id, GRADES["world"])

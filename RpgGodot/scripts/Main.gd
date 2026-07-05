@@ -21,6 +21,39 @@ func _ready() -> void:
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(fade_rect)
 	goto_map("town", "start")
+	if OS.get_environment("SHOT") != "":
+		_shot_tour()
+
+## Temporärer Debug-Rundgang: Screenshots von Feld und Bosskampf (env SHOT=Zielordner).
+func _shot_tour() -> void:
+	await get_tree().create_timer(2.0).timeout
+	_snap("town")
+	goto_map("dungeon", "entrance")
+	await get_tree().create_timer(2.0).timeout
+	_snap("dungeon")
+	goto_map("dungeon2", "entrance")
+	await get_tree().create_timer(2.0).timeout
+	_snap("dungeon2")
+	# Berührungs-Test: neben den Boss stellen und hineinlaufen — muss den Kampf starten.
+	goto_map("dungeon", "", Vector2i(17, 10))
+	await get_tree().create_timer(1.5).timeout
+	_snap("boss_before_touch")
+	(current_screen as Field)._try_step(Vector2i(1, 0))
+	await get_tree().create_timer(7.0).timeout
+	_snap("battle1")
+	await get_tree().create_timer(3.0).timeout
+	_snap("battle2")
+	start_battle(["slime", "bat", "skeleton"], "dungeon", Vector2i(4, 10))
+	await get_tree().create_timer(2.5).timeout
+	_snap("battle_normal")
+	start_battle(["frostwolf", "eisgeist"], "dungeon2", Vector2i(4, 10))
+	await get_tree().create_timer(2.5).timeout
+	_snap("battle_frost")
+	get_tree().quit()
+
+func _snap(shot_name: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(OS.get_environment("SHOT") + "/" + shot_name + ".png")
 
 func goto_map(map_id: String, spawn_id: String, exact_pos := Vector2i(-1, -1)) -> void:
 	await _fade(1.0, 0.25)
