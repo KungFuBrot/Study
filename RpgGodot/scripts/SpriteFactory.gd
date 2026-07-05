@@ -8,6 +8,26 @@ const TILE := 16
 static func _tex(img: Image) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
+## Dunkle 1px-Kontur um alle opaken Pixel — lässt Figuren deutlich hervortreten.
+static func _outlined(img: Image, color := Color(0.06, 0.05, 0.09)) -> Image:
+	var w := img.get_width()
+	var h := img.get_height()
+	var out := _img(w + 2, h + 2)
+	out.blit_rect(img, Rect2i(0, 0, w, h), Vector2i(1, 1))
+	for y in h + 2:
+		for x in w + 2:
+			if out.get_pixel(x, y).a > 0.01:
+				continue
+			# Nachbarn im QUELLBILD prüfen, sonst frisst sich die Kontur fort.
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var sx: int = x - 1 + d.x
+				var sy: int = y - 1 + d.y
+				if sx >= 0 and sy >= 0 and sx < w and sy < h \
+						and img.get_pixel(sx, sy).a > 0.35:
+					out.set_pixel(x, y, color)
+					break
+	return out
+
 static func _img(w: int, h: int, base := Color(0, 0, 0, 0)) -> Image:
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
 	img.fill(base)
@@ -142,7 +162,120 @@ static func character(id: String, dir: String, frame: int) -> Texture2D:
 	var off := 1 if frame == 1 else 0
 	img.fill_rect(Rect2i(4, 12 + off, 2, 3 - off), dark)
 	img.fill_rect(Rect2i(6, 12 + (1 - off), 2, 3 - (1 - off)), dark)
-	var t := _tex(img)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+## ---------- Detaillierte Kampf-Sprites der Helden (blicken nach links) ----------
+
+## Serena: Schwertkämpferin mit erhobener Klinge, Goldhaar und rotem Harnisch.
+static func _serena_battle_img() -> Image:
+	var img := _img(26, 28)
+	var hair := Color(0.92, 0.74, 0.28)
+	var hair2 := Color(0.74, 0.56, 0.18)
+	var skin := Color(0.96, 0.80, 0.66)
+	var armor := Color(0.76, 0.20, 0.24)
+	var armor2 := Color(0.55, 0.12, 0.16)
+	var gold := Color(0.95, 0.82, 0.35)
+	var dark := Color(0.16, 0.14, 0.18)
+	var boot := Color(0.42, 0.28, 0.15)
+	var blade := Color(0.86, 0.91, 0.98)
+	var blade2 := Color(0.60, 0.68, 0.80)
+	# Wehendes Haar hinten
+	img.fill_rect(Rect2i(16, 2, 8, 3), hair)
+	img.fill_rect(Rect2i(18, 5, 7, 3), hair2)
+	img.fill_rect(Rect2i(20, 8, 5, 2), hair)
+	img.fill_rect(Rect2i(22, 10, 3, 2), hair2)
+	# Umhang hinter dem Körper
+	img.fill_rect(Rect2i(17, 10, 5, 10), armor2)
+	for cx in range(17, 22):
+		if (cx % 2) == 0:
+			img.set_pixel(cx, 20, armor2)
+	# Kopf mit Pony
+	img.fill_rect(Rect2i(9, 2, 8, 7), skin)
+	img.fill_rect(Rect2i(8, 1, 10, 2), hair)
+	img.fill_rect(Rect2i(8, 2, 2, 4), hair)
+	img.set_pixel(10, 5, dark)
+	# Körper: Harnisch mit Kragen, Gürtel, Schulterplatte
+	img.fill_rect(Rect2i(10, 9, 8, 8), armor)
+	img.fill_rect(Rect2i(10, 9, 8, 1), gold)
+	img.fill_rect(Rect2i(16, 10, 2, 7), armor2)
+	img.fill_rect(Rect2i(10, 13, 8, 1), gold)
+	img.fill_rect(Rect2i(14, 9, 5, 3), gold)
+	# Vorderer Arm mit Hand am Schwert
+	img.fill_rect(Rect2i(7, 10, 4, 2), armor)
+	img.fill_rect(Rect2i(6, 11, 2, 2), skin)
+	# Erhobene Klinge (diagonal nach vorn-oben) mit Parierstange
+	img.fill_rect(Rect2i(5, 10, 1, 3), gold)
+	for i in 8:
+		var bx := 5 - i / 2
+		var by := 9 - i
+		img.set_pixel(bx, by, blade)
+		img.set_pixel(bx + 1, by, blade2)
+	img.set_pixel(2, 1, Color(1, 1, 1))
+	# Beine im Ausfallschritt + Stiefel
+	img.fill_rect(Rect2i(10, 17, 3, 7), dark)
+	img.fill_rect(Rect2i(14, 17, 3, 7), dark)
+	img.fill_rect(Rect2i(9, 24, 4, 3), boot)
+	img.fill_rect(Rect2i(14, 24, 4, 3), boot)
+	return img
+
+## Milo: Zauberer mit Spitzhut, Schal und Stab samt glühendem Orb.
+static func _milo_battle_img() -> Image:
+	var img := _img(26, 28)
+	var robe := Color(0.24, 0.34, 0.72)
+	var robe2 := Color(0.16, 0.23, 0.52)
+	var trim := Color(0.78, 0.80, 0.96)
+	var hat := Color(0.30, 0.26, 0.60)
+	var hat2 := Color(0.20, 0.17, 0.44)
+	var skin := Color(0.94, 0.79, 0.65)
+	var scarf := Color(0.62, 0.30, 0.62)
+	var wood := Color(0.48, 0.32, 0.16)
+	var orb := Color(0.35, 0.90, 1.0)
+	var dark := Color(0.14, 0.12, 0.18)
+	var gold := Color(0.95, 0.82, 0.35)
+	# Spitzhut mit Knick und Stern
+	img.fill_rect(Rect2i(14, 0, 3, 2), hat2)
+	img.fill_rect(Rect2i(13, 2, 4, 2), hat)
+	img.fill_rect(Rect2i(11, 4, 7, 2), hat)
+	img.fill_rect(Rect2i(9, 6, 11, 1), hat2)
+	img.fill_rect(Rect2i(7, 7, 14, 2), hat)
+	img.set_pixel(12, 4, gold)
+	# Kopf unter der Krempe
+	img.fill_rect(Rect2i(10, 9, 7, 5), skin)
+	img.set_pixel(11, 11, dark)
+	img.fill_rect(Rect2i(16, 9, 2, 3), Color(0.35, 0.30, 0.55))
+	# Schal
+	img.fill_rect(Rect2i(10, 14, 7, 2), scarf)
+	img.fill_rect(Rect2i(15, 16, 3, 4), scarf)
+	# Robe, unten weiter werdend, mit Saum und Gürtel
+	img.fill_rect(Rect2i(10, 16, 8, 5), robe)
+	img.fill_rect(Rect2i(9, 21, 10, 5), robe)
+	img.fill_rect(Rect2i(16, 16, 2, 10), robe2)
+	img.fill_rect(Rect2i(9, 25, 10, 1), trim)
+	img.fill_rect(Rect2i(10, 20, 8, 1), gold)
+	# Arm nach vorn zur Stabhand
+	img.fill_rect(Rect2i(7, 16, 4, 2), robe)
+	img.fill_rect(Rect2i(6, 17, 2, 2), skin)
+	# Stab mit glühendem Orb
+	img.fill_rect(Rect2i(4, 9, 2, 18), wood)
+	img.fill_rect(Rect2i(3, 5, 4, 4), orb)
+	img.fill_rect(Rect2i(4, 6, 2, 2), Color(0.95, 1.0, 1.0))
+	img.set_pixel(2, 6, orb)
+	img.set_pixel(7, 6, orb)
+	img.set_pixel(4, 3, orb)
+	# Füße unter der Robe
+	img.fill_rect(Rect2i(10, 26, 3, 1), dark)
+	img.fill_rect(Rect2i(14, 26, 3, 1), dark)
+	return img
+
+## Großes Kampf-Sprite eines Helden (mit Kontur, gecacht).
+static func hero_battle(id: String) -> Texture2D:
+	var key := "hero_battle_" + id
+	if _cache.has(key):
+		return _cache[key]
+	var img := _serena_battle_img() if id == "serena" else _milo_battle_img()
+	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t
 
@@ -164,6 +297,20 @@ const ENEMY_ART := {
 			"abbaaaaaaaaaabba",
 			".abbbbbbbbbbbba.",
 			"..abbbbbbbbbba..",
+		],
+		"rows2": [
+			"................",
+			"....aaaaaaaa....",
+			"..aaaaaaaaaaaa..",
+			".aawaaaaaawaaaa.",
+			".aaeaaaaaaeaaaa.",
+			"aaaaaaaaaaaaaaaa",
+			"aaaaaabbbbaaaaaa",
+			"aaaaaaaaaaaaaaaa",
+			"abaaaaaaaaaaaaba",
+			"abbaaaaaaaaaabba",
+			"abbbbbbbbbbbbbba",
+			".abbbbbbbbbbbba.",
 		]},
 	"bat": {
 		"map": {"a": Color(0.35, 0.25, 0.45), "b": Color(0.22, 0.15, 0.30), "e": Color(0.95, 0.25, 0.25), "f": Color(0.55, 0.40, 0.65)},
@@ -178,6 +325,18 @@ const ENEMY_ART := {
 			"..fbbaaaaaabbf..",
 			"...f.aa..aa.f...",
 			".....a....a.....",
+		],
+		"rows2": [
+			"......a..a......",
+			".....aaaaaa.....",
+			"bb...aeaaea...bb",
+			"bbb..aaaaaa..bbb",
+			"bbbbbaaaaaabbbbb",
+			".bbbbaaaaaabbbb.",
+			"..fbbaafaabbf...",
+			"...fbaaaaaabf...",
+			".....aa..aa.....",
+			"................",
 		]},
 	"frostwolf": {
 		"map": {"a": Color(0.68, 0.80, 0.93), "b": Color(0.36, 0.50, 0.70), "e": Color(0.25, 0.95, 1.0), "w": Color(0.92, 0.97, 1.0)},
@@ -192,6 +351,18 @@ const ENEMY_ART := {
 			"...bab..baab....",
 			"...ba....ba.....",
 			"...b.....b......",
+		],
+		"rows2": [
+			".b.........bb...",
+			".bb........bab..",
+			"..b......baaab..",
+			".babbbbbaaaaaeb.",
+			"..baaaaaaaaaaab.",
+			"..baaaaaaaaawww.",
+			"...baaaaaaaab...",
+			"....ab...bab....",
+			"....b....a......",
+			"................",
 		]},
 	"eisgeist": {
 		"map": {"a": Color(0.72, 0.85, 0.98, 0.85), "b": Color(0.45, 0.62, 0.85, 0.85), "e": Color(0.20, 0.90, 1.0)},
@@ -207,6 +378,19 @@ const ENEMY_ART := {
 			".aabaaaaaabaa.",
 			"..aa.aaaa.aa..",
 			"..a...aa...a..",
+		],
+		"rows2": [
+			"....aaaaaa....",
+			"..aaaaaaaaaa..",
+			".aaaeaaaaeaaa.",
+			".aaaeaaaaeaaa.",
+			".aaaaaaaaaaaa.",
+			"aaaaabaabaaaaa",
+			"aaaaaabbaaaaaa",
+			".aaaaaaaaaaaa.",
+			".aabaaaaaabaa.",
+			"...aa.aa..aa..",
+			"....a..aa..a..",
 		]},
 	"skeleton": {
 		"map": {"a": Color(0.88, 0.86, 0.78), "b": Color(0.60, 0.58, 0.50), "e": Color(0.05, 0.05, 0.08), "r": Color(0.55, 0.15, 0.15)},
@@ -218,6 +402,24 @@ const ENEMY_ART := {
 			"...abbbba...",
 			"....aaaa....",
 			"..raaaaaar..",
+			".raabaabaar.",
+			".a.abaaba.a.",
+			".a.aaaaaa.a.",
+			"...abaaba...",
+			"...abaaba...",
+			"...aa..aa...",
+			"..ba....ab..",
+			"..a......a..",
+			".aa......aa.",
+		],
+		"rows2": [
+			"...aaaaaa...",
+			"..aaaaaaaa..",
+			"..aeaaaaea..",
+			"..aaaaaaaa..",
+			"...aeeeea...",
+			"....aaaa....",
+			".r.aaaaaa.r.",
 			".raabaabaar.",
 			".a.abaaba.a.",
 			".a.aaaaaa.a.",
@@ -383,27 +585,32 @@ static func _boss2_img() -> Image:
 	return img
 
 static func enemy(id: String) -> Texture2D:
-	var key := "enemy_" + id
+	return enemy_frame(id, 0)
+
+## Hat der Gegner eine zweite Idle-Pose zum Durchwechseln?
+static func enemy_has_anim(id: String) -> bool:
+	return ENEMY_ART.has(id) and ENEMY_ART[id].has("rows2")
+
+static func enemy_frame(id: String, frame: int) -> Texture2D:
+	var key := "enemy_%s_%d" % [id, frame]
 	if _cache.has(key):
 		return _cache[key]
+	var img: Image
 	if id == "boss":
-		var bt := _tex(_boss_img())
-		_cache[key] = bt
-		return bt
-	if id == "boss2":
-		var bt2 := _tex(_boss2_img())
-		_cache[key] = bt2
-		return bt2
-	var art: Dictionary = ENEMY_ART[id]
-	var rows: Array = art["rows"]
-	var w: int = rows[0].length()
-	var img := _img(w, rows.size())
-	for y in rows.size():
-		for x in w:
-			var ch: String = rows[y][x]
-			if art["map"].has(ch):
-				img.set_pixel(x, y, art["map"][ch])
-	var t := _tex(img)
+		img = _boss_img()
+	elif id == "boss2":
+		img = _boss2_img()
+	else:
+		var art: Dictionary = ENEMY_ART[id]
+		var rows: Array = art["rows2"] if (frame == 1 and art.has("rows2")) else art["rows"]
+		var w: int = rows[0].length()
+		img = _img(w, rows.size())
+		for y in rows.size():
+			for x in w:
+				var ch: String = rows[y][x]
+				if art["map"].has(ch):
+					img.set_pixel(x, y, art["map"][ch])
+	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t
 

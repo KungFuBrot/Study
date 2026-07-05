@@ -110,12 +110,11 @@ func _build_scene() -> void:
 	for i in GameState.party.size():
 		var data: Dictionary = GameState.party[i]
 		var s := Sprite2D.new()
-		s.texture = SpriteFactory.character(data["id"], "side", 0)
-		s.flip_h = true
+		s.texture = SpriteFactory.hero_battle(data["id"])
 		s.scale = Vector2(5, 5)
-		var home := Vector2(700 + i * 40, 230 + i * 90)
+		var home := Vector2(700 + i * 45, 225 + i * 95)
 		s.position = home + Vector2(340, 0)
-		_attach_shadow(s, 9, 3, 8.5)
+		_attach_shadow(s, 11, 3, s.texture.get_height() * 0.5 - 1.0)
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false})
 
@@ -124,20 +123,20 @@ func _build_scene() -> void:
 		var is_boss: bool = def.get("boss", false)
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		s.scale = Vector2(7, 7) if is_boss else Vector2(5, 5)
-		var home := Vector2(215, 232) if is_boss else Vector2(230 + (i % 2) * 90, 200 + i * 85)
+		s.scale = Vector2(7, 7) if is_boss else Vector2(6, 6)
+		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 190 + i * 90)
 		s.position = home - Vector2(500, 0)
 		if is_boss:
 			var foot: float = s.texture.get_height() * 0.5 + 0.5
 			_attach_shadow(s, 13, 3, foot)
 			_attach_boss_aura(s, def.get("theme", "bone"))
 		else:
-			_attach_shadow(s, 9, 3, 7.0)
+			_attach_shadow(s, 9, 3, s.texture.get_height() * 0.5 - 1.0)
 		add_child(s)
 		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"],
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
-			"acts": 0, "enraged": false})
+			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false})
 
 ## Weicher Schatten unter einem Kämpfer (als Kind, skaliert also mit).
 func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
@@ -256,6 +255,40 @@ func _add_snow() -> void:
 	snow.texture = SpriteFactory.circle(2, Color.WHITE)
 	snow.z_index = 20
 	add_child(snow)
+
+## Lebendige Idles: Monster wechseln zwischen zwei Posen, Heldenwaffen glitzern.
+func _start_idle_animations() -> void:
+	var frame_timer := Timer.new()
+	frame_timer.wait_time = 0.38
+	frame_timer.autostart = true
+	frame_timer.timeout.connect(func():
+		for e in enemies:
+			if e["alive"] and not e["is_boss"] and SpriteFactory.enemy_has_anim(e["id"]):
+				e["frame"] = 1 - e["frame"]
+				(e["sprite"] as Sprite2D).texture = SpriteFactory.enemy_frame(e["id"], e["frame"]))
+	add_child(frame_timer)
+	var glint_timer := Timer.new()
+	glint_timer.wait_time = 2.6
+	glint_timer.autostart = true
+	glint_timer.timeout.connect(func():
+		var h: Dictionary = heroes[randi() % heroes.size()]
+		if h["data"]["hp"] <= 0:
+			return
+		var s: Sprite2D = h["sprite"]
+		var glint := Sprite2D.new()
+		glint.texture = SpriteFactory.circle(5, Color(1, 1, 1))
+		glint.position = s.position + Vector2(-52, -44) + Vector2(randf_range(-6, 6), randf_range(-6, 6))
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		glint.material = mat
+		glint.scale = Vector2(0.2, 0.2)
+		add_child(glint)
+		var tw := glint.create_tween()
+		tw.tween_property(glint, "scale", Vector2(1.4, 1.4), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(glint, "rotation", 0.8, 0.4)
+		tw.tween_property(glint, "modulate:a", 0.0, 0.22)
+		tw.tween_callback(glint.queue_free))
+	add_child(glint_timer)
 
 func _idle_bob(s: Sprite2D, period: float) -> Tween:
 	var tw := create_tween().set_loops()
@@ -434,6 +467,7 @@ func _run_battle() -> void:
 		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
 	for i in enemies.size():
 		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
+	_start_idle_animations()
 	if not boss_def.is_empty():
 		await _boss_entrance()
 	else:
