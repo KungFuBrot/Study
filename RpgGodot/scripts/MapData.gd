@@ -2,14 +2,16 @@ class_name MapData
 ## ASCII-Karten. Legende:
 ##  g Gras, t Baum, p Weg, w Wasser, b Brücke, m Berg,
 ##  R Dach, W Hauswand, D Tür, f Dungeonboden, # Dungeonwand,
-##  T Stadt (Portal), C Höhle (Portal), X Dungeon-Ausgang (Portal)
+##  i Eisboden, I Eiswand,
+##  T Stadt (Portal), C Höhle (Portal), F Frostgrotte (Portal), X Dungeon-Ausgang (Portal)
 
-const WALKABLE := ["g", "p", "b", "f", "T", "C", "X"]
+const WALKABLE := ["g", "p", "b", "f", "i", "T", "C", "F", "X"]
 
 const TILE_FOR_CHAR := {
 	"g": "grass", "t": "tree", "p": "path", "w": "water", "b": "bridge",
 	"m": "mount", "R": "roof", "W": "wall", "D": "door", "f": "floor",
-	"#": "dwall", "T": "town_icon", "C": "cave", "X": "path",
+	"#": "dwall", "i": "ice", "I": "iwall", "T": "town_icon", "C": "cave",
+	"F": "icecave", "X": "path",
 }
 
 const MAPS := {
@@ -43,7 +45,10 @@ const MAPS := {
 				"lines": [
 					"Willkommen in Lindenhain, Reisende!",
 					"Östlich des Flusses liegt eine dunkle Höhle.",
-					"Dort lauern Monster. Geht nicht unvorbereitet hinein!"]},
+					"Dort lauern Monster. Geht nicht unvorbereitet hinein!",
+					"Und noch etwas: Im Nordosten liegt die Frostgrotte,",
+					"versiegelt von der Magie des Knochenkönigs.",
+					"Nur wer ihn bezwingt, kann das Eis betreten."]},
 			{"id": "npc_kid", "name": "Pia", "pos": Vector2i(12, 8),
 				"lines": [
 					"Hihi! Serena, dein Schwert glitzert so schön!",
@@ -59,8 +64,8 @@ const MAPS := {
 		"ground": "grass",
 		"rows": [
 			"mmmmmmmmmmmmmmmmmmmmmm",
-			"mggggtgggggwwgggggtggm",
-			"mggggggggggwwggggggggm",
+			"mggggtgggggwwggmmmmmmm",
+			"mggggggggggwwggmmmFmmm",
 			"mgTggggggggwwggggggggm",
 			"mgpggggggggwwggggggggm",
 			"mgpppppppppbbppppppggm",
@@ -75,10 +80,14 @@ const MAPS := {
 			"mggggggggggwwggggggggm",
 			"mmmmmmmmmmmmmmmmmmmmmm",
 		],
-		"spawns": {"from_town": Vector2i(2, 4), "from_dungeon": Vector2i(18, 9)},
+		"spawns": {"from_town": Vector2i(2, 4), "from_dungeon": Vector2i(18, 9),
+			"from_dungeon2": Vector2i(18, 3)},
 		"portals": [
 			{"pos": Vector2i(2, 3), "to": "town", "spawn": "from_world"},
 			{"pos": Vector2i(18, 10), "to": "dungeon", "spawn": "entrance"},
+			{"pos": Vector2i(18, 2), "to": "dungeon2", "spawn": "entrance",
+				"locked_until": "boss_defeated",
+				"locked_msg": "Eine Barriere aus ewigem Eis versperrt den Eingang. Die dunkle Magie des Knochenkönigs hält sie aufrecht — bezwingt ihn zuerst!"},
 		],
 		"npcs": [],
 	},
@@ -105,6 +114,32 @@ const MAPS := {
 		"spawns": {"entrance": Vector2i(2, 1)},
 		"portals": [
 			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon"},
+		],
+		"npcs": [],
+	},
+	"dungeon2": {
+		"name": "Frostgrotte",
+		"music": "dungeon2",
+		"encounters": true,
+		"ground": "ice",
+		"rows": [
+			"IIIIIIIIIIIIIIIIIIIIII",
+			"IXiiiiiiIIiiiiiiiiiiiI",
+			"IiiiiiiiIIiiiiIIIiiiiI",
+			"IiiIIiiiiiiiiiiIIIiiiI",
+			"IiiIIiiiiIIiiiiiiiiiiI",
+			"IiiiiiiiiiIIiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiIIiiiiI",
+			"IiiiIIIiiiiiiiiiIIiiiI",
+			"IiiiIIIiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IIIIIIIIIIIIIIIIIIIIII",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon2"},
 		],
 		"npcs": [],
 	},

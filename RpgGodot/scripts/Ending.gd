@@ -74,9 +74,9 @@ func _build_text() -> void:
 	layer.add_child(vig)
 	var entries := [
 		["DAS ABENTEUER IST VOLLBRACHT", 40, Color(1.0, 0.85, 0.3), 60],
-		["Der Knochenkönig ist Geschichte.", 22, Color.WHITE, 140],
-		["Frieden kehrt in die Finsterhöhle ein,", 22, Color.WHITE, 175],
-		["und Bruckstadt feiert seine Helden.", 22, Color.WHITE, 210],
+		["Knochenkönig und Frostkoloss sind Geschichte.", 22, Color.WHITE, 140],
+		["Frieden kehrt in Finsterhöhle und Frostgrotte ein,", 22, Color.WHITE, 175],
+		["und Lindenhain feiert seine Helden.", 22, Color.WHITE, 210],
 		["Serena  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 265],
 		["Milo  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 295],
 		["Erbeutetes Gold: %d" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 330],

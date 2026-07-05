@@ -6,6 +6,14 @@ extends Node2D
 const TILE := 16
 const STEP_TIME := 0.18
 
+# Feld-Bosse: welcher Boss in welchem Dungeon thront (bis sein Flag gesetzt ist).
+const FIELD_BOSSES := {
+	"dungeon": {"id": "boss", "tile": Vector2i(18, 10), "flag": "boss_defeated",
+		"glow": Color(1.0, 0.15, 0.05, 0.35)},
+	"dungeon2": {"id": "boss2", "tile": Vector2i(18, 10), "flag": "boss2_defeated",
+		"glow": Color(0.20, 0.80, 1.0, 0.35)},
+}
+
 var map_id := "town"
 var spawn_id := "start"
 var exact_pos := Vector2i(-1, -1)
@@ -43,6 +51,67 @@ func _ready() -> void:
 	_spawn_npcs()
 	_spawn_party()
 	_build_ui()
+	_add_barrier_shimmer()
+	_add_ambience()
+
+## Versiegelte Portale schimmern eisig, solange sie verschlossen sind.
+func _add_barrier_shimmer() -> void:
+	for portal in map["portals"]:
+		if not portal.has("locked_until") or GameState.get(portal["locked_until"]):
+			continue
+		var p: Vector2i = portal["pos"]
+		var shimmer := Sprite2D.new()
+		shimmer.texture = SpriteFactory.circle(10, Color(0.45, 0.85, 1.0, 0.5))
+		shimmer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		shimmer.position = Vector2(p.x * TILE + 8, p.y * TILE + 8)
+		shimmer.z_index = 6
+		add_child(shimmer)
+		var tw := shimmer.create_tween().set_loops()
+		tw.tween_property(shimmer, "modulate:a", 0.25, 0.8) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(shimmer, "modulate:a", 1.0, 0.8) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+## Dezente Umgebungspartikel je Karte: Blätter, Staub oder Schneetreiben.
+func _add_ambience() -> void:
+	var p := CPUParticles2D.new()
+	p.amount = 24
+	p.lifetime = 5.0
+	p.preprocess = 5.0
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.emission_rect_extents = Vector2(190, 8)
+	p.position = Vector2(6, -110)
+	p.z_index = 30
+	match map_id:
+		"town":
+			p.direction = Vector2(0.3, 1)
+			p.gravity = Vector2(4, 8)
+			p.initial_velocity_min = 18.0
+			p.initial_velocity_max = 34.0
+			p.color = Color(0.55, 0.75, 0.35, 0.8)
+			p.texture = SpriteFactory.circle(2, Color.WHITE)
+		"dungeon":
+			p.emission_rect_extents = Vector2(190, 120)
+			p.position = Vector2(6, 8)
+			p.direction = Vector2(0, -1)
+			p.gravity = Vector2.ZERO
+			p.initial_velocity_min = 2.0
+			p.initial_velocity_max = 7.0
+			p.color = Color(0.75, 0.70, 0.85, 0.35)
+			p.texture = SpriteFactory.circle(1, Color.WHITE)
+		"dungeon2":
+			p.amount = 40
+			p.direction = Vector2(0.15, 1)
+			p.gravity = Vector2(0, 6)
+			p.initial_velocity_min = 22.0
+			p.initial_velocity_max = 44.0
+			p.color = Color(0.95, 0.98, 1.0, 0.8)
+			p.texture = SpriteFactory.circle(1, Color.WHITE)
+		_:
+			p.queue_free()
+			return
+	# Am Spieler verankert, damit das Treiben die Kamera begleitet.
+	player.add_child(p)
 
 func _build_tiles() -> void:
 	var rows: Array = map["rows"]
@@ -65,18 +134,24 @@ func _spawn_npcs() -> void:
 		s.z_index = 5
 		add_child(s)
 		npc_nodes[npc["pos"]] = npc
-	# Boss thront hinten in der Finsterhöhle, bis er besiegt ist.
-	if map_id == "dungeon" and not GameState.boss_defeated:
-		var boss_tile := Vector2i(18, 10)
+	# Boss thront hinten im Dungeon, bis er besiegt ist.
+	if FIELD_BOSSES.has(map_id):
+		var cfg: Dictionary = FIELD_BOSSES[map_id]
+		if GameState.get(cfg["flag"]):
+			return
+		var boss_tile: Vector2i = cfg["tile"]
 		var bs := Sprite2D.new()
-		bs.texture = SpriteFactory.enemy("boss")
+		bs.texture = SpriteFactory.enemy(cfg["id"])
 		bs.centered = false
-		bs.position = Vector2(boss_tile.x * TILE - 6, boss_tile.y * TILE - 19)
+		# Sprite mittig über der Kachel, Füße auf dem Kachelboden.
+		var tw2 := bs.texture.get_width()
+		var th := bs.texture.get_height()
+		bs.position = Vector2(boss_tile.x * TILE + 8 - tw2 / 2.0, boss_tile.y * TILE + TILE - th + 1)
 		bs.z_index = 5
 		add_child(bs)
-		# Rotes Glühen unter dem Boss macht schon von Weitem klar: Gefahr!
+		# Glühen unter dem Boss macht schon von Weitem klar: Gefahr!
 		var glow := Sprite2D.new()
-		glow.texture = SpriteFactory.circle(16, Color(1.0, 0.15, 0.05, 0.35))
+		glow.texture = SpriteFactory.circle(16, cfg["glow"])
 		glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		glow.position = Vector2(boss_tile.x * TILE + 8, boss_tile.y * TILE + 12)
 		glow.z_index = 4
@@ -91,7 +166,8 @@ func _spawn_npcs() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		bob.tween_property(bs, "position:y", bs.position.y, 1.1) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		npc_nodes[boss_tile] = {"boss": true, "name": "Knochenkönig", "pos": boss_tile}
+		npc_nodes[boss_tile] = {"boss": true, "battle_id": cfg["id"],
+			"name": GameState.ENEMIES[cfg["id"]]["name"], "pos": boss_tile}
 
 func _spawn_party() -> void:
 	if exact_pos.x >= 0:
@@ -186,6 +262,15 @@ func _try_step(dir: Vector2i) -> void:
 func _after_step() -> void:
 	for portal in map["portals"]:
 		if portal["pos"] == player_tile:
+			# Versiegelte Portale (z. B. Frostgrotte) erst nach Freischaltung.
+			if portal.has("locked_until") and not GameState.get(portal["locked_until"]):
+				AudioManager.play_sfx("error")
+				dialog_name.text = "Eisbarriere"
+				dialog_lines = [portal["locked_msg"]]
+				dialog_after_shop = false
+				state = "dialogue"
+				_advance_dialogue()
+				return
 			state = "locked"  # Eingaben sperren während des Wechsels
 			GameState.main.goto_map(portal["to"], portal["spawn"])
 			return
@@ -194,7 +279,7 @@ func _after_step() -> void:
 		if steps_since_battle > 4 and randf() < 0.12:
 			steps_since_battle = 0
 			state = "locked"
-			GameState.main.start_battle(GameState.random_dungeon_encounter(), map_id, player_tile)
+			GameState.main.start_battle(GameState.random_encounter(map_id), map_id, player_tile)
 
 func _try_interact() -> void:
 	var target := player_tile + facing
@@ -203,7 +288,7 @@ func _try_interact() -> void:
 	var npc: Dictionary = npc_nodes[target]
 	if npc.get("boss", false):
 		state = "locked"
-		GameState.main.start_battle(["boss"], map_id, player_tile)
+		GameState.main.start_battle([npc["battle_id"]], map_id, player_tile)
 		return
 	dialog_lines = (npc["lines"] as Array).duplicate()
 	dialog_after_shop = npc.get("shop", false)

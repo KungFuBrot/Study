@@ -75,6 +75,21 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			var d2 := Vector2(x - 7.5, y - 9.0).length()
 			if d2 < 4.5: return Color(0.05, 0.04, 0.08)
 			return _tile_color("mount", x, y)
+		"ice":
+			if (x * 2 + y) % 11 == 0: return Color(0.44, 0.62, 0.82)
+			var ci := Color(0.62, 0.80, 0.94)
+			if n > 0.85: ci = Color(0.74, 0.89, 0.99)
+			elif n < 0.08: ci = Color(0.50, 0.68, 0.86)
+			return ci
+		"iwall":
+			if y % 4 == 0 or (x + (y / 4) * 2) % 6 == 0: return Color(0.12, 0.20, 0.36)
+			return Color(0.22, 0.34, 0.55) if n > 0.2 else Color(0.18, 0.29, 0.48)
+		"icecave":
+			var d3 := Vector2(x - 7.5, y - 9.0).length()
+			if d3 < 4.5: return Color(0.04, 0.08, 0.16)
+			var ridge2 := absf(float(x) - 8.0) + float(15 - y) * 0.8
+			if ridge2 < 6.0: return Color(0.60, 0.72, 0.86) if n > 0.3 else Color(0.68, 0.80, 0.92)
+			return Color(0.45, 0.54, 0.68)
 		"town_icon":
 			if y > 9 and x > 2 and x < 13: return Color(0.75, 0.68, 0.55)
 			if y > 5 and y <= 9 and x > 1 and x < 14: return Color(0.66, 0.24, 0.20)
@@ -163,6 +178,35 @@ const ENEMY_ART := {
 			"..fbbaaaaaabbf..",
 			"...f.aa..aa.f...",
 			".....a....a.....",
+		]},
+	"frostwolf": {
+		"map": {"a": Color(0.68, 0.80, 0.93), "b": Color(0.36, 0.50, 0.70), "e": Color(0.25, 0.95, 1.0), "w": Color(0.92, 0.97, 1.0)},
+		"rows": [
+			"...........bb...",
+			".b........bab...",
+			".bb......baaab..",
+			".babbbbbaaaaaeb.",
+			"..baaaaaaaaaaab.",
+			"..baaaaaaaaawww.",
+			"...baaaaaaaab...",
+			"...bab..baab....",
+			"...ba....ba.....",
+			"...b.....b......",
+		]},
+	"eisgeist": {
+		"map": {"a": Color(0.72, 0.85, 0.98, 0.85), "b": Color(0.45, 0.62, 0.85, 0.85), "e": Color(0.20, 0.90, 1.0)},
+		"rows": [
+			"....aaaaaa....",
+			"..aaaaaaaaaa..",
+			".aaaeaaaaeaaa.",
+			".aaaeaaaaeaaa.",
+			".aaaaaaaaaaaa.",
+			"aaaaabaabaaaaa",
+			"aaaaaabbaaaaaa",
+			".aaaaaaaaaaaa.",
+			".aabaaaaaabaa.",
+			"..aa.aaaa.aa..",
+			"..a...aa...a..",
 		]},
 	"skeleton": {
 		"map": {"a": Color(0.88, 0.86, 0.78), "b": Color(0.60, 0.58, 0.50), "e": Color(0.05, 0.05, 0.08), "r": Color(0.55, 0.15, 0.15)},
@@ -273,6 +317,71 @@ static func _boss_img() -> Image:
 			img.set_pixel(25 - hx, hy, horn)
 	return img
 
+## Der Frostkoloss: 30x38, massiger Eisgolem mit Kristallschultern,
+## glühendem Frostkern in der Brust und eisblauen Glutaugen.
+static func _boss2_img() -> Image:
+	var img := _img(30, 38)
+	var ice := Color(0.82, 0.91, 0.98)
+	var ice2 := Color(0.55, 0.74, 0.92)
+	var ice3 := Color(0.32, 0.52, 0.76)
+	var deep := Color(0.12, 0.24, 0.44)
+	var glow := Color(0.25, 0.95, 1.0)
+	var white := Color(0.96, 1.0, 1.0)
+	# Massige Schultern (breiter als der Kopf)
+	img.fill_rect(Rect2i(6, 9, 18, 1), ice)
+	img.fill_rect(Rect2i(4, 10, 22, 1), ice2)
+	img.fill_rect(Rect2i(2, 11, 26, 3), ice2)
+	img.fill_rect(Rect2i(2, 13, 26, 1), ice3)
+	# Kristall-Spitzen auf den Schultern
+	for sx in [3, 25]:
+		img.fill_rect(Rect2i(sx, 7, 3, 2), ice)
+		img.fill_rect(Rect2i(sx + 1, 5, 1, 2), ice)
+		img.set_pixel(sx + 1, 4, white)
+	# Arme mit klobigen Fäusten
+	img.fill_rect(Rect2i(3, 14, 5, 11), ice2)
+	img.fill_rect(Rect2i(22, 14, 5, 11), ice2)
+	img.fill_rect(Rect2i(3, 14, 1, 11), ice3)
+	img.fill_rect(Rect2i(26, 14, 1, 11), ice3)
+	img.fill_rect(Rect2i(2, 25, 7, 4), ice3)
+	img.fill_rect(Rect2i(21, 25, 7, 4), ice3)
+	for kx in [3, 5, 7, 22, 24, 26]:
+		img.set_pixel(kx, 24, white)
+	# Rumpf mit Panzerplatten und Rissen
+	img.fill_rect(Rect2i(9, 14, 12, 12), ice3)
+	img.fill_rect(Rect2i(10, 15, 10, 2), ice2)
+	img.fill_rect(Rect2i(10, 22, 10, 2), ice2)
+	for cp in [Vector2i(11, 19), Vector2i(18, 20), Vector2i(12, 24), Vector2i(19, 15)]:
+		img.set_pixel(cp.x, cp.y, deep)
+	# Glühender Frostkern in der Brust
+	img.fill_rect(Rect2i(13, 17, 4, 4), glow)
+	img.fill_rect(Rect2i(14, 18, 2, 2), white)
+	for gp in [Vector2i(12, 18), Vector2i(17, 19), Vector2i(14, 16), Vector2i(15, 21)]:
+		img.set_pixel(gp.x, gp.y, glow)
+	# Hüfte + stämmige Beine mit Fußplatten
+	img.fill_rect(Rect2i(11, 26, 8, 2), deep)
+	img.fill_rect(Rect2i(10, 28, 4, 7), ice2)
+	img.fill_rect(Rect2i(16, 28, 4, 7), ice2)
+	img.fill_rect(Rect2i(10, 28, 1, 7), ice3)
+	img.fill_rect(Rect2i(19, 28, 1, 7), ice3)
+	img.fill_rect(Rect2i(8, 35, 6, 2), ice3)
+	img.fill_rect(Rect2i(16, 35, 6, 2), ice3)
+	# Kopf: Eisblock mit Glutaugen und Kristallkrone
+	img.fill_rect(Rect2i(11, 3, 8, 7), ice2)
+	img.fill_rect(Rect2i(11, 3, 8, 1), ice)
+	img.fill_rect(Rect2i(12, 5, 2, 2), deep)
+	img.fill_rect(Rect2i(16, 5, 2, 2), deep)
+	img.set_pixel(12, 5, glow)
+	img.set_pixel(16, 5, glow)
+	img.set_pixel(13, 6, glow)
+	img.set_pixel(17, 6, glow)
+	# Grimmiger Mund
+	img.fill_rect(Rect2i(13, 8, 4, 1), deep)
+	# Kristallzacken auf dem Kopf
+	for hx in [11, 14, 17]:
+		img.fill_rect(Rect2i(hx, 1, 2, 2), ice)
+		img.set_pixel(hx, 0, white)
+	return img
+
 static func enemy(id: String) -> Texture2D:
 	var key := "enemy_" + id
 	if _cache.has(key):
@@ -281,6 +390,10 @@ static func enemy(id: String) -> Texture2D:
 		var bt := _tex(_boss_img())
 		_cache[key] = bt
 		return bt
+	if id == "boss2":
+		var bt2 := _tex(_boss2_img())
+		_cache[key] = bt2
+		return bt2
 	var art: Dictionary = ENEMY_ART[id]
 	var rows: Array = art["rows"]
 	var w: int = rows[0].length()
@@ -356,6 +469,22 @@ static func vignette(w: int, h: int, strength := 0.55) -> Texture2D:
 			img.set_pixel(x, y, Color(0, 0, 0, a * a * strength))
 	var t := _tex(img)
 	_cache[key] = t
+	return t
+
+## Spitzer Eissplitter für den Eissturm des Frostkolosses.
+static func shard() -> Texture2D:
+	if _cache.has("shard"):
+		return _cache["shard"]
+	var img := _img(7, 12)
+	var widths := [1, 2, 3, 3, 3, 3, 2, 2, 2, 1, 1, 1]
+	for y in 12:
+		var w: int = widths[y]
+		var x0 := 3 - w / 2
+		for x in w:
+			img.set_pixel(x0 + x, y, Color(0.75, 0.90, 1.0) if x == 0 else Color(0.50, 0.72, 0.95))
+	img.set_pixel(3, 0, Color(0.96, 1.0, 1.0))
+	var t := _tex(img)
+	_cache["shard"] = t
 	return t
 
 ## Kleiner Knochen für den Knochensturm des Bosses.

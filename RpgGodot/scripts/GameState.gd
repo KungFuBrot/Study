@@ -6,28 +6,49 @@ var main: Node = null
 var gold := 120
 var inventory := {}  # name -> anzahl
 var party := []      # Array aus Dictionaries (siehe reset_party)
-var boss_defeated := false  # bleibt auch nach einer Niederlage bestehen
+var boss_defeated := false   # Knochenkönig (Finsterhöhle)
+var boss2_defeated := false  # Frostkoloss (Frostgrotte) — beendet das Spiel
 
 const ITEMS := {
 	"Trank": {"price": 20, "desc": "Heilt 30 LP.", "hp": 30, "mp": 0},
 	"Äther": {"price": 35, "desc": "Stellt 12 MP wieder her.", "hp": 0, "mp": 12},
+	"Elixier": {"price": 90, "desc": "Heilt 100 LP.", "hp": 100, "mp": 0},
 }
 
+# Bosse tragen "boss": true plus Inszenierungs-Daten (Thema, Musik, Texte).
 const ENEMIES := {
 	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "sprite": "slime"},
 	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "sprite": "bat"},
 	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "sprite": "skeleton"},
-	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "sprite": "boss"},
+	"frostwolf": {"name": "Frostwolf", "hp": 55, "atk": 17, "def": 5, "gold": 25, "sprite": "frostwolf"},
+	"eisgeist": {"name": "Eisgeist", "hp": 45, "atk": 19, "def": 3, "gold": 28, "sprite": "eisgeist"},
+	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "sprite": "boss",
+		"boss": true, "theme": "bone", "song": "boss",
+		"entrance_line": "Der Herrscher der Finsterhöhle erhebt sich!",
+		"aoe_name": "Knochensturm"},
+	"boss2": {"name": "Frostkoloss", "hp": 520, "atk": 26, "def": 8, "gold": 800, "sprite": "boss2",
+		"boss": true, "theme": "frost", "song": "boss2",
+		"entrance_line": "Das ewige Eis erwacht — der Wächter der Frostgrotte!",
+		"aoe_name": "Eissturm"},
 }
 
-# Zufalls-Begegnungen im Dungeon (Gruppen von Gegner-IDs).
-const DUNGEON_ENCOUNTERS := [
-	["slime", "slime"],
-	["bat", "bat", "slime"],
-	["skeleton"],
-	["skeleton", "bat"],
-	["slime", "bat"],
-]
+# Zufalls-Begegnungen pro Dungeon (Gruppen von Gegner-IDs).
+const ENCOUNTERS := {
+	"dungeon": [
+		["slime", "slime"],
+		["bat", "bat", "slime"],
+		["skeleton"],
+		["skeleton", "bat"],
+		["slime", "bat"],
+	],
+	"dungeon2": [
+		["frostwolf"],
+		["frostwolf", "eisgeist"],
+		["eisgeist", "eisgeist"],
+		["frostwolf", "frostwolf"],
+		["eisgeist", "frostwolf", "eisgeist"],
+	],
+}
 
 func _ready() -> void:
 	reset_party()
@@ -36,6 +57,7 @@ func _ready() -> void:
 func reset_all() -> void:
 	gold = 120
 	boss_defeated = false
+	boss2_defeated = false
 	reset_party()
 
 func reset_party() -> void:
@@ -68,6 +90,21 @@ func reset_party() -> void:
 			],
 		},
 	]
+	# Nach dem Sieg über den Knochenkönig bleibt seine Segnung erhalten,
+	# auch wenn die Gruppe später fällt — sonst wäre die Frostgrotte unschaffbar.
+	if boss_defeated:
+		apply_blessing()
+
+## Segnung des Knochenkönigs: dauerhafter Machtschub für die Frostgrotte.
+func apply_blessing() -> void:
+	for member in party:
+		member["max_hp"] += 35
+		member["hp"] = member["max_hp"]
+		member["max_mp"] += 12
+		member["mp"] = member["max_mp"]
+		member["atk"] += 6
+		member["mag"] += 8
+		member["def"] += 3
 
 func add_item(item_name: String, count := 1) -> void:
 	inventory[item_name] = inventory.get(item_name, 0) + count
@@ -86,5 +123,6 @@ func party_alive() -> bool:
 			return true
 	return false
 
-func random_dungeon_encounter() -> Array:
-	return DUNGEON_ENCOUNTERS[randi() % DUNGEON_ENCOUNTERS.size()]
+func random_encounter(map_id: String) -> Array:
+	var groups: Array = ENCOUNTERS[map_id]
+	return groups[randi() % groups.size()]

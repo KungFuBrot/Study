@@ -11,6 +11,8 @@ signal _choice_made
 const BAR_W := 170
 
 var enemy_ids: Array = []
+var arena_theme := "cave"  # "cave" | "frost" — von Main anhand der Karte gesetzt
+var boss_def := {}         # ENEMIES-Definition des Bosses in diesem Kampf (falls vorhanden)
 var heroes := []   # {data, sprite, home, hp_label, hp_fill, mp_fill}
 var enemies := []  # {name, hp, max_hp, atk, def, gold, sprite, home, alive, ...}
 
@@ -30,9 +32,32 @@ var boss_bar_fill: ColorRect
 var boss_bar_holder: Control
 
 func _ready() -> void:
+	for id in enemy_ids:
+		if GameState.ENEMIES[id].get("boss", false):
+			boss_def = GameState.ENEMIES[id]
 	_build_scene()
 	_build_ui()
 	_run_battle()
+
+## Farbstimmung des Schauplatzes (dunkle Höhle vs. Frostgrotte).
+func _palette() -> Dictionary:
+	if arena_theme == "frost":
+		return {
+			"bg_top": Color(0.08, 0.15, 0.26), "bg_bottom": Color(0.02, 0.05, 0.11),
+			"floor_top": Color(0.20, 0.28, 0.40), "floor_bottom": Color(0.08, 0.12, 0.20),
+			"stone": Color(0.34, 0.44, 0.58), "stal": Color(0.14, 0.22, 0.36, 0.9),
+			"flame": Color(0.35, 0.80, 1.0), "glow": Color(0.25, 0.70, 1.0, 0.35),
+			"fog": Color(0.70, 0.85, 1.0, 0.09), "hit": Color(0.55, 0.85, 1.0),
+		}
+	var boss_fight := not boss_def.is_empty()
+	return {
+		"bg_top": Color(0.16, 0.07, 0.12) if boss_fight else Color(0.13, 0.11, 0.22),
+		"bg_bottom": Color(0.05, 0.03, 0.07),
+		"floor_top": Color(0.22, 0.18, 0.27), "floor_bottom": Color(0.10, 0.08, 0.14),
+		"stone": Color(0.28, 0.24, 0.34), "stal": Color(0.09, 0.06, 0.13, 0.85),
+		"flame": Color(1.0, 0.60, 0.15), "glow": Color(1.0, 0.55, 0.15, 0.35),
+		"fog": Color(0.55, 0.50, 0.75, 0.07), "hit": Color(1.0, 0.4, 0.3),
+	}
 
 ## ---------- Aufbau ----------
 
@@ -41,12 +66,10 @@ func _build_scene() -> void:
 	cam.position = Vector2(480, 270)
 	add_child(cam)
 	cam.make_current()
-	var has_boss := enemy_ids.has("boss")
-	# Hintergrund: weicher Höhlen-Verlauf, bei Bosskämpfen bedrohlich rötlich.
+	var pal := _palette()
+	# Hintergrund: weicher Farbverlauf passend zum Schauplatz.
 	var bg := Sprite2D.new()
-	bg.texture = SpriteFactory.gradient(8, 64,
-		Color(0.16, 0.07, 0.12) if has_boss else Color(0.13, 0.11, 0.22),
-		Color(0.05, 0.03, 0.07))
+	bg.texture = SpriteFactory.gradient(8, 64, pal["bg_top"], pal["bg_bottom"])
 	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	bg.centered = false
 	bg.scale = Vector2(960.0 / 8, 540.0 / 64)
@@ -58,13 +81,13 @@ func _build_scene() -> void:
 		var w := 40.0 + fmod(i * 37.0, 50.0)
 		var h := 120.0 + fmod(i * 73.0, 140.0)
 		stal.polygon = PackedVector2Array([Vector2(-w / 2, 0), Vector2(0, -h), Vector2(w / 2, 0)])
-		stal.color = Color(0.09, 0.06, 0.13, 0.85)
+		stal.color = pal["stal"]
 		stal.position = Vector2(30 + i * 150.0, 360)
 		stal.z_index = -15
 		add_child(stal)
 	# Boden mit Verlauf + Steine als Dekor
 	var floor_s := Sprite2D.new()
-	floor_s.texture = SpriteFactory.gradient(8, 32, Color(0.22, 0.18, 0.27), Color(0.10, 0.08, 0.14))
+	floor_s.texture = SpriteFactory.gradient(8, 32, pal["floor_top"], pal["floor_bottom"])
 	floor_s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	floor_s.centered = false
 	floor_s.position = Vector2(0, 340)
@@ -73,13 +96,15 @@ func _build_scene() -> void:
 	add_child(floor_s)
 	for i in 24:
 		var stone := Sprite2D.new()
-		stone.texture = SpriteFactory.circle(3 + (i % 4), Color(0.28, 0.24, 0.34))
+		stone.texture = SpriteFactory.circle(3 + (i % 4), pal["stone"])
 		stone.position = Vector2(40 + i * 39.0, 350 + fmod(i * 61.3, 160.0))
 		stone.z_index = -11
 		add_child(stone)
-	_add_torch(Vector2(70, 160))
-	_add_torch(Vector2(890, 160))
-	_add_fog()
+	_add_torch(Vector2(70, 160), pal)
+	_add_torch(Vector2(890, 160), pal)
+	_add_fog(pal)
+	if arena_theme == "frost":
+		_add_snow()
 
 	# Alle Kämpfer starten außerhalb des Bildes und marschieren in _run_battle ein.
 	for i in GameState.party.size():
@@ -95,16 +120,17 @@ func _build_scene() -> void:
 		heroes.append({"data": data, "sprite": s, "home": home})
 
 	for i in enemy_ids.size():
-		var is_boss: bool = enemy_ids[i] == "boss"
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
+		var is_boss: bool = def.get("boss", false)
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
 		s.scale = Vector2(7, 7) if is_boss else Vector2(5, 5)
-		var home := Vector2(215, 235) if is_boss else Vector2(230 + (i % 2) * 90, 200 + i * 85)
+		var home := Vector2(215, 232) if is_boss else Vector2(230 + (i % 2) * 90, 200 + i * 85)
 		s.position = home - Vector2(500, 0)
 		if is_boss:
-			_attach_shadow(s, 13, 3, 18.5)
-			_attach_boss_aura(s)
+			var foot: float = s.texture.get_height() * 0.5 + 0.5
+			_attach_shadow(s, 13, 3, foot)
+			_attach_boss_aura(s, def.get("theme", "bone"))
 		else:
 			_attach_shadow(s, 9, 3, 7.0)
 		add_child(s)
@@ -123,10 +149,12 @@ func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
 	sh.show_behind_parent = true
 	s.add_child(sh)
 
-## Dunkelrote Aura + pulsierendes Glühen hinter dem Boss.
-func _attach_boss_aura(s: Sprite2D) -> void:
+## Pulsierende Aura + aufsteigende Glut hinter dem Boss (rot bzw. eisblau).
+func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
+	var aura_col := Color(0.20, 0.75, 1.0, 0.30) if theme == "frost" else Color(1.0, 0.15, 0.05, 0.30)
+	var ember_col := Color(0.45, 0.85, 1.0, 0.8) if theme == "frost" else Color(1.0, 0.25, 0.08, 0.8)
 	var glow := Sprite2D.new()
-	glow.texture = SpriteFactory.circle(40, Color(1.0, 0.15, 0.05, 0.30))
+	glow.texture = SpriteFactory.circle(40, aura_col)
 	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	glow.scale = Vector2(3.2, 3.6)
 	glow.show_behind_parent = true
@@ -149,12 +177,12 @@ func _attach_boss_aura(s: Sprite2D) -> void:
 	ember.initial_velocity_max = 16.0
 	ember.scale_amount_min = 0.5
 	ember.scale_amount_max = 1.1
-	ember.color = Color(1.0, 0.25, 0.08, 0.8)
+	ember.color = ember_col
 	ember.texture = SpriteFactory.circle(3, Color.WHITE)
 	s.add_child(ember)
 
-## Fackel: flackerndes Licht + aufsteigende Glut.
-func _add_torch(pos: Vector2) -> void:
+## Fackel: flackerndes Licht + aufsteigende Glut (Flammenfarbe je Schauplatz).
+func _add_torch(pos: Vector2, pal: Dictionary) -> void:
 	var pole := ColorRect.new()
 	pole.size = Vector2(8, 46)
 	pole.position = pos + Vector2(-4, -6)
@@ -162,7 +190,7 @@ func _add_torch(pos: Vector2) -> void:
 	pole.z_index = -10
 	add_child(pole)
 	var glow := Sprite2D.new()
-	glow.texture = SpriteFactory.circle(30, Color(1.0, 0.55, 0.15, 0.35))
+	glow.texture = SpriteFactory.circle(30, pal["glow"])
 	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	glow.position = pos + Vector2(0, -14)
 	glow.scale = Vector2(3, 3)
@@ -186,16 +214,16 @@ func _add_torch(pos: Vector2) -> void:
 	flame.initial_velocity_max = 30.0
 	flame.scale_amount_min = 0.6
 	flame.scale_amount_max = 1.4
-	flame.color = Color(1.0, 0.6, 0.15, 0.9)
+	flame.color = pal["flame"]
 	flame.texture = SpriteFactory.circle(3, Color.WHITE)
 	flame.z_index = -8
 	add_child(flame)
 
 ## Träge dahinziehende Nebelschwaden geben dem Bild Tiefe.
-func _add_fog() -> void:
+func _add_fog(pal: Dictionary) -> void:
 	for i in 4:
 		var fog := Sprite2D.new()
-		fog.texture = SpriteFactory.circle(60, Color(0.55, 0.50, 0.75, 0.07))
+		fog.texture = SpriteFactory.circle(60, pal["fog"])
 		fog.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		fog.scale = Vector2(6.0 + i, 2.2)
 		fog.position = Vector2(150 + i * 260.0, 320 + i * 30.0)
@@ -207,6 +235,27 @@ func _add_fog() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		drift.tween_property(fog, "position:x", fog.position.x, 7.0 + i * 2.0) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+## Sanft rieselnder Schnee in der Frostgrotte.
+func _add_snow() -> void:
+	var snow := CPUParticles2D.new()
+	snow.position = Vector2(480, -20)
+	snow.amount = 70
+	snow.lifetime = 6.0
+	snow.preprocess = 6.0
+	snow.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	snow.emission_rect_extents = Vector2(520, 10)
+	snow.direction = Vector2(0, 1)
+	snow.spread = 12.0
+	snow.gravity = Vector2(0, 12)
+	snow.initial_velocity_min = 55.0
+	snow.initial_velocity_max = 95.0
+	snow.scale_amount_min = 0.5
+	snow.scale_amount_max = 1.2
+	snow.color = Color(0.95, 0.98, 1.0, 0.75)
+	snow.texture = SpriteFactory.circle(2, Color.WHITE)
+	snow.z_index = 20
+	add_child(snow)
 
 func _idle_bob(s: Sprite2D, period: float) -> void:
 	var tw := create_tween().set_loops()
@@ -278,7 +327,7 @@ func _build_ui() -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pulse.tween_property(cursor, "scale", Vector2.ONE, 0.35) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	if enemy_ids.has("boss"):
+	if not boss_def.is_empty():
 		_build_boss_bar()
 	_refresh_party()
 
@@ -304,14 +353,17 @@ func _build_boss_bar() -> void:
 	boss_bar_holder.position = Vector2(270, 52)
 	boss_bar_holder.modulate.a = 0.0
 	ui_layer.add_child(boss_bar_holder)
+	var frost: bool = boss_def.get("theme", "bone") == "frost"
 	var name_l := Label.new()
-	name_l.text = "☠  KNOCHENKÖNIG  ☠"
+	name_l.text = "☠  %s  ☠" % boss_def["name"].to_upper()
 	name_l.position = Vector2(0, -30)
 	name_l.custom_minimum_size = Vector2(420, 0)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_l.add_theme_font_size_override("font_size", 20)
-	name_l.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	name_l.add_theme_color_override("font_outline_color", Color(0.25, 0.03, 0.03))
+	name_l.add_theme_color_override("font_color",
+		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.85, 0.3))
+	name_l.add_theme_color_override("font_outline_color",
+		Color(0.03, 0.10, 0.25) if frost else Color(0.25, 0.03, 0.03))
 	name_l.add_theme_constant_override("outline_size", 6)
 	boss_bar_holder.add_child(name_l)
 	var bg := ColorRect.new()
@@ -321,13 +373,13 @@ func _build_boss_bar() -> void:
 	var border := ColorRect.new()
 	border.size = Vector2(424, 20)
 	border.position = Vector2(-2, -2)
-	border.color = Color(0.6, 0.15, 0.1)
+	border.color = Color(0.15, 0.35, 0.6) if frost else Color(0.6, 0.15, 0.1)
 	border.show_behind_parent = true
 	bg.add_child(border)
 	boss_bar_fill = ColorRect.new()
 	boss_bar_fill.position = Vector2(1, 1)
 	boss_bar_fill.size = Vector2(418, 14)
-	boss_bar_fill.color = Color(0.9, 0.2, 0.15)
+	boss_bar_fill.color = Color(0.25, 0.75, 1.0) if frost else Color(0.9, 0.2, 0.15)
 	bg.add_child(boss_bar_fill)
 
 func _refresh_party() -> void:
@@ -363,18 +415,25 @@ func _say(text: String) -> void:
 ## ---------- Rundenablauf ----------
 
 func _run_battle() -> void:
-	# Einmarsch: alle gleiten an ihre Position, dann beginnt das Idle-Wippen.
+	# Gestaffelter Einmarsch: alle gleiten nacheinander eingeblendet an ihre
+	# Position, dann beginnt das Idle-Wippen.
 	await get_tree().create_timer(0.15).timeout
-	var intro := create_tween().set_parallel(true)
-	for u in heroes + enemies:
-		intro.tween_property(u["sprite"], "position", u["home"], 0.5) \
+	var units: Array = heroes + enemies
+	for i in units.size():
+		var u: Dictionary = units[i]
+		var s: Sprite2D = u["sprite"]
+		s.modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_interval(i * 0.09)
+		tw.tween_property(s, "position", u["home"], 0.5) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	await intro.finished
+		tw.parallel().tween_property(s, "modulate:a", 1.0, 0.35)
+	await get_tree().create_timer(0.55 + units.size() * 0.09).timeout
 	for i in heroes.size():
 		_idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
 	for i in enemies.size():
 		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
-	if enemy_ids.has("boss"):
+	if not boss_def.is_empty():
 		await _boss_entrance()
 	else:
 		_say("Monster greifen an!")
@@ -472,6 +531,10 @@ func _menu(entries: Array, h: Dictionary) -> int:
 	menu_index = 0
 	ui_state = "menu"
 	_redraw_menu()
+	# Sanftes Einblenden des Menüs
+	menu_box.modulate.a = 0.0
+	var fade := menu_box.create_tween()
+	fade.tween_property(menu_box, "modulate:a", 1.0, 0.15)
 	await _choice_made
 	_clear_menu()
 	_highlight_hero(h, false)
@@ -586,23 +649,38 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	_say("%s greift an!" % h["data"]["name"])
+	# Anspannung (Squash) vor dem Sprint — klassisches Squash & Stretch.
+	var wind := create_tween()
+	wind.tween_property(s, "scale", Vector2(5.5, 4.4), 0.09)
+	wind.tween_property(s, "scale", Vector2(4.6, 5.4), 0.10)
+	await wind.finished
 	var strike_pos: Vector2 = es.position + Vector2(_strike_offset(e), 0)
 	var tw := create_tween()
-	tw.tween_property(s, "position", strike_pos, 0.22) \
+	tw.tween_property(s, "position", strike_pos, 0.2) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_ghost_trail(s, 0.22)
+	tw.parallel().tween_property(s, "scale", Vector2(5, 5), 0.2)
+	_ghost_trail(s, 0.2)
 	await tw.finished
 	AudioManager.play_sfx("slash")
 	_slash_arc(es.position)
 	_burst(es.position, Color(1.0, 0.9, 0.5), 10, 120)
 	_impact_ring(es.position, Color(1, 1, 1, 0.7))
-	await _hitstop(0.06)
-	var dmg: int = int(h["data"]["atk"] * randf_range(0.9, 1.2)) - e["def"]
+	var crit := randf() < 0.12
+	await _hitstop(0.11 if crit else 0.06)
+	var dmg: int = int(h["data"]["atk"] * randf_range(0.9, 1.2) * (1.6 if crit else 1.0)) - e["def"]
+	if crit:
+		_crit_fx(es.position)
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.25) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
+
+## Kritischer Treffer: großer Schriftzug, extra Funken, stärkeres Beben.
+func _crit_fx(pos: Vector2) -> void:
+	_float_text(pos + Vector2(-30, -46), "KRITISCH!", Color(1.0, 0.62, 0.1), 36)
+	_burst(pos, Color(1.0, 0.75, 0.2), 16, 200)
+	_shake_camera(1.9)
 
 ## Angriffsposition: vor dem Gegner stehen, beim breiten Boss weiter außen.
 func _strike_offset(e: Dictionary) -> float:
@@ -617,6 +695,7 @@ func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	tw.tween_property(s, "position", Vector2(430, 260), 0.25).set_trans(Tween.TRANS_QUAD)
 	_ghost_trail(s, 0.25)
 	await tw.finished
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.95, 0.5))
 	AudioManager.play_sfx("whirl")
 	var spin := create_tween()
 	spin.tween_property(s, "rotation", TAU * 2, 0.5)
@@ -638,6 +717,7 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s wirkt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 14.0, 0.2)
 	await raise.finished
@@ -696,8 +776,11 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 		_burst(es.position, Color(1.0, 0.95, 0.6), 7, 110)
 		await get_tree().create_timer(0.11).timeout
 	_impact_ring(es.position, Color(1.0, 0.95, 0.5, 0.8))
-	await _hitstop(0.06)
-	var dmg: int = int((ab["power"] + d["atk"]) * randf_range(0.95, 1.15))
+	var crit := randf() < 0.12
+	await _hitstop(0.11 if crit else 0.06)
+	var dmg: int = int((ab["power"] + d["atk"]) * randf_range(0.95, 1.15) * (1.6 if crit else 1.0))
+	if crit:
+		_crit_fx(es.position)
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.22) \
@@ -710,6 +793,7 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var td: Dictionary = target["data"]
 	_say("%s wirkt %s auf %s!" % [d["name"], ab["name"], td["name"]])
 	var s: Sprite2D = h["sprite"]
+	_cast_circle(s.position + Vector2(0, 40), Color(0.45, 1.0, 0.55))
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 12.0, 0.2)
 	await raise.finished
@@ -749,8 +833,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	windup.tween_property(es, "scale", base_scale * 1.15, 0.16)
 	windup.parallel().tween_property(es, "modulate", Color(1.3, 0.8, 0.8), 0.16)
 	windup.tween_property(es, "scale", base_scale, 0.12)
-	windup.parallel().tween_property(es, "modulate",
-		Color(1.15, 0.85, 0.85) if e["enraged"] else Color.WHITE, 0.12)
+	windup.parallel().tween_property(es, "modulate", e.get("tint", Color.WHITE), 0.12)
 	await windup.finished
 	if e["is_boss"] and e["acts"] % 3 == 0:
 		await _boss_aoe(e, alive_heroes)
@@ -764,7 +847,7 @@ func _enemy_turn(e: Dictionary) -> void:
 		_ghost_trail(es, 0.22)
 	await tw.finished
 	AudioManager.play_sfx("hit")
-	_burst(target["sprite"].position, Color(1.0, 0.4, 0.3), 8, 110)
+	_burst(target["sprite"].position, _palette()["hit"], 8, 110)
 	var dmg := maxi(int(e["atk"] * randf_range(0.85, 1.15)) - target["data"]["def"], 1)
 	_damage_hero(target, dmg)
 	var back := create_tween()
@@ -772,38 +855,41 @@ func _enemy_turn(e: Dictionary) -> void:
 	await back.finished
 	await get_tree().create_timer(0.25).timeout
 
-## Boss-Spezial: Knochensturm — Knochenhagel prasselt auf die ganze Gruppe.
+## Boss-Spezial: Knochen- bzw. Eissturm prasselt auf die ganze Gruppe.
 func _boss_aoe(e: Dictionary, targets: Array) -> void:
-	_say("%s beschwört den Knochensturm!" % e["name"])
+	var frost: bool = boss_def.get("theme", "bone") == "frost"
+	_say("%s beschwört den %s!" % [e["name"], boss_def["aoe_name"]])
 	AudioManager.play_sfx("roar")
 	var es: Sprite2D = e["sprite"]
 	var pump := create_tween()
 	pump.tween_property(es, "scale", es.scale * 1.25, 0.35).set_trans(Tween.TRANS_QUAD)
 	pump.tween_property(es, "scale", es.scale, 0.15)
 	await pump.finished
-	_flash_screen(Color(1.0, 0.15, 0.1, 0.40))
+	_flash_screen(Color(0.3, 0.7, 1.0, 0.40) if frost else Color(1.0, 0.15, 0.1, 0.40))
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.0)
-	# Knochenhagel über den Helden
+	# Projektilhagel über den Helden (Knochen bzw. Eissplitter)
+	var impact_col := Color(0.6, 0.9, 1.0) if frost else Color(0.9, 0.88, 0.8)
 	for i in 12:
 		var b := Sprite2D.new()
-		b.texture = SpriteFactory.bone()
+		b.texture = SpriteFactory.shard() if frost else SpriteFactory.bone()
 		b.scale = Vector2(3, 3)
-		b.rotation = randf() * TAU
+		b.rotation = randf() * TAU if not frost else randf_range(-0.3, 0.3)
 		b.position = Vector2(randf_range(600, 860), -30)
 		add_child(b)
 		var fall := create_tween()
 		fall.tween_interval(randf_range(0.0, 0.35))
 		fall.tween_property(b, "position:y", randf_range(240, 360), randf_range(0.30, 0.5)) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		fall.parallel().tween_property(b, "rotation", b.rotation + randf_range(-6.0, 6.0), 0.5)
+		if not frost:
+			fall.parallel().tween_property(b, "rotation", b.rotation + randf_range(-6.0, 6.0), 0.5)
 		fall.tween_callback(func():
-			_burst(b.position, Color(0.9, 0.88, 0.8), 5, 80)
+			_burst(b.position, impact_col, 5, 80)
 			b.queue_free())
 	await get_tree().create_timer(0.55).timeout
 	for t in targets:
 		var dmg := maxi(int(e["atk"] * randf_range(0.7, 0.9)) - t["data"]["def"], 1)
-		_burst(t["sprite"].position, Color(0.9, 0.4, 0.9), 8, 110)
+		_burst(t["sprite"].position, Color(0.5, 0.8, 1.0) if frost else Color(0.9, 0.4, 0.9), 8, 110)
 		_damage_hero(t, dmg)
 	await get_tree().create_timer(0.7).timeout
 
@@ -844,26 +930,30 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 			await _boss_enrage(e)
 		await get_tree().create_timer(0.35).timeout
 
-## Wut-Phase des Bosses: rote Färbung, Aufschrei, mehr Angriff.
+## Wut-Phase des Bosses: Aufschrei, Färbung, mehr Angriff (Farbe je Thema).
 func _boss_enrage(e: Dictionary) -> void:
+	var frost: bool = boss_def.get("theme", "bone") == "frost"
 	e["enraged"] = true
 	e["atk"] = int(e["atk"] * 1.35)
 	AudioManager.play_sfx("charge")
-	_say("Der Knochenkönig tobt vor Wut!")
+	_say("%s tobt vor Wut!" % e["name"])
 	var es: Sprite2D = e["sprite"]
-	_flash_screen(Color(1.0, 0.1, 0.05, 0.35))
+	_flash_screen(Color(0.3, 0.7, 1.0, 0.35) if frost else Color(1.0, 0.1, 0.05, 0.35))
 	_shake_camera(2.2)
+	var rage_col := Color(0.5, 1.1, 1.7) if frost else Color(1.6, 0.5, 0.4)
+	var tint := Color(0.85, 1.0, 1.2) if frost else Color(1.15, 0.85, 0.85)
+	e["tint"] = tint
 	var tw := create_tween()
-	tw.tween_property(es, "modulate", Color(1.6, 0.5, 0.4), 0.3)
-	tw.tween_property(es, "modulate", Color(1.15, 0.85, 0.85), 0.4)
-	_burst(es.position, Color(1.0, 0.2, 0.1), 22, 190)
+	tw.tween_property(es, "modulate", rage_col, 0.3)
+	tw.tween_property(es, "modulate", tint, 0.4)
+	_burst(es.position, Color(0.3, 0.85, 1.0) if frost else Color(1.0, 0.2, 0.1), 22, 190)
 	AudioManager.play_sfx("roar")
 	await get_tree().create_timer(1.0).timeout
 
 ## Inszenierter Boss-Tod: Zeitlupe, Explosionskette, weißer Blitz, Zerfall.
 func _boss_death(e: Dictionary) -> void:
 	var s: Sprite2D = e["sprite"]
-	_say("Der Knochenkönig bricht zusammen!")
+	_say("%s bricht zusammen!" % e["name"])
 	await _hitstop(0.25)
 	AudioManager.play_sfx("roar")
 	# Explosionskette über den ganzen Körper
@@ -898,6 +988,12 @@ func _shake(s: Sprite2D) -> void:
 	var flash := create_tween()
 	flash.tween_property(s, "modulate", Color(1, 0.35, 0.35), 0.08)
 	flash.tween_property(s, "modulate", Color.WHITE, 0.15)
+	# Kurzer Quetsch-Impuls verkauft die Wucht des Treffers.
+	var base: Vector2 = s.scale
+	var squash := create_tween()
+	squash.tween_property(s, "scale", base * Vector2(1.12, 0.88), 0.06)
+	squash.tween_property(s, "scale", base, 0.14) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _shake_camera(strength := 1.0) -> void:
 	var tw := create_tween()
@@ -927,11 +1023,11 @@ func _ghost_trail(s: Sprite2D, dur: float) -> void:
 		tw.tween_property(g, "modulate:a", 0.0, 0.28)
 		tw.tween_callback(g.queue_free)
 
-func _float_text(pos: Vector2, text: String, color: Color) -> void:
+func _float_text(pos: Vector2, text: String, color: Color, size := 30) -> void:
 	var l := Label.new()
 	l.text = text
 	l.position = pos + Vector2(-14, -70)
-	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 7)
@@ -997,6 +1093,37 @@ func _burst(pos: Vector2, color: Color, amount: int, speed: float) -> void:
 	tw.tween_interval(1.2)
 	tw.tween_callback(p.queue_free)
 
+## Rotierender Zauberkreis unter dem Wirker: kreisende Lichter + Glühen.
+func _cast_circle(pos: Vector2, color: Color) -> void:
+	var pivot := Node2D.new()
+	pivot.position = pos
+	pivot.scale = Vector2(1, 0.33)  # flach gedrückt → Bodenkreis in Pseudo-3D
+	add_child(pivot)
+	# Flaches Glühen bleibt unrotiert, nur die Lichter kreisen.
+	var glow := Sprite2D.new()
+	glow.texture = SpriteFactory.circle(24, Color(color.r, color.g, color.b, 0.35))
+	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	glow.position = pos
+	glow.scale = Vector2(2.2, 0.7)
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glow.material = mat
+	add_child(glow)
+	var gt := glow.create_tween()
+	gt.tween_property(glow, "modulate:a", 0.0, 0.8)
+	gt.tween_callback(glow.queue_free)
+	for i in 8:
+		var orb := Sprite2D.new()
+		orb.texture = SpriteFactory.circle(4, color)
+		var ang := TAU * i / 8.0
+		orb.position = Vector2(cos(ang) * 46, sin(ang) * 46)
+		pivot.add_child(orb)
+	var tw := pivot.create_tween()
+	tw.tween_property(pivot, "rotation", TAU * 1.5, 0.8) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(pivot, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(pivot.queue_free)
+
 ## Expandierender Stoßwellen-Ring am Aufprallpunkt.
 func _impact_ring(pos: Vector2, color: Color) -> void:
 	var ring := Sprite2D.new()
@@ -1045,17 +1172,22 @@ func _boss_entrance() -> void:
 		AudioManager.play_sfx("stomp")
 		_shake_camera(1.8)
 		await get_tree().create_timer(0.42).timeout
+	var frost: bool = boss_def.get("theme", "bone") == "frost"
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.4)
-	_flash_screen(Color(0.8, 0.1, 0.1, 0.35))
+	_flash_screen(Color(0.2, 0.6, 1.0, 0.35) if frost else Color(0.8, 0.1, 0.1, 0.35))
 	var banner := Label.new()
-	banner.text = "☠  KNOCHENKÖNIG  ☠"
+	banner.text = "☠  %s  ☠" % boss_def["name"].to_upper()
 	banner.add_theme_font_size_override("font_size", 48)
-	banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	banner.add_theme_color_override("font_outline_color", Color(0.3, 0.05, 0.05))
+	banner.add_theme_color_override("font_color",
+		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.85, 0.3))
+	banner.add_theme_color_override("font_outline_color",
+		Color(0.03, 0.10, 0.28) if frost else Color(0.3, 0.05, 0.05))
 	banner.add_theme_constant_override("outline_size", 12)
-	banner.position = Vector2(230, 150)
-	banner.pivot_offset = Vector2(250, 30)
+	banner.custom_minimum_size = Vector2(960, 0)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.position = Vector2(0, 150)
+	banner.pivot_offset = Vector2(480, 30)
 	banner.modulate.a = 0.0
 	banner.scale = Vector2(2.6, 2.6)
 	ui_layer.add_child(banner)
@@ -1066,7 +1198,7 @@ func _boss_entrance() -> void:
 	tw.tween_interval(1.2)
 	tw.tween_property(banner, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(banner.queue_free)
-	_say("Der Herrscher der Finsterhöhle erhebt sich!")
+	_say(boss_def["entrance_line"])
 	await get_tree().create_timer(1.6).timeout
 	# Balken raus, Boss-HP-Leiste rein
 	var out := create_tween().set_parallel(true)
@@ -1103,9 +1235,9 @@ func _victory() -> void:
 		gold += e["gold"]
 	GameState.gold += gold
 	AudioManager.play_music("victory")
-	if enemy_ids.has("boss"):
-		GameState.boss_defeated = true
-		_say("Der Knochenkönig ist besiegt!  %d Gold erbeutet!" % gold)
+	_victory_banner()
+	if not boss_def.is_empty():
+		_say("%s ist besiegt!  %d Gold erbeutet!" % [boss_def["name"], gold])
 	else:
 		_say("Sieg!  %d Gold erbeutet!" % gold)
 	# Münzregen über den Helden
@@ -1127,7 +1259,45 @@ func _victory() -> void:
 			tw.tween_property(s, "position:y", s.position.y - 30.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 			tw.tween_property(s, "position:y", s.position.y, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	await get_tree().create_timer(2.2).timeout
+	# Boss-Siege schalten den Fortschritt frei.
+	if enemy_ids.has("boss2"):
+		GameState.boss2_defeated = true
+	elif enemy_ids.has("boss"):
+		GameState.boss_defeated = true
+		GameState.apply_blessing()
+		_refresh_party()
+		AudioManager.play_sfx("heal")
+		for h in heroes:
+			_sparkle(h["sprite"].position, Color(1.0, 0.9, 0.4))
+			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
+		_say("Die Segnung des Königs durchströmt euch — ihr fühlt euch stärker!")
+		await get_tree().create_timer(2.4).timeout
+		_say("Im Nordosten birst krachend eine Barriere aus Eis ...")
+		await get_tree().create_timer(2.2).timeout
 	finished.emit(true)
+
+## Großes „SIEG!“-Banner, das ins Bild ploppt.
+func _victory_banner() -> void:
+	var banner := Label.new()
+	banner.text = "SIEG!"
+	banner.add_theme_font_size_override("font_size", 64)
+	banner.add_theme_color_override("font_color", Color(1.0, 0.88, 0.25))
+	banner.add_theme_color_override("font_outline_color", Color(0.35, 0.2, 0.0))
+	banner.add_theme_constant_override("outline_size", 12)
+	banner.custom_minimum_size = Vector2(960, 0)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.position = Vector2(0, 130)
+	banner.pivot_offset = Vector2(480, 40)
+	banner.scale = Vector2(0.2, 0.2)
+	banner.modulate.a = 0.0
+	ui_layer.add_child(banner)
+	var tw := create_tween()
+	tw.tween_property(banner, "modulate:a", 1.0, 0.15)
+	tw.parallel().tween_property(banner, "scale", Vector2.ONE, 0.4) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.3)
+	tw.tween_property(banner, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(banner.queue_free)
 
 func _defeat() -> void:
 	_say("Die Gruppe wurde besiegt ...")

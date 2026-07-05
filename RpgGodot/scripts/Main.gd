@@ -7,7 +7,7 @@ var fade_rect: ColorRect
 
 # Merker, um nach einem Kampf an dieselbe Stelle zurückzukehren.
 var field_return := {"map": "town", "spawn": "start", "pos": Vector2i(-1, -1)}
-var last_battle_was_boss := false
+var last_battle_was_final_boss := false
 
 func _ready() -> void:
 	GameState.main = self
@@ -36,7 +36,7 @@ func goto_map(map_id: String, spawn_id: String, exact_pos := Vector2i(-1, -1)) -
 
 func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	field_return = {"map": from_map, "spawn": "", "pos": pos}
-	last_battle_was_boss = enemy_ids.has("boss")
+	last_battle_was_final_boss = enemy_ids.has("boss2")
 	AudioManager.play_sfx("encounter")
 	# Kurzes Aufblitzen als Kampf-Übergang.
 	for i in 2:
@@ -48,17 +48,22 @@ func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	_clear_screen()
 	var battle := Battle.new()
 	battle.enemy_ids = enemy_ids
+	battle.arena_theme = "frost" if from_map == "dungeon2" else "cave"
 	battle.finished.connect(_on_battle_finished)
 	add_child(battle)
 	current_screen = battle
-	AudioManager.play_music("boss" if enemy_ids.has("boss") else "battle")
+	# Boss-Kämpfe bringen ihre eigene Musik mit.
+	var song := "battle"
+	for id in enemy_ids:
+		song = GameState.ENEMIES[id].get("song", song)
+	AudioManager.play_music(song)
 	await _fade(0.0, 0.35)
 
 func _on_battle_finished(victory: bool) -> void:
 	if not victory:
 		GameState.reset_party()
 		goto_map("town", "start")
-	elif last_battle_was_boss and GameState.boss_defeated:
+	elif last_battle_was_final_boss and GameState.boss2_defeated:
 		_show_ending()
 	else:
 		goto_map(field_return["map"], "", field_return["pos"])
