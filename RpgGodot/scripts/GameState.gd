@@ -25,11 +25,11 @@ const ENEMIES := {
 	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "sprite": "boss",
 		"boss": true, "theme": "bone", "song": "boss",
 		"entrance_line": "Der Herrscher der Finsterhöhle erhebt sich!",
-		"aoe_name": "Knochensturm"},
+		"aoe_name": "Knochensturm", "ultimate_name": "Armee der Verdammten"},
 	"boss2": {"name": "Frostkoloss", "hp": 520, "atk": 26, "def": 8, "gold": 800, "sprite": "boss2",
 		"boss": true, "theme": "frost", "song": "boss2",
 		"entrance_line": "Das ewige Eis erwacht — der Wächter der Frostgrotte!",
-		"aoe_name": "Eissturm"},
+		"aoe_name": "Eissturm", "ultimate_name": "Ewiger Winter"},
 }
 
 # Zufalls-Begegnungen pro Dungeon (Gruppen von Gegner-IDs).
@@ -75,6 +75,8 @@ func reset_party() -> void:
 					"power": 16, "kind": "pierce",
 					"desc": "Durchbohrt die Verteidigung."},
 			],
+			"ultimate": {"name": "Sternenklinge",
+				"desc": "Lichtklingen zerreißen alle Feinde. (1x pro Kampf)"},
 		},
 		{
 			"id": "milo", "name": "Milo", "class": "Zauberer",
@@ -88,6 +90,8 @@ func reset_party() -> void:
 					"power": 28, "kind": "heal",
 					"desc": "Heilt einen Verbündeten."},
 			],
+			"ultimate": {"name": "Meteorregen",
+				"desc": "Brennende Meteore auf alle Feinde. (1x pro Kampf)"},
 		},
 	]
 	# Nach dem Sieg über den Knochenkönig bleibt seine Segnung erhalten,

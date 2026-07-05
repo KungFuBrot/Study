@@ -117,7 +117,7 @@ func _build_scene() -> void:
 		s.position = home + Vector2(340, 0)
 		_attach_shadow(s, 9, 3, 8.5)
 		add_child(s)
-		heroes.append({"data": data, "sprite": s, "home": home})
+		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false})
 
 	for i in enemy_ids.size():
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
@@ -257,12 +257,13 @@ func _add_snow() -> void:
 	snow.z_index = 20
 	add_child(snow)
 
-func _idle_bob(s: Sprite2D, period: float) -> void:
+func _idle_bob(s: Sprite2D, period: float) -> Tween:
 	var tw := create_tween().set_loops()
 	tw.tween_property(s, "position:y", s.position.y - 4.0, period * 0.5) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(s, "position:y", s.position.y, period * 0.5) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	return tw
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -430,7 +431,7 @@ func _run_battle() -> void:
 		tw.parallel().tween_property(s, "modulate:a", 1.0, 0.35)
 	await get_tree().create_timer(0.55 + units.size() * 0.09).timeout
 	for i in heroes.size():
-		_idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
+		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
 	for i in enemies.size():
 		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
 	if not boss_def.is_empty():
@@ -486,16 +487,30 @@ func _hero_turn(h: Dictionary) -> bool:
 				return false
 	return false
 
-## Untermenü: eine der Fähigkeiten des Helden wählen und ausführen.
+## Untermenü: eine der Fähigkeiten (oder die Ultimative) wählen und ausführen.
 func _ability_menu(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
 	var abilities: Array = d["abilities"]
+	var ult: Dictionary = d["ultimate"]
 	var entries := []
 	for ab in abilities:
 		entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
+	entries.append("★ %s — %s" % [ult["name"],
+		"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
 	entries.append("Zurück")
 	var pick: int = await _menu(entries, h)
-	if pick >= abilities.size():
+	if pick == abilities.size():
+		if h["ult_used"]:
+			_say("Die ultimative Kraft ist in diesem Kampf bereits verbraucht!")
+			AudioManager.play_sfx("error")
+			return false
+		h["ult_used"] = true
+		if d["id"] == "serena":
+			await _ultimate_serena(h)
+		else:
+			await _ultimate_milo(h)
+		return true
+	if pick > abilities.size():
 		return false
 	var ab: Dictionary = abilities[pick]
 	if d["mp"] < ab["cost"]:
@@ -787,6 +802,185 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
 
+## Dunkelt den Schauplatz ab (hinter den Kämpfern) für Ultimate-Inszenierungen.
+func _dim_world(alpha: float) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = Color(0, 0, 0, 0)
+	rect.size = Vector2(960, 540)
+	rect.z_index = -4
+	add_child(rect)
+	var tw := rect.create_tween()
+	tw.tween_property(rect, "color:a", alpha, 0.3)
+	return rect
+
+func _undim(rect: ColorRect) -> void:
+	var tw := rect.create_tween()
+	tw.tween_property(rect, "color:a", 0.0, 0.4)
+	tw.tween_callback(rect.queue_free)
+
+## Aufploppender Namenszug einer Ultimate-Attacke.
+func _ult_banner(text: String, color: Color) -> void:
+	var banner := Label.new()
+	banner.text = text
+	banner.add_theme_font_size_override("font_size", 42)
+	banner.add_theme_color_override("font_color", color)
+	banner.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.10))
+	banner.add_theme_constant_override("outline_size", 10)
+	banner.custom_minimum_size = Vector2(960, 0)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.position = Vector2(0, 120)
+	banner.pivot_offset = Vector2(480, 26)
+	banner.scale = Vector2(2.2, 2.2)
+	banner.modulate.a = 0.0
+	ui_layer.add_child(banner)
+	var tw := create_tween()
+	tw.tween_property(banner, "modulate:a", 1.0, 0.18)
+	tw.parallel().tween_property(banner, "scale", Vector2.ONE, 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(1.0)
+	tw.tween_property(banner, "modulate:a", 0.0, 0.35)
+	tw.tween_callback(banner.queue_free)
+
+## Serenas Ultimative „Sternenklinge“: Blitz-Dashes durch alle Gegner,
+## dann ein gewaltiger Kreuzschnitt mit weißem Blitz.
+func _ultimate_serena(h: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s entfesselt ihre ultimative Kraft!" % d["name"])
+	if h.has("bob"):
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.55)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.92, 0.45))
+	s.modulate = Color(1.6, 1.5, 1.1)
+	_burst(s.position, Color(1.0, 0.95, 0.5), 14, 130)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("★ STERNENKLINGE ★", Color(1.0, 0.9, 0.35))
+	await get_tree().create_timer(0.5).timeout
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	# Sieben Blitz-Durchgänge kreuz und quer durch die Gegnerreihen
+	var dash := create_tween()
+	for i in 7:
+		var target: Dictionary = alive[i % alive.size()]
+		var es: Sprite2D = target["sprite"]
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var from := es.position + Vector2(side * randf_range(160, 240), randf_range(-70, 70))
+		var to := es.position + Vector2(-side * randf_range(160, 240), randf_range(-70, 70))
+		dash.tween_property(s, "position", from, 0.0)
+		dash.tween_callback(func():
+			AudioManager.play_sfx("slash")
+			_slash_arc(es.position + Vector2(randf_range(-24, 24), randf_range(-24, 24)))
+			_burst(es.position, Color(1.0, 0.95, 0.6), 7, 130)
+			_ghost_trail(s, 0.09))
+		dash.tween_property(s, "position", to, 0.09)
+		dash.tween_interval(0.04)
+	await dash.finished
+	# Finale: riesiger Kreuzschnitt über dem Schlachtfeld
+	s.position = Vector2(300, 120)
+	for rot in [0.8, -0.8]:
+		var arc := Polygon2D.new()
+		arc.polygon = PackedVector2Array([Vector2(-220, -14), Vector2(220, -14), Vector2(240, 0), Vector2(220, 14), Vector2(-220, 14), Vector2(-240, 0)])
+		arc.color = Color(1, 1, 0.9, 0.9)
+		arc.position = Vector2(260, 240)
+		arc.rotation = rot
+		arc.scale = Vector2(0.1, 0.1)
+		add_child(arc)
+		var at := create_tween()
+		at.tween_property(arc, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		at.tween_property(arc, "modulate:a", 0.0, 0.35)
+		at.tween_callback(arc.queue_free)
+	_flash_screen(Color(1, 1, 1, 0.8))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.4)
+	await _hitstop(0.16)
+	s.modulate = Color.WHITE
+	for e in alive:
+		if e["alive"]:
+			var dmg := int((d["atk"] * 2.5 + 30) * randf_range(0.95, 1.1))
+			await _damage_enemy(e, dmg)
+	_undim(dim)
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+	h["bob"] = _idle_bob(s, 2.0)
+
+## Milos Ultimative „Meteorregen“: brennende Meteore stürzen auf alle Gegner.
+func _ultimate_milo(h: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s entfesselt seine ultimative Kraft!" % d["name"])
+	if h.has("bob"):
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.55)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
+	s.modulate = Color(1.5, 1.2, 1.6)
+	var rise := create_tween()
+	rise.tween_property(s, "position:y", s.position.y - 34.0, 0.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("★ METEORREGEN ★", Color(1.0, 0.55, 0.2))
+	await get_tree().create_timer(0.5).timeout
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	# Meteore schlagen gestaffelt im Gegnergebiet ein
+	for i in 6:
+		var target: Dictionary = alive[i % alive.size()]
+		var impact: Vector2 = target["sprite"].position + Vector2(randf_range(-50, 50), randf_range(-30, 30))
+		var meteor := Sprite2D.new()
+		meteor.texture = SpriteFactory.circle(12, Color(1.0, 0.45, 0.1))
+		var core := Sprite2D.new()
+		core.texture = SpriteFactory.circle(6, Color(1.0, 0.9, 0.5))
+		meteor.add_child(core)
+		var trail := CPUParticles2D.new()
+		trail.amount = 20
+		trail.lifetime = 0.3
+		trail.direction = Vector2(1, -1)
+		trail.spread = 20.0
+		trail.gravity = Vector2.ZERO
+		trail.initial_velocity_min = 60.0
+		trail.initial_velocity_max = 120.0
+		trail.scale_amount_min = 0.6
+		trail.scale_amount_max = 1.4
+		trail.color = Color(1.0, 0.55, 0.1, 0.85)
+		trail.texture = SpriteFactory.circle(4, Color.WHITE)
+		meteor.add_child(trail)
+		meteor.position = impact + Vector2(randf_range(120, 260), -420)
+		add_child(meteor)
+		AudioManager.play_sfx("meteor")
+		var fall := create_tween()
+		fall.tween_property(meteor, "position", impact, 0.32) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fall.tween_callback(func():
+			meteor.queue_free()
+			_explosion(impact)
+			AudioManager.play_sfx("boom")
+			_shake_camera(1.5))
+		await get_tree().create_timer(0.16).timeout
+	await get_tree().create_timer(0.5).timeout
+	_flash_screen(Color(1.0, 0.6, 0.2, 0.55))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.4)
+	await _hitstop(0.14)
+	s.modulate = Color.WHITE
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((d["mag"] * 2.5 + 40) * randf_range(0.95, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+	_undim(dim)
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+	h["bob"] = _idle_bob(s, 2.0)
+
 ## Heillicht: grüner Lichtring + Funken, heilt einen Verbündeten.
 func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var d: Dictionary = h["data"]
@@ -826,6 +1020,11 @@ func _enemy_turn(e: Dictionary) -> void:
 	if alive_heroes.is_empty():
 		return
 	e["acts"] += 1
+	# In der Wut-Phase entfesselt der Boss einmalig seine Ultimative.
+	if e["is_boss"] and e["enraged"] and not e.get("ult_used", false):
+		e["ult_used"] = true
+		await _boss_ultimate(e, alive_heroes)
+		return
 	# Kurzes Aufladen (Anspannen + rote Färbung) vor jeder Gegner-Aktion.
 	var es: Sprite2D = e["sprite"]
 	var base_scale: Vector2 = es.scale
@@ -892,6 +1091,80 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 		_burst(t["sprite"].position, Color(0.5, 0.8, 1.0) if frost else Color(0.9, 0.4, 0.9), 8, 110)
 		_damage_hero(t, dmg)
 	await get_tree().create_timer(0.7).timeout
+
+## Boss-Ultimative: „Armee der Verdammten“ (Geisterschädel-Welle) bzw.
+## „Ewiger Winter“ (Eisspeere brechen unter den Helden hervor).
+func _boss_ultimate(e: Dictionary, targets: Array) -> void:
+	var frost: bool = boss_def.get("theme", "bone") == "frost"
+	var ult_name: String = boss_def["ultimate_name"]
+	_say("%s entfesselt: %s!" % [e["name"], ult_name])
+	var dim := _dim_world(0.55)
+	var es: Sprite2D = e["sprite"]
+	var base: Vector2 = es.scale
+	AudioManager.play_sfx("ult_charge")
+	var pump := create_tween()
+	pump.tween_property(es, "scale", base * 1.35, 0.55).set_trans(Tween.TRANS_QUAD)
+	await pump.finished
+	AudioManager.play_sfx("roar")
+	_shake_camera(2.0)
+	_ult_banner("☠ %s ☠" % ult_name.to_upper(),
+		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.45, 0.35))
+	await get_tree().create_timer(0.6).timeout
+	if frost:
+		# Eisspeere brechen unter jedem Helden aus dem Boden
+		AudioManager.play_sfx("bigboom")
+		_flash_screen(Color(0.5, 0.8, 1.0, 0.5))
+		_shake_camera(2.2)
+		for t in targets:
+			var pos: Vector2 = t["sprite"].position
+			for k in 3:
+				var spike := Sprite2D.new()
+				spike.texture = SpriteFactory.shard()
+				spike.scale = Vector2(4.5, 6.5)
+				spike.position = pos + Vector2((k - 1) * 26.0, 110)
+				spike.rotation = (k - 1) * 0.18
+				add_child(spike)
+				var rise := create_tween()
+				rise.tween_interval(k * 0.06)
+				rise.tween_property(spike, "position:y", pos.y + 4 + k * 7.0, 0.15) \
+					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				rise.tween_interval(0.55)
+				rise.tween_property(spike, "modulate:a", 0.0, 0.3)
+				rise.tween_callback(spike.queue_free)
+			_burst(pos, Color(0.6, 0.9, 1.0), 14, 150)
+		await get_tree().create_timer(0.5).timeout
+	else:
+		# Eine Welle geisterhafter Schädel fegt über das Schlachtfeld
+		AudioManager.play_sfx("bigboom")
+		_flash_screen(Color(1.0, 0.2, 0.15, 0.45))
+		for i in 9:
+			var sk := Sprite2D.new()
+			sk.texture = SpriteFactory.skull()
+			sk.scale = Vector2(4, 4)
+			sk.modulate = Color(0.95, 0.8, 1.0, 0.85)
+			var mat := CanvasItemMaterial.new()
+			mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			sk.material = mat
+			sk.position = Vector2(-60, 90 + (i % 5) * 55.0 + randf_range(-18, 18))
+			add_child(sk)
+			var fly := create_tween()
+			fly.tween_interval(i * 0.07)
+			fly.tween_property(sk, "position:x", 1040.0, randf_range(0.5, 0.75)) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			fly.parallel().tween_property(sk, "position:y", sk.position.y + randf_range(-50, 50), 0.7)
+			fly.tween_callback(sk.queue_free)
+		await get_tree().create_timer(0.55).timeout
+		for t in targets:
+			_burst(t["sprite"].position, Color(0.85, 0.5, 1.0), 12, 140)
+		_shake_camera(2.0)
+		await get_tree().create_timer(0.35).timeout
+	for t in targets:
+		var dmg := maxi(int(e["atk"] * randf_range(0.95, 1.15)) - t["data"]["def"], 1)
+		_damage_hero(t, dmg)
+	var shrink := create_tween()
+	shrink.tween_property(es, "scale", base, 0.3).set_trans(Tween.TRANS_QUAD)
+	_undim(dim)
+	await get_tree().create_timer(0.9).timeout
 
 func _damage_hero(target: Dictionary, dmg: int) -> void:
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)

@@ -471,6 +471,30 @@ static func vignette(w: int, h: int, strength := 0.55) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## Geisterschädel für die „Armee der Verdammten“ des Knochenkönigs.
+static func skull() -> Texture2D:
+	if _cache.has("skull"):
+		return _cache["skull"]
+	var img := _img(12, 12)
+	var bone_c := Color(0.92, 0.90, 0.98)
+	var dark := Color(0.18, 0.06, 0.28)
+	img.fill_rect(Rect2i(1, 1, 10, 7), bone_c)
+	for p in [Vector2i(1, 1), Vector2i(10, 1), Vector2i(1, 7), Vector2i(10, 7)]:
+		img.set_pixel(p.x, p.y, Color(0, 0, 0, 0))
+	# Glühende Augenhöhlen + Nasenloch
+	img.fill_rect(Rect2i(3, 3, 2, 2), dark)
+	img.fill_rect(Rect2i(7, 3, 2, 2), dark)
+	img.set_pixel(3, 3, Color(1.0, 0.3, 0.2))
+	img.set_pixel(7, 3, Color(1.0, 0.3, 0.2))
+	img.fill_rect(Rect2i(5, 5, 2, 1), dark)
+	# Kiefer mit Zahnlücken
+	img.fill_rect(Rect2i(3, 8, 6, 3), bone_c)
+	for tx in [4, 6, 8]:
+		img.set_pixel(tx, 9, dark)
+	var t := _tex(img)
+	_cache["skull"] = t
+	return t
+
 ## Spitzer Eissplitter für den Eissturm des Frostkolosses.
 static func shard() -> Texture2D:
 	if _cache.has("shard"):

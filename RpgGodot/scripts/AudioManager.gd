@@ -235,6 +235,10 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			_tone(buf, 90, 28, 0.28, 0.55, "noise")
 			_tone(buf, 55, 22, 0.22, 0.45, "tri")
 		"charge": _tone(buf, 160, 1900, 0.65, 0.28, "tri")
+		"ult_charge":
+			_tone(buf, 120, 900, 0.55, 0.28, "tri")
+			_tone(buf, 400, 2600, 0.45, 0.24, "square")
+		"meteor": _tone(buf, 1900, 110, 0.45, 0.32, "noise")
 		"heal":
 			for f in [523, 659, 784, 1047]:
 				_tone(buf, f, f, 0.09, 0.18, "tri")
