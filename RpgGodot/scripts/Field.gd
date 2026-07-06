@@ -5,6 +5,9 @@ extends Node2D
 
 const TILE := 16
 const STEP_TIME := 0.18
+# DTII-Feldfiguren sind 16x28: horizontal in der 16er-Kachel zentrieren (x-2)
+# und so anheben, dass die Füße auf dem Kachelboden stehen (y -(28-16)).
+const CHAR_OFFSET := Vector2(-2, -12)
 
 # Feld-Bosse: welcher Boss in welchem Dungeon thront (bis sein Flag gesetzt ist).
 const FIELD_BOSSES := {
@@ -274,6 +277,7 @@ func _spawn_npcs() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.character(npc["id"], "down", 0)
 		s.centered = false
+		s.offset = CHAR_OFFSET
 		s.position = Vector2(npc["pos"].x * TILE + 2, npc["pos"].y * TILE)
 		s.z_index = 5
 		add_child(s)
@@ -333,11 +337,13 @@ func _spawn_party() -> void:
 	follower_tile = player_tile
 	player = Sprite2D.new()
 	player.centered = false
+	player.offset = CHAR_OFFSET
 	player.z_index = 10
 	add_child(player)
 	_attach_drop_shadow(player)
 	follower = Sprite2D.new()
 	follower.centered = false
+	follower.offset = CHAR_OFFSET
 	follower.z_index = 9
 	add_child(follower)
 	_attach_drop_shadow(follower)

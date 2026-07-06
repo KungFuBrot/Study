@@ -28,6 +28,9 @@ func _ready() -> void:
 func _shot_tour() -> void:
 	await get_tree().create_timer(2.0).timeout
 	_snap("town")
+	goto_map("world", "from_town")
+	await get_tree().create_timer(2.0).timeout
+	_snap("world")
 	goto_map("dungeon", "entrance")
 	await get_tree().create_timer(2.0).timeout
 	_snap("dungeon")

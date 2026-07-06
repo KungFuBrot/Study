@@ -43,6 +43,40 @@ const DTII_TILES := {
 	"ice": "floor_2", "iwall": "wall_mid",
 }
 
+# Feldfiguren (Erkundung) → DTII-Basissprite (16x28). Identisch zu den
+# Kampfsprites bei den Helden, damit die Party überall gleich aussieht.
+const FIELD_DTII := {
+	"serena": "elf_f", "milo": "wizzard_m",
+	"npc_elder": "dwarf_m", "npc_kid": "lizard_m", "npc_shop": "dwarf_f",
+}
+const FIELD_SPRITE_H := 28  # DTII-Figurenhöhe (für die Bodenausrichtung im Feld)
+
+## ---------- Kenney Roguelike/RPG Pack (CC0) für Überwelt-Bodenkacheln ----------
+
+const KENNEY_SHEET := "res://assets/kenney/roguelikeSheet.png"
+const KENNEY_STRIDE := 17  # 16px-Kacheln mit 1px Abstand
+
+# Kartenzeichen → Kenney-Zelle (Spalte, Zeile). Nur Terrain; Häuser/Marker
+# und Dungeon-Kacheln kommen weiterhin von anderswo.
+const KENNEY_TILES := {
+	"grass": Vector2i(1, 15), "tree": Vector2i(13, 10), "path": Vector2i(0, 25),
+	"water": Vector2i(1, 3), "mount": Vector2i(6, 14),
+}
+
+static var _kenney_sheet: Texture2D
+
+static func _kenney(cell: Vector2i) -> Texture2D:
+	var key := "kenney_%d_%d" % [cell.x, cell.y]
+	if _cache.has(key):
+		return _cache[key]
+	if _kenney_sheet == null:
+		_kenney_sheet = load(KENNEY_SHEET)
+	var at := AtlasTexture.new()
+	at.atlas = _kenney_sheet
+	at.region = Rect2(cell.x * KENNEY_STRIDE, cell.y * KENNEY_STRIDE, 16, 16)
+	_cache[key] = at
+	return at
+
 static func _tex(img: Image) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
@@ -80,6 +114,8 @@ static func _n(x: int, y: int, seed_: int) -> float:
 static func tile(kind: String) -> Texture2D:
 	if DTII_TILES.has(kind):
 		return dtii(DTII_TILES[kind])
+	if KENNEY_TILES.has(kind):
+		return _kenney(KENNEY_TILES[kind])
 	var key := "tile_" + kind
 	if _cache.has(key):
 		return _cache[key]
@@ -279,7 +315,14 @@ const CHAR_TPL := {
 	]],
 }
 
+# Feldfigur aus dem CC0-Pack. dir wird ignoriert (DTII blickt nach rechts;
+# das Feld spiegelt für „links"), frame 0/1 gibt eine leichte Idle-Bewegung.
 static func character(id: String, dir: String, frame: int) -> Texture2D:
+	var base: String = FIELD_DTII.get(id, "elf_f")
+	return dtii("%s_idle_anim_f%d" % [base, frame % 4])
+
+## (Alt, ungenutzt) prozedurale Feldfigur aus Row-Art.
+static func character_art(id: String, dir: String, frame: int) -> Texture2D:
 	var key := "chr_%s_%s_%d" % [id, dir, frame]
 	if _cache.has(key):
 		return _cache[key]
