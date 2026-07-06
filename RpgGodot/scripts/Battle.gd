@@ -14,9 +14,9 @@ const BAR_W := 170
 # Milo hintere Reihe Mitte (weiter rechts + kleiner → Tiefe), Rax vordere
 # Reihe unten. pos = Mittelpunkt.
 const BATTLE_FORMATION := {
-	"serena": {"pos": Vector2(690, 188), "scale": 4.2},
-	"milo": {"pos": Vector2(802, 250), "scale": 3.4},
-	"rax": {"pos": Vector2(700, 316), "scale": 4.0},
+	"serena": {"pos": Vector2(692, 178), "scale": 4.9},
+	"milo": {"pos": Vector2(808, 242), "scale": 4.1},
+	"rax": {"pos": Vector2(702, 300), "scale": 4.6},
 }
 
 var enemy_ids: Array = []
