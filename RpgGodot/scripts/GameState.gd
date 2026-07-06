@@ -17,16 +17,16 @@ const ITEMS := {
 
 # Bosse tragen "boss": true plus Inszenierungs-Daten (Thema, Musik, Texte).
 const ENEMIES := {
-	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "sprite": "slime"},
-	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "sprite": "bat"},
-	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "sprite": "skeleton"},
-	"frostwolf": {"name": "Frostwolf", "hp": 55, "atk": 17, "def": 5, "gold": 25, "sprite": "frostwolf"},
-	"eisgeist": {"name": "Eisgeist", "hp": 45, "atk": 19, "def": 3, "gold": 28, "sprite": "eisgeist"},
-	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "sprite": "boss",
+	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "xp": 7, "sprite": "slime"},
+	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "xp": 8, "sprite": "bat"},
+	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "xp": 15, "sprite": "skeleton"},
+	"frostwolf": {"name": "Frostwolf", "hp": 55, "atk": 17, "def": 5, "gold": 25, "xp": 22, "sprite": "frostwolf"},
+	"eisgeist": {"name": "Eisgeist", "hp": 45, "atk": 19, "def": 3, "gold": 28, "xp": 24, "sprite": "eisgeist"},
+	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130, "sprite": "boss",
 		"boss": true, "theme": "bone", "song": "boss",
 		"entrance_line": "Der Herrscher der Finsterhöhle erhebt sich!",
 		"aoe_name": "Knochensturm", "ultimate_name": "Armee der Verdammten"},
-	"boss2": {"name": "Frostkoloss", "hp": 520, "atk": 26, "def": 8, "gold": 800, "sprite": "boss2",
+	"boss2": {"name": "Frostkoloss", "hp": 520, "atk": 26, "def": 8, "gold": 800, "xp": 180, "sprite": "boss2",
 		"boss": true, "theme": "frost", "song": "boss2",
 		"entrance_line": "Das ewige Eis erwacht — der Wächter der Frostgrotte!",
 		"aoe_name": "Eissturm", "ultimate_name": "Ewiger Winter"},
@@ -65,6 +65,7 @@ func reset_party() -> void:
 	party = [
 		{
 			"id": "serena", "name": "Serena", "class": "Schwertkämpferin",
+			"level": 1, "xp": 0,
 			"hp": 60, "max_hp": 60, "mp": 10, "max_mp": 10,
 			"atk": 14, "mag": 4, "def": 6,
 			"abilities": [
@@ -80,6 +81,7 @@ func reset_party() -> void:
 		},
 		{
 			"id": "milo", "name": "Milo", "class": "Zauberer",
+			"level": 1, "xp": 0,
 			"hp": 42, "max_hp": 42, "mp": 24, "max_mp": 24,
 			"atk": 6, "mag": 16, "def": 4,
 			"abilities": [
@@ -109,6 +111,40 @@ func apply_blessing() -> void:
 		member["atk"] += 6
 		member["mag"] += 8
 		member["def"] += 3
+
+## ---------- Stufenaufstieg (Level-System) ----------
+
+# Benötigte EP, um von der angegebenen Stufe zur nächsten aufzusteigen.
+func xp_to_next(level: int) -> int:
+	return 30 + (level - 1) * 35
+
+# Wachstum pro Stufe je Held: Serena kämpferisch, Milo magisch.
+const LEVEL_GROWTH := {
+	"serena": {"max_hp": 9, "max_mp": 2, "atk": 3, "mag": 1, "def": 2},
+	"milo": {"max_hp": 6, "max_mp": 4, "atk": 1, "mag": 3, "def": 1},
+}
+
+# Verteilt EP an alle lebenden Mitglieder. Rückgabe: Liste der Aufstiege
+# [{name, level}] für die Kampf-Meldung. Ein Aufstieg heilt voll.
+func award_xp(amount: int) -> Array:
+	var ups := []
+	for m in party:
+		if m["hp"] <= 0:
+			continue
+		m["xp"] = m.get("xp", 0) + amount
+		while m["xp"] >= xp_to_next(m.get("level", 1)):
+			m["xp"] -= xp_to_next(m["level"])
+			m["level"] += 1
+			var g: Dictionary = LEVEL_GROWTH.get(m["id"], LEVEL_GROWTH["serena"])
+			m["max_hp"] += g["max_hp"]
+			m["max_mp"] += g["max_mp"]
+			m["atk"] += g["atk"]
+			m["mag"] += g["mag"]
+			m["def"] += g["def"]
+			m["hp"] = m["max_hp"]
+			m["mp"] = m["max_mp"]
+			ups.append({"name": m["name"], "level": m["level"]})
+	return ups
 
 func add_item(item_name: String, count := 1) -> void:
 	inventory[item_name] = inventory.get(item_name, 0) + count

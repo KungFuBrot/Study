@@ -156,7 +156,7 @@ func _build_scene() -> void:
 			refl = _attach_reflection(s, foot_e)
 		add_child(s)
 		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
-			"atk": def["atk"], "def": def["def"], "gold": def["gold"],
+			"atk": def["atk"], "def": def["def"], "gold": def["gold"], "xp": def.get("xp", 0),
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl})
 
@@ -564,8 +564,8 @@ func _build_boss_bar() -> void:
 func _refresh_party() -> void:
 	for h in heroes:
 		var d: Dictionary = h["data"]
-		h["hp_label"].text = "%-8s LP %3d/%3d   MP %2d/%2d" % \
-			[d["name"], d["hp"], d["max_hp"], d["mp"], d["max_mp"]]
+		h["hp_label"].text = "%-7s Lv%2d  LP %3d/%3d  MP %2d/%2d" % \
+			[d["name"], d.get("level", 1), d["hp"], d["max_hp"], d["mp"], d["max_mp"]]
 		h["hp_label"].add_theme_color_override("font_color",
 			Color(1, 0.4, 0.4) if d["hp"] <= d["max_hp"] / 4 else Color.WHITE)
 		var hp_ratio: float = float(d["hp"]) / float(d["max_hp"])
@@ -1683,15 +1683,18 @@ func _any_enemy_alive() -> bool:
 
 func _victory() -> void:
 	var gold := 0
+	var xp := 0
 	for e in enemies:
 		gold += e["gold"]
+		xp += e.get("xp", 0)
 	GameState.gold += gold
+	var level_ups: Array = GameState.award_xp(xp)
 	AudioManager.play_music("victory")
 	_victory_banner()
 	if not boss_def.is_empty():
-		_say("%s ist besiegt!  %d Gold erbeutet!" % [boss_def["name"], gold])
+		_say("%s ist besiegt!  %d Gold, %d EP!" % [boss_def["name"], gold, xp])
 	else:
-		_say("Sieg!  %d Gold erbeutet!" % gold)
+		_say("Sieg!  %d Gold und %d EP erbeutet!" % [gold, xp])
 	# Münzregen über den Helden
 	for i in 14:
 		var coin := Sprite2D.new()
@@ -1710,7 +1713,18 @@ func _victory() -> void:
 			var tw := create_tween()
 			tw.tween_property(s, "position:y", s.position.y - 30.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 			tw.tween_property(s, "position:y", s.position.y, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-	await get_tree().create_timer(2.2).timeout
+	await get_tree().create_timer(2.0).timeout
+	# Stufenaufstiege feiern (heilt voll, LP/MP-Leisten aktualisieren).
+	if not level_ups.is_empty():
+		_refresh_party()
+		for up in level_ups:
+			AudioManager.play_sfx("heal")
+			_say("%s erreicht Stufe %d!" % [up["name"], up["level"]])
+			for h in heroes:
+				if h["data"]["name"] == up["name"]:
+					_sparkle(h["sprite"].position, Color(1.0, 0.92, 0.4))
+					_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.45))
+			await get_tree().create_timer(1.5).timeout
 	# Boss-Siege schalten den Fortschritt frei.
 	if enemy_ids.has("boss2"):
 		GameState.boss2_defeated = true
