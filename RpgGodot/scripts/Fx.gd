@@ -54,6 +54,40 @@ static func tilt_shift(top := 3.0, bottom := 2.2, center := 0.5, width := 0.18) 
 	rect.material = mat
 	return rect
 
+# Wasser-Shimmer: helle Wellenlinien wandern in Weltkoordinaten über alle
+# Wasserkacheln hinweg (nicht pro Kachel wiederholt), plus leichtes Wogen.
+const WATER_SHADER_CODE := "
+shader_type canvas_item;
+varying vec2 world_pos;
+void vertex() {
+	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
+}
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	float w = sin(world_pos.x * 0.13 + TIME * 1.1)
+			+ sin(world_pos.y * 0.19 - TIME * 0.8)
+			+ sin((world_pos.x + world_pos.y) * 0.09 + TIME * 0.6);
+	w /= 3.0;
+	float crest = smoothstep(0.55, 1.0, w);
+	float trough = smoothstep(0.55, 1.0, -w);
+	col.rgb += crest * vec3(0.16, 0.20, 0.24) * col.a;
+	col.rgb -= trough * vec3(0.05, 0.07, 0.09) * col.a;
+	COLOR = col;
+}
+"
+
+static var _water_shader: Shader
+static var _water_mat: ShaderMaterial
+
+## Gemeinsames Wasser-Material (einmalig erzeugt) für alle Wasserkacheln.
+static func water_material() -> ShaderMaterial:
+	if _water_mat == null:
+		_water_shader = Shader.new()
+		_water_shader.code = WATER_SHADER_CODE
+		_water_mat = ShaderMaterial.new()
+		_water_mat.shader = _water_shader
+	return _water_mat
+
 ## Weiche radiale Falloff-Textur für PointLight2D (smoothstep, 128 px).
 static func light_texture() -> Texture2D:
 	if _light_tex != null:

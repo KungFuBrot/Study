@@ -195,10 +195,13 @@ func _build_tiles() -> void:
 		var row: String = rows[y]
 		for x in row.length():
 			var ch := row[x]
+			var kind: String = MapData.TILE_FOR_CHAR[ch]
 			var s := Sprite2D.new()
-			s.texture = SpriteFactory.tile_at(MapData.TILE_FOR_CHAR[ch], x, y)
+			s.texture = SpriteFactory.tile_at(kind, x, y)
 			s.centered = false
 			s.position = Vector2(x * TILE, y * TILE)
+			if kind == "water":
+				s.material = Fx.water_material()  # sanftes Wogen + Glanzlichter
 			add_child(s)
 	_add_tile_details()
 
