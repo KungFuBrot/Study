@@ -10,6 +10,14 @@ signal _choice_made
 
 const BAR_W := 170
 
+# Kampf-Aufstellung: zwei Nahkämpfer vorn (unten, größer), der Zauberer in der
+# hinteren Reihe (höher + weiter rechts + kleiner → Tiefe). pos = Mittelpunkt.
+const BATTLE_FORMATION := {
+	"serena": {"pos": Vector2(688, 202), "scale": 4.2},
+	"rax": {"pos": Vector2(712, 300), "scale": 4.0},
+	"milo": {"pos": Vector2(808, 150), "scale": 3.3},
+}
+
 var enemy_ids: Array = []
 var arena_theme := "cave"  # "cave" | "frost" — von Main anhand der Karte gesetzt
 var boss_def := {}         # ENEMIES-Definition des Bosses in diesem Kampf (falls vorhanden)
@@ -173,11 +181,12 @@ func _build_scene() -> void:
 		var data: Dictionary = GameState.party[i]
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.hero_battle(data["id"])
-		var hscale := 4.4 if data["id"] == "rax" else 5.0
+		var form: Dictionary = BATTLE_FORMATION.get(data["id"],
+			{"pos": Vector2(700 + (i % 2) * 60, 170 + i * 78), "scale": 4.0})
+		var hscale: float = form["scale"]
 		s.scale = Vector2(hscale, hscale)
 		s.flip_h = true  # DTII-Figuren blicken nach rechts → zum Gegner (links) drehen
-		# Gestaffelte Zickzack-Aufstellung rechts, oberhalb des HUD-Panels.
-		var home := Vector2(705 + (i % 2) * 58, 135 + i * 86)
+		var home: Vector2 = form["pos"]
 		s.position = home + Vector2(340, 0)
 		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
 		_attach_shadow(s, 9, 3, foot_h)
