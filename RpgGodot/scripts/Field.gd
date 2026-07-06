@@ -26,6 +26,8 @@ var player_tile: Vector2i
 var facing := Vector2i(0, 1)
 var moving := false
 var walk_frame := 0
+var anim_frame := 0      # laufender Animationsindex (0..3) für Idle/Lauf
+var anim_accum := 0.0    # Zeitzähler für den Frame-Wechsel
 var steps_since_battle := 0
 var state := "move"  # move | dialogue | shop | locked (Übergang läuft)
 
@@ -194,7 +196,7 @@ func _build_tiles() -> void:
 		for x in row.length():
 			var ch := row[x]
 			var s := Sprite2D.new()
-			s.texture = SpriteFactory.tile(MapData.TILE_FOR_CHAR[ch])
+			s.texture = SpriteFactory.tile_at(MapData.TILE_FOR_CHAR[ch], x, y)
 			s.centered = false
 			s.position = Vector2(x * TILE, y * TILE)
 			add_child(s)
@@ -382,15 +384,22 @@ func _dir_name(d: Vector2i) -> String:
 	return "side"
 
 func _update_sprites() -> void:
-	player.texture = SpriteFactory.character("serena", _dir_name(facing), walk_frame)
+	player.texture = SpriteFactory.field_char("serena", moving, anim_frame)
 	player.flip_h = facing.x < 0
 	var fd := player_tile - follower_tile
 	if fd == Vector2i.ZERO:
 		fd = facing
-	follower.texture = SpriteFactory.character("milo", _dir_name(fd), walk_frame)
+	follower.texture = SpriteFactory.field_char("milo", moving, anim_frame)
 	follower.flip_h = fd.x < 0
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# Weiterlaufende Idle-/Lauf-Animation (4 Frames, ~7 fps).
+	anim_accum += delta
+	if anim_accum >= 0.14:
+		anim_accum -= 0.14
+		anim_frame = (anim_frame + 1) % 4
+		if is_instance_valid(player):
+			_update_sprites()
 	if state == "move" and not moving:
 		var dir := Vector2i.ZERO
 		if Input.is_action_pressed("move_up"): dir = Vector2i(0, -1)

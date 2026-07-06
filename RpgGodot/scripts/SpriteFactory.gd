@@ -59,9 +59,24 @@ const KENNEY_STRIDE := 17  # 16px-Kacheln mit 1px Abstand
 # Kartenzeichen → Kenney-Zelle (Spalte, Zeile). Nur Terrain; Häuser/Marker
 # und Dungeon-Kacheln kommen weiterhin von anderswo.
 const KENNEY_TILES := {
-	"grass": Vector2i(1, 15), "tree": Vector2i(13, 10), "path": Vector2i(0, 25),
-	"water": Vector2i(1, 3), "mount": Vector2i(6, 14),
+	"grass": Vector2i(0, 15), "tree": Vector2i(13, 10), "path": Vector2i(0, 25),
+	"water": Vector2i(0, 0), "mount": Vector2i(6, 14),
 }
+
+# Mehrere gleichwertige Voll-Kacheln pro Terrain → bricht den Rastereindruck.
+const KENNEY_VARIANTS := {
+	"grass": [Vector2i(0, 15), Vector2i(1, 15), Vector2i(0, 16), Vector2i(1, 16)],
+	"water": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)],
+	"path": [Vector2i(0, 25), Vector2i(1, 25), Vector2i(0, 26), Vector2i(1, 26)],
+}
+
+## Kachel für Kartenposition (x,y) mit deterministischer Variation (falls vorhanden).
+static func tile_at(kind: String, x: int, y: int) -> Texture2D:
+	if KENNEY_VARIANTS.has(kind):
+		var vs: Array = KENNEY_VARIANTS[kind]
+		var h := ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff
+		return _kenney(vs[h % vs.size()])
+	return tile(kind)
 
 static var _kenney_sheet: Texture2D
 
@@ -315,11 +330,16 @@ const CHAR_TPL := {
 	]],
 }
 
-# Feldfigur aus dem CC0-Pack. dir wird ignoriert (DTII blickt nach rechts;
-# das Feld spiegelt für „links"), frame 0/1 gibt eine leichte Idle-Bewegung.
+# Feldfigur aus dem CC0-Pack (Idle-Pose). dir wird ignoriert (DTII blickt
+# nach rechts; das Feld spiegelt für „links").
 static func character(id: String, dir: String, frame: int) -> Texture2D:
+	return field_char(id, false, frame)
+
+## Feldfigur mit Zustand: laufend → Lauf-Animation, sonst Idle (je 4 Frames).
+static func field_char(id: String, walking: bool, frame: int) -> Texture2D:
 	var base: String = FIELD_DTII.get(id, "elf_f")
-	return dtii("%s_idle_anim_f%d" % [base, frame % 4])
+	var anim := "run" if walking else "idle"
+	return dtii("%s_%s_anim_f%d" % [base, anim, frame % 4])
 
 ## (Alt, ungenutzt) prozedurale Feldfigur aus Row-Art.
 static func character_art(id: String, dir: String, frame: int) -> Texture2D:
