@@ -20,6 +20,9 @@ func _ready() -> void:
 	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(fade_rect)
+	# Bildschirm-Steuerung für Geräte ohne Tastatur (Web/Touch); bleibt über
+	# allen Szenen bestehen und speist die Input-Actions ein.
+	add_child(TouchControls.new())
 	goto_map("town", "start")
 	if OS.get_environment("SHOT") != "":
 		_shot_tour()
