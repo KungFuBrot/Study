@@ -123,21 +123,23 @@ func _build_scene() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.hero_battle(data["id"])
 		s.scale = Vector2(5, 5)
-		var home := Vector2(692 + i * 56, 205 + i * 133)
+		s.flip_h = true  # DTII-Figuren blicken nach rechts → zum Gegner (links) drehen
+		var home := Vector2(690 + i * 34, 180 + i * 150)
 		s.position = home + Vector2(340, 0)
 		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
-		_attach_shadow(s, 11, 3, foot_h)
+		_attach_shadow(s, 9, 3, foot_h)
 		_attach_glow_pool(s, foot_h, pal["pool_hero"])
 		_attach_reflection(s, foot_h, 0.09)
+		_attach_weapon(s, data["id"])
 		add_child(s)
-		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false})
+		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false, "frame": 0})
 
 	for i in enemy_ids.size():
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
 		var is_boss: bool = def.get("boss", false)
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		s.scale = Vector2(7, 7) if is_boss else Vector2(6, 6)
+		s.scale = Vector2(6, 6) if is_boss else Vector2(6.5, 6.5)
 		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
 		var refl: Sprite2D
@@ -167,6 +169,20 @@ func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
 	sh.z_index = -1
 	sh.show_behind_parent = true
 	s.add_child(sh)
+
+## Waffe des Helden als Overlay in die (linke, zum Gegner gewandte) Hand.
+func _attach_weapon(s: Sprite2D, hero_id: String) -> void:
+	var tex := SpriteFactory.hero_weapon(hero_id)
+	if tex == null:
+		return
+	var w := Sprite2D.new()
+	w.texture = tex
+	# Der Held ist flip_h → die Waffenhand liegt bildlinks. In den Faustbereich
+	# setzen (leicht unter Schultern) und kompakt halten, damit sie nicht dominiert.
+	w.position = Vector2(-6, 1)
+	w.scale = Vector2(0.85, 0.85)
+	w.z_index = 1
+	s.add_child(w)
 
 ## Additiver Lichtkreis unter dem Kämpfer — hebt ihn wie ein Spot hervor.
 func _attach_glow_pool(s: Sprite2D, foot_y: float, color: Color) -> void:
@@ -366,19 +382,24 @@ func _add_snow() -> void:
 	snow.z_index = 20
 	add_child(snow)
 
-## Lebendige Idles: Monster wechseln zwischen zwei Posen, Heldenwaffen glitzern.
+## Lebendige Idles: Held*innen und Monster durchlaufen ihre 4-Frame-Animation.
 func _start_idle_animations() -> void:
 	var frame_timer := Timer.new()
-	frame_timer.wait_time = 0.38
+	frame_timer.wait_time = 0.16
 	frame_timer.autostart = true
 	frame_timer.timeout.connect(func():
 		for e in enemies:
-			if e["alive"] and not e["is_boss"] and SpriteFactory.enemy_has_anim(e["id"]):
-				e["frame"] = 1 - e["frame"]
+			if e["alive"] and SpriteFactory.enemy_has_anim(e["id"]):
+				e["frame"] = (e["frame"] + 1) % SpriteFactory.ENEMY_FRAMES
 				var tex := SpriteFactory.enemy_frame(e["id"], e["frame"])
 				(e["sprite"] as Sprite2D).texture = tex
 				if is_instance_valid(e["refl"]):
-					(e["refl"] as Sprite2D).texture = tex)
+					(e["refl"] as Sprite2D).texture = tex
+		for h in heroes:
+			if h["data"]["hp"] > 0:
+				h["frame"] = (h["frame"] + 1) % 4
+				var tex := SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"])
+				(h["sprite"] as Sprite2D).texture = tex)
 	add_child(frame_timer)
 	var glint_timer := Timer.new()
 	glint_timer.wait_time = 2.6

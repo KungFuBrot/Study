@@ -1,9 +1,47 @@
 class_name SpriteFactory
-## Erzeugt alle Texturen zur Laufzeit (Pixel-Art, 16px-Raster) — keine Assets nötig.
+## Texturen für das Spiel. Umgebungs-Deko und Effekte werden prozedural erzeugt;
+## Dungeon-Kacheln sowie Helden-/Monster-Kampfsprites stammen aus dem
+## CC0-Pack "Dungeon Tileset II" von 0x72 (siehe assets/dtii/LICENSE.txt).
 
 static var _cache := {}
 
 const TILE := 16
+
+## ---------- Dungeon Tileset II (CC0, 0x72) ----------
+
+const DTII := "res://assets/dtii/frames/"
+
+# Lädt einen Einzelframe als Textur (gecacht). name z. B. "skelet_idle_anim_f0".
+static func dtii(name: String) -> Texture2D:
+	var key := "dtii_" + name
+	if _cache.has(key):
+		return _cache[key]
+	var t: Texture2D = load(DTII + name + ".png")
+	_cache[key] = t
+	return t
+
+# Held → Basissprite (16x28) + Waffe fürs Kampfbild.
+const HERO_DTII := {
+	"serena": {"base": "elf_f", "weapon": "weapon_regular_sword"},
+	"milo": {"base": "wizzard_m", "weapon": "weapon_green_magic_staff"},
+}
+
+# Gegner-ID → animiertes DTII-Sprite (alle 4 Frames), plus Kampfmaßstab.
+const MON_DTII := {
+	"slime": {"anim": "muddy_anim", "big": false},
+	"bat": {"anim": "imp_idle_anim", "big": false},
+	"skeleton": {"anim": "skelet_idle_anim", "big": false},
+	"frostwolf": {"anim": "ice_zombie_anim", "big": false},
+	"eisgeist": {"anim": "swampy_anim", "big": false},
+	"boss": {"anim": "big_zombie_idle_anim", "big": true},
+	"boss2": {"anim": "big_demon_idle_anim", "big": true},
+}
+
+# Dungeon-Kacheln aus DTII (der Rest bleibt prozedural).
+const DTII_TILES := {
+	"floor": "floor_1", "dwall": "wall_mid",
+	"ice": "floor_2", "iwall": "wall_mid",
+}
 
 static func _tex(img: Image) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
@@ -40,6 +78,8 @@ static func _n(x: int, y: int, seed_: int) -> float:
 	return float(h % 1000) / 1000.0
 
 static func tile(kind: String) -> Texture2D:
+	if DTII_TILES.has(kind):
+		return dtii(DTII_TILES[kind])
 	var key := "tile_" + kind
 	if _cache.has(key):
 		return _cache[key]
@@ -353,8 +393,23 @@ const HERO_BATTLE_ART := {
 		]},
 }
 
-## Großes Kampf-Sprite eines Helden (mit Kontur, gecacht).
+## Kampf-Sprite eines Helden aus dem CC0-Pack (16x28, idle f0..f3).
 static func hero_battle(id: String) -> Texture2D:
+	return hero_battle_frame(id, 0)
+
+static func hero_battle_frame(id: String, frame: int) -> Texture2D:
+	var def: Dictionary = HERO_DTII.get(id, HERO_DTII["serena"])
+	return dtii("%s_idle_anim_f%d" % [def["base"], frame % 4])
+
+## Waffe eines Helden (kleines Overlay-Sprite), oder null.
+static func hero_weapon(id: String) -> Texture2D:
+	var def: Dictionary = HERO_DTII.get(id, {})
+	if def.has("weapon"):
+		return dtii(def["weapon"])
+	return null
+
+## (Alt, ungenutzt) prozedurales Helden-Kampfsprite aus Row-Art.
+static func hero_battle_art(id: String) -> Texture2D:
 	var key := "hero_battle_" + id
 	if _cache.has(key):
 		return _cache[key]
@@ -703,35 +758,23 @@ static func _boss2_img() -> Image:
 		img.set_pixel(hx, 0, white)
 	return img
 
+## Gegner-Sprites kommen aus dem CC0-Pack (4 animierte Frames pro Monster).
+const ENEMY_FRAMES := 4
+
 static func enemy(id: String) -> Texture2D:
 	return enemy_frame(id, 0)
 
-## Hat der Gegner eine zweite Idle-Pose zum Durchwechseln?
+## Alle DTII-Monster haben eine Lauf-/Idle-Animation.
 static func enemy_has_anim(id: String) -> bool:
-	return ENEMY_ART.has(id) and ENEMY_ART[id].has("rows2")
+	return MON_DTII.has(id)
 
 static func enemy_frame(id: String, frame: int) -> Texture2D:
-	var key := "enemy_%s_%d" % [id, frame]
-	if _cache.has(key):
-		return _cache[key]
-	var img: Image
-	if id == "boss":
-		img = _boss_img()
-	elif id == "boss2":
-		img = _boss2_img()
-	else:
-		var art: Dictionary = ENEMY_ART[id]
-		var rows: Array = art["rows2"] if (frame == 1 and art.has("rows2")) else art["rows"]
-		var w: int = rows[0].length()
-		img = _img(w, rows.size())
-		for y in rows.size():
-			for x in mini(w, (rows[y] as String).length()):
-				var ch: String = rows[y][x]
-				if art["map"].has(ch):
-					img.set_pixel(x, y, art["map"][ch])
-	var t := _tex(_outlined(img))
-	_cache[key] = t
-	return t
+	var def: Dictionary = MON_DTII.get(id, MON_DTII["slime"])
+	return dtii("%s_f%d" % [def["anim"], frame % ENEMY_FRAMES])
+
+## Ist dieser Gegner ein großes Boss-Sprite (32x36 statt 16x16)?
+static func enemy_is_big(id: String) -> bool:
+	return MON_DTII.has(id) and MON_DTII[id]["big"]
 
 ## ---------- Effekt-Texturen ----------
 

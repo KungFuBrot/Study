@@ -1,0 +1,14 @@
+Dungeon Tileset II (v1.7)
+=========================
+
+Autor:   0x72
+Quelle:  https://0x72.itch.io/dungeontileset-ii
+Lizenz:  CC0 1.0 Universal (Public Domain Dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+
+Diese Grafiken (Ordner frames/) sind gemeinfrei (CC0). Es besteht keine
+Pflicht zur Namensnennung; sie erfolgt hier freiwillig aus Respekt vor
+der Arbeit des Autors.
+
+Verwendet in RpgGodot für die Dungeon-Kacheln sowie die animierten
+Helden- und Monster-Sprites im Kampf.
