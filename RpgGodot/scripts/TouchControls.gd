@@ -12,7 +12,9 @@ const MARGIN := 28     # Abstand zum Bildschirmrand
 const VW := 960        # Viewport-Breite (project.godot)
 const VH := 540        # Viewport-Höhe
 
-var _root: Control
+var _root: Control     # enthält D-Pad + Aktionsknöpfe (per Button ein-/ausblendbar)
+var _toggle: Button     # bleibt immer sichtbar, schaltet die Pads um
+var _pads_visible := true
 var _held := {}        # action -> bool, verhindert doppelte Press/Release
 
 func _ready() -> void:
@@ -53,6 +55,39 @@ func _build() -> void:
 	var bx := ax - BTN - GAP                 # Spalte links davon
 	_make(ax, by, "A", "confirm", Color(0.30, 0.70, 0.45))   # Bestätigen
 	_make(bx, my, "B", "cancel", Color(0.80, 0.35, 0.35))    # Abbrechen/Zurück
+
+	_build_toggle()
+
+## Kleiner Schalter oben rechts (bleibt immer sichtbar), der D-Pad und
+## Aktionsknöpfe ein-/ausblendet — z. B. um die Sicht freizugeben.
+func _build_toggle() -> void:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(124, 42)
+	b.size = Vector2(124, 42)
+	b.position = Vector2(VW - MARGIN - 124, MARGIN)
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_filter = Control.MOUSE_FILTER_STOP
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.18, 0.20, 0.28, 0.5)
+	st.set_corner_radius_all(12)
+	st.set_border_width_all(2)
+	st.border_color = Color(1, 1, 1, 0.35)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st)
+	b.add_theme_stylebox_override("pressed", st)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	b.add_theme_color_override("font_hover_color", Color(1, 1, 1, 0.9))
+	b.text = "Pad aus"
+	b.pressed.connect(_toggle_pads)
+	add_child(b)
+	_toggle = b
+
+func _toggle_pads() -> void:
+	_pads_visible = not _pads_visible
+	_root.visible = _pads_visible
+	_toggle.text = "Pad aus" if _pads_visible else "Pad ein"
 
 func _make(x: int, y: int, label: String, action: String, tint := Color(0.55, 0.60, 0.75), arrow := Vector2.ZERO) -> void:
 	var b := Button.new()
