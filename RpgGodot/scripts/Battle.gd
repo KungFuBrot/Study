@@ -10,12 +10,13 @@ signal _choice_made
 
 const BAR_W := 170
 
-# Kampf-Aufstellung: zwei Nahkämpfer vorn (unten, größer), der Zauberer in der
-# hinteren Reihe (höher + weiter rechts + kleiner → Tiefe). pos = Mittelpunkt.
+# Kampf-Aufstellung (Zickzack in der Tiefe): Serena vordere Reihe oben,
+# Milo hintere Reihe Mitte (weiter rechts + kleiner → Tiefe), Rax vordere
+# Reihe unten. pos = Mittelpunkt.
 const BATTLE_FORMATION := {
-	"serena": {"pos": Vector2(688, 202), "scale": 4.2},
-	"rax": {"pos": Vector2(712, 300), "scale": 4.0},
-	"milo": {"pos": Vector2(808, 150), "scale": 3.3},
+	"serena": {"pos": Vector2(690, 188), "scale": 4.2},
+	"milo": {"pos": Vector2(802, 250), "scale": 3.4},
+	"rax": {"pos": Vector2(700, 316), "scale": 4.0},
 }
 
 var enemy_ids: Array = []
