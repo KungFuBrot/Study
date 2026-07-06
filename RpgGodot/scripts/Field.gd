@@ -328,6 +328,16 @@ func _spawn_npcs() -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		bob.tween_property(bs, "position:y", bs.position.y, 1.1) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		# Der thronende Boss atmet/wabert durch seine 4 Animationsframes.
+		var boss_id: String = cfg["id"]
+		var af := {"i": 0}
+		var atimer := Timer.new()
+		atimer.wait_time = 0.18
+		atimer.autostart = true
+		atimer.timeout.connect(func():
+			af["i"] = (af["i"] + 1) % SpriteFactory.ENEMY_FRAMES
+			bs.texture = SpriteFactory.enemy_frame(boss_id, af["i"]))
+		add_child(atimer)
 		npc_nodes[boss_tile] = {"boss": true, "battle_id": cfg["id"],
 			"name": GameState.ENEMIES[cfg["id"]]["name"], "pos": boss_tile}
 
