@@ -41,10 +41,12 @@ func _build() -> void:
 	var by := VH - MARGIN - BTN              # untere Reihe
 	var my := by - (BTN + GAP)               # mittlere Reihe
 	var ty := by - 2 * (BTN + GAP)           # obere Reihe
-	_make(mx, ty, "▲", "move_up")
-	_make(lx, my, "◀", "move_left")
-	_make(rx, my, "▶", "move_right")
-	_make(mx, by, "▼", "move_down")
+	# Richtungsknöpfe tragen ein gezeichnetes Dreieck (arrow != ZERO) statt eines
+	# Schrift-Glyphs — Unicode-Pfeile fehlen in der Standardschrift des Web-Exports.
+	_make(mx, ty, "", "move_up", Color(0.55, 0.60, 0.75), Vector2(0, -1))
+	_make(lx, my, "", "move_left", Color(0.55, 0.60, 0.75), Vector2(-1, 0))
+	_make(rx, my, "", "move_right", Color(0.55, 0.60, 0.75), Vector2(1, 0))
+	_make(mx, by, "", "move_down", Color(0.55, 0.60, 0.75), Vector2(0, 1))
 
 	# --- Aktionsknöpfe unten rechts ---
 	var ax := VW - MARGIN - BTN              # rechte Spalte der Aktionsknöpfe
@@ -52,7 +54,7 @@ func _build() -> void:
 	_make(ax, by, "A", "confirm", Color(0.30, 0.70, 0.45))   # Bestätigen
 	_make(bx, my, "B", "cancel", Color(0.80, 0.35, 0.35))    # Abbrechen/Zurück
 
-func _make(x: int, y: int, label: String, action: String, tint := Color(0.55, 0.60, 0.75)) -> void:
+func _make(x: int, y: int, label: String, action: String, tint := Color(0.55, 0.60, 0.75), arrow := Vector2.ZERO) -> void:
 	var b := Button.new()
 	b.text = label
 	b.position = Vector2(x, y)
@@ -80,6 +82,22 @@ func _make(x: int, y: int, label: String, action: String, tint := Color(0.55, 0.
 	b.button_down.connect(_press.bind(action))
 	b.button_up.connect(_release.bind(action))
 	_root.add_child(b)
+
+	if arrow != Vector2.ZERO:
+		_add_arrow(b, arrow)
+
+## Zeichnet ein Pfeil-Dreieck mittig in einen Knopf (statt eines Schrift-Glyphs,
+## das im Web-Export mangels Font fehlt). `dir` zeigt in die Laufrichtung.
+func _add_arrow(button: Button, dir: Vector2) -> void:
+	var tri := Polygon2D.new()
+	# Nach oben zeigendes Basis-Dreieck, um die Knopfmitte zentriert.
+	tri.polygon = PackedVector2Array([
+		Vector2(0, -17), Vector2(-15, 12), Vector2(15, 12),
+	])
+	tri.color = Color(1, 1, 1, 0.92)
+	tri.position = Vector2(BTN, BTN) * 0.5
+	tri.rotation = dir.angle() + PI / 2.0   # Basis zeigt hoch → in dir drehen
+	button.add_child(tri)
 
 ## Action als gedrückt melden — erreicht Polling UND _unhandled_input.
 func _press(action: String) -> void:
