@@ -95,6 +95,22 @@ func reset_party() -> void:
 			"ultimate": {"name": "Meteorregen",
 				"desc": "Brennende Meteore auf alle Feinde. (1x pro Kampf)"},
 		},
+		{
+			"id": "rax", "name": "Rax", "class": "Kampfroboter",
+			"level": 1, "xp": 0,
+			"hp": 72, "max_hp": 72, "mp": 16, "max_mp": 16,
+			"atk": 12, "mag": 12, "def": 10,
+			"abilities": [
+				{"name": "Laserstoß", "cost": 4, "target": "one",
+					"power": 22, "kind": "beam",
+					"desc": "Gebündelter Energiestrahl."},
+				{"name": "Raketensalve", "cost": 7, "target": "all",
+					"power": 15, "kind": "rocket",
+					"desc": "Raketen auf alle Gegner."},
+			],
+			"ultimate": {"name": "Orbitallaser",
+				"desc": "Ein Strahl aus dem Orbit vernichtet alle Feinde. (1x pro Kampf)"},
+		},
 	]
 	# Nach dem Sieg über den Knochenkönig bleibt seine Segnung erhalten,
 	# auch wenn die Gruppe später fällt — sonst wäre die Frostgrotte unschaffbar.
@@ -122,6 +138,7 @@ func xp_to_next(level: int) -> int:
 const LEVEL_GROWTH := {
 	"serena": {"max_hp": 9, "max_mp": 2, "atk": 3, "mag": 1, "def": 2},
 	"milo": {"max_hp": 6, "max_mp": 4, "atk": 1, "mag": 3, "def": 1},
+	"rax": {"max_hp": 9, "max_mp": 3, "atk": 2, "mag": 2, "def": 3},
 }
 
 # Verteilt EP an alle lebenden Mitglieder. Rückgabe: Liste der Aufstiege

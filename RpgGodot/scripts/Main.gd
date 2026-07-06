@@ -26,6 +26,9 @@ func _ready() -> void:
 	goto_map("town", "start")
 	if OS.get_environment("SHOT") != "":
 		_shot_tour()
+	elif OS.get_environment("SPELLSHOT") != "":
+		await get_tree().create_timer(0.5).timeout
+		start_battle(["slime", "bat", "skeleton"], "dungeon", Vector2i(4, 10))
 
 ## Temporärer Debug-Rundgang: Screenshots von Feld und Bosskampf (env SHOT=Zielordner).
 func _shot_tour() -> void:

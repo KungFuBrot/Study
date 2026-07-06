@@ -250,6 +250,12 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			for f in [880, 660, 520, 390]:
 				_tone(buf, f, f, 0.06, 0.20, "square")
 		"whirl": _tone(buf, 300, 1400, 0.35, 0.22, "square")
+		"laser":
+			_tone(buf, 2600, 700, 0.28, 0.24, "square")
+			_tone(buf, 1400, 400, 0.20, 0.20, "tri")
+		"rocket":
+			_tone(buf, 300, 1700, 0.22, 0.20, "noise")
+			_tone(buf, 200, 90, 0.14, 0.30, "tri")
 		"roar":
 			_tone(buf, 130, 35, 0.55, 0.40, "noise")
 			_tone(buf, 90, 45, 0.35, 0.30, "square")

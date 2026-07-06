@@ -37,7 +37,58 @@ func _ready() -> void:
 			boss_def = GameState.ENEMIES[id]
 	_build_scene()
 	_build_ui()
-	_run_battle()
+	if OS.get_environment("SPELLSHOT") != "":
+		_spell_showcase()
+	else:
+		_run_battle()
+
+## Debug: löst jeden Zauber-/Spezialeffekt aus und macht Screenshots am Höhepunkt
+## (env SPELLSHOT=Zielordner). Nur zum visuellen Prüfen, kein Spielinhalt.
+func _spell_showcase() -> void:
+	var dir := OS.get_environment("SPELLSHOT")
+	for u in heroes + enemies:
+		(u["sprite"] as Sprite2D).position = u["home"]
+		(u["sprite"] as Sprite2D).modulate.a = 1.0
+	for e in enemies:
+		e["hp"] = 99999  # unsterblich, damit alle Effekte auf volle Ziele treffen
+	for i in heroes.size():
+		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0)
+	for e in enemies:
+		_idle_bob(e["sprite"], 1.6)
+	_start_idle_animations()
+	for h in heroes:
+		h["data"]["mp"] = 60
+	await get_tree().create_timer(1.0).timeout
+	_snap(dir, "show_idle")
+	_highlight_hero(heroes[2], true)
+	await get_tree().create_timer(0.6).timeout
+	_snap(dir, "show_turnarrow")
+	_highlight_hero(heroes[2], false)
+	# Milo Feuerball (Explosion einfangen)
+	_fireball(heroes[1], heroes[1]["data"]["abilities"][0], enemies[0])
+	await get_tree().create_timer(1.05).timeout
+	_snap(dir, "show_fireball")
+	await get_tree().create_timer(1.4).timeout
+	# Rax Laser
+	_laser(heroes[2], heroes[2]["data"]["abilities"][0], enemies[1])
+	await get_tree().create_timer(0.55).timeout
+	_snap(dir, "show_laser")
+	await get_tree().create_timer(1.2).timeout
+	# Rax Raketensalve
+	_rocket_all(heroes[2], heroes[2]["data"]["abilities"][1])
+	await get_tree().create_timer(0.95).timeout
+	_snap(dir, "show_rockets")
+	await get_tree().create_timer(1.6).timeout
+	# Rax Ultimate
+	_ultimate_rax(heroes[2])
+	await get_tree().create_timer(1.95).timeout
+	_snap(dir, "show_ultimate")
+	await get_tree().create_timer(1.8).timeout
+	get_tree().quit()
+
+func _snap(dir: String, shot_name: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(dir + "/" + shot_name + ".png")
 
 ## Farbstimmung des Schauplatzes (dunkle Höhle vs. Frostgrotte).
 func _palette() -> Dictionary:
@@ -122,9 +173,11 @@ func _build_scene() -> void:
 		var data: Dictionary = GameState.party[i]
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.hero_battle(data["id"])
-		s.scale = Vector2(5, 5)
+		var hscale := 4.4 if data["id"] == "rax" else 5.0
+		s.scale = Vector2(hscale, hscale)
 		s.flip_h = true  # DTII-Figuren blicken nach rechts → zum Gegner (links) drehen
-		var home := Vector2(690 + i * 34, 180 + i * 150)
+		# Gestaffelte Zickzack-Aufstellung rechts, oberhalb des HUD-Panels.
+		var home := Vector2(705 + (i % 2) * 58, 135 + i * 86)
 		s.position = home + Vector2(340, 0)
 		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
 		_attach_shadow(s, 9, 3, foot_h)
@@ -197,6 +250,10 @@ func _attach_glow_pool(s: Sprite2D, foot_y: float, color: Color) -> void:
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	pool.material = mat
 	s.add_child(pool)
+	# Sanftes Pulsieren des Bodenlichts — gibt jedem Kämpfer ruhiges „Atmen".
+	var breath := pool.create_tween().set_loops()
+	breath.tween_property(pool, "modulate:a", 0.5, 1.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breath.tween_property(pool, "modulate:a", 1.0, 1.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Gespiegeltes Abbild unter den Füßen — der „nasse Boden“-Look aus HD-2D-Spielen.
 func _attach_reflection(s: Sprite2D, foot_y: float, alpha := 0.15) -> Sprite2D:
@@ -437,7 +494,7 @@ func _build_ui() -> void:
 	add_child(layer)
 	ui_layer = layer
 	# Tilt-Shift-Tiefenunschärfe (nur die Bühne, UI kommt später obendrauf).
-	layer.add_child(Fx.tilt_shift(3.0, 2.0, 0.45, 0.22))
+	layer.add_child(Fx.tilt_shift(2.2, 1.6, 0.46, 0.28))
 	# Filmisches Color-Grading: warmes Licht oben, kühle Schatten unten.
 	var pal := _palette()
 	var grade := TextureRect.new()
@@ -456,8 +513,8 @@ func _build_ui() -> void:
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(vig)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(20, 410)
-	panel.custom_minimum_size = Vector2(920, 115)
+	panel.position = Vector2(20, 378)
+	panel.custom_minimum_size = Vector2(920, 148)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.05, 0.05, 0.12, 0.94)
 	style.border_color = Color(0.75, 0.7, 0.5)
@@ -482,7 +539,7 @@ func _build_ui() -> void:
 		row.add_theme_constant_override("separation", 2)
 		party_box.add_child(row)
 		var l := Label.new()
-		l.add_theme_font_size_override("font_size", 17)
+		l.add_theme_font_size_override("font_size", 16)
 		row.add_child(l)
 		h["hp_label"] = l
 		var bars := HBoxContainer.new()
@@ -684,10 +741,10 @@ func _ability_menu(h: Dictionary) -> bool:
 			AudioManager.play_sfx("error")
 			return false
 		h["ult_used"] = true
-		if d["id"] == "serena":
-			await _ultimate_serena(h)
-		else:
-			await _ultimate_milo(h)
+		match d["id"]:
+			"serena": await _ultimate_serena(h)
+			"rax": await _ultimate_rax(h)
+			_: await _ultimate_milo(h)
 		return true
 	if pick > abilities.size():
 		return false
@@ -700,22 +757,32 @@ func _ability_menu(h: Dictionary) -> bool:
 		"all":
 			d["mp"] -= ab["cost"]
 			_refresh_party()
-			await _whirl_all(h, ab)
+			if ab["kind"] == "rocket":
+				await _rocket_all(h, ab)
+			else:
+				await _whirl_all(h, ab)
 		"one":
 			var t: int = await _pick_enemy()
 			if t < 0: return false
 			d["mp"] -= ab["cost"]
 			_refresh_party()
-			if ab["kind"] == "magic":
-				await _fireball(h, ab, enemies[t])
-			else:
-				await _pierce(h, ab, enemies[t])
+			match ab["kind"]:
+				"magic": await _fireball(h, ab, enemies[t])
+				"beam": await _laser(h, ab, enemies[t])
+				_: await _pierce(h, ab, enemies[t])
 		"ally":
-			var a: int = await _menu(["Für Serena", "Für Milo"], h)
+			var a: int = await _menu(_ally_entries(), h)
 			d["mp"] -= ab["cost"]
 			_refresh_party()
 			await _heal_ally(h, ab, heroes[a])
 	return true
+
+## Auswahl-Einträge „Für <Name>" für alle Party-Mitglieder (beliebige Größe).
+func _ally_entries() -> Array:
+	var names := []
+	for hh in heroes:
+		names.append("Für " + hh["data"]["name"])
+	return names
 
 ## ---------- Menüs (await auf Spieler-Eingabe) ----------
 
@@ -735,7 +802,24 @@ func _menu(entries: Array, h: Dictionary) -> int:
 	return choice
 
 func _highlight_hero(h: Dictionary, on: bool) -> void:
-	(h["sprite"] as Sprite2D).modulate = Color(1.3, 1.3, 1.0) if on else Color.WHITE
+	var s: Sprite2D = h["sprite"]
+	s.modulate = Color(1.3, 1.3, 1.0) if on else Color.WHITE
+	if on:
+		if h.get("turn_arrow") != null:
+			return
+		var arrow := Polygon2D.new()
+		arrow.polygon = PackedVector2Array([Vector2(-13, -13), Vector2(13, -13), Vector2(0, 5)])
+		arrow.color = Color(1.0, 0.9, 0.35)
+		var base_y := s.position.y - 82.0
+		arrow.position = Vector2(s.position.x, base_y)
+		add_child(arrow)
+		h["turn_arrow"] = arrow
+		var tw := arrow.create_tween().set_loops()
+		tw.tween_property(arrow, "position:y", base_y + 9.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(arrow, "position:y", base_y, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	elif h.get("turn_arrow") != null:
+		(h["turn_arrow"] as Node).queue_free()
+		h["turn_arrow"] = null
 
 func _redraw_menu() -> void:
 	for c in menu_box.get_children():
@@ -792,7 +876,7 @@ func _item_menu(h: Dictionary) -> bool:
 	var pick: int = await _menu(entries, h)
 	if pick >= names.size():
 		return false
-	var target: int = await _menu(["Für Serena", "Für Milo"], h)
+	var target: int = await _menu(_ally_entries(), h)
 	var item_name: String = names[pick]
 	var item: Dictionary = GameState.ITEMS[item_name]
 	var td: Dictionary = heroes[target]["data"]
@@ -912,41 +996,58 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	_say("%s wirkt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.82, 0.35))
 	var raise := create_tween()
-	raise.tween_property(s, "position:y", s.position.y - 14.0, 0.2)
+	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
 	await raise.finished
-	# Feuerball mit glühendem Kern und Funkenschweif fliegt zum Ziel
+	# --- Aufladung: eine glühende Feuerkugel wächst in der Hand und pulsiert ---
+	var hand := s.position + Vector2(-44, -4)
 	var ball := Sprite2D.new()
-	ball.texture = SpriteFactory.circle(10, Color(1.0, 0.55, 0.15))
-	ball.position = s.position + Vector2(-40, 0)
+	ball.texture = SpriteFactory.circle(15, Color(1.0, 0.5, 0.12))
+	ball.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	ball.position = hand
+	ball.scale = Vector2(0.15, 0.15)
+	var bmat := CanvasItemMaterial.new()
+	bmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	ball.material = bmat
 	var core := Sprite2D.new()
-	core.texture = SpriteFactory.circle(5, Color(1.0, 0.95, 0.6))
+	core.texture = SpriteFactory.circle(8, Color(1.0, 0.96, 0.7))
+	core.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	ball.add_child(core)
 	var trail := CPUParticles2D.new()
-	trail.amount = 24
-	trail.lifetime = 0.35
+	trail.amount = 34
+	trail.lifetime = 0.4
 	trail.direction = Vector2(1, 0)
-	trail.spread = 25.0
+	trail.spread = 30.0
 	trail.gravity = Vector2.ZERO
-	trail.initial_velocity_min = 30.0
-	trail.initial_velocity_max = 70.0
-	trail.scale_amount_min = 0.5
-	trail.scale_amount_max = 1.2
-	trail.color = Color(1.0, 0.5, 0.1, 0.8)
+	trail.initial_velocity_min = 40.0
+	trail.initial_velocity_max = 95.0
+	trail.scale_amount_min = 0.6
+	trail.scale_amount_max = 1.6
+	trail.color = Color(1.0, 0.5, 0.1, 0.85)
 	trail.texture = SpriteFactory.circle(4, Color.WHITE)
 	ball.add_child(trail)
 	add_child(ball)
+	AudioManager.play_sfx("charge")
+	var charge := create_tween()
+	charge.tween_property(ball, "scale", Vector2(1.1, 1.1), 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	charge.tween_property(ball, "scale", Vector2(0.92, 0.92), 0.12).set_trans(Tween.TRANS_SINE)
+	await charge.finished
+	# --- Abschuss: der große Feuerball rast zum Ziel und wächst dabei ---
 	AudioManager.play_sfx("fire")
 	var fly := create_tween()
-	fly.tween_property(ball, "position", e["sprite"].position, 0.4) \
+	fly.tween_property(ball, "position", e["sprite"].position, 0.34) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	fly.parallel().tween_property(ball, "scale", Vector2(1.8, 1.8), 0.4)
+	fly.parallel().tween_property(ball, "scale", Vector2(2.7, 2.7), 0.34)
+	fly.parallel().tween_property(ball, "rotation", TAU, 0.34)
 	await fly.finished
 	ball.queue_free()
-	_explosion(e["sprite"].position)
-	_flash_screen(Color(1.0, 0.6, 0.2, 0.20))
-	AudioManager.play_sfx("boom")
-	await _hitstop(0.07)
+	# --- Einschlag: große Explosion, Blitz, Beben, Zeitlupe ---
+	_explosion(e["sprite"].position, 1.9)
+	_flash_screen(Color(1.0, 0.62, 0.25, 0.34))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.1)
+	await _hitstop(0.11)
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	var back := create_tween()
@@ -980,6 +1081,199 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	back.tween_property(s, "position", h["home"], 0.22) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
+
+## ---------- Roboter-Held Rax: Laser, Raketen, Orbital-Ultimate ----------
+
+## Weltposition der Mündung (die Kanone sitzt nach flip_h bildlinks/vorn).
+func _cannon_muzzle(s: Sprite2D) -> Vector2:
+	return s.position + Vector2(-52, -6)
+
+## Leuchtender Energiestrahl von A nach B (additiv, kurzer Auf-/Abblendimpuls).
+func _beam(from: Vector2, to: Vector2, color: Color, width: float, hold: float) -> void:
+	var seg := Node2D.new()
+	seg.position = from
+	seg.rotation = (to - from).angle()
+	add_child(seg)
+	var length := from.distance_to(to)
+	var pts := PackedVector2Array([Vector2(0, -0.5), Vector2(length, -0.5),
+		Vector2(length, 0.5), Vector2(0, 0.5)])
+	var glow := Polygon2D.new()
+	glow.polygon = pts
+	glow.color = color
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glow.material = mat
+	seg.add_child(glow)
+	var core := Polygon2D.new()
+	core.polygon = pts
+	core.color = Color(1, 1, 1, 0.95)
+	core.scale = Vector2(1, 0.4)
+	seg.add_child(core)
+	seg.scale = Vector2(1, 0.1)
+	var tw := seg.create_tween()
+	tw.tween_property(seg, "scale", Vector2(1, width), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(hold)
+	tw.tween_property(seg, "modulate:a", 0.0, 0.2)
+	tw.tween_callback(seg.queue_free)
+
+## Laserstoß: Kanone lädt cyan auf, dann ein gebündelter Strahl auf einen Gegner.
+func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s feuert %s!" % [d["name"], ab["name"]])
+	var muzzle := _cannon_muzzle(s)
+	var chg := Sprite2D.new()
+	chg.texture = SpriteFactory.circle(11, Color(0.5, 0.97, 1.0))
+	chg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	chg.position = muzzle
+	chg.scale = Vector2(0.1, 0.1)
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	chg.material = m
+	add_child(chg)
+	AudioManager.play_sfx("charge")
+	var ct := chg.create_tween()
+	ct.tween_property(chg, "scale", Vector2(1.5, 1.5), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await ct.finished
+	chg.queue_free()
+	var target: Vector2 = e["sprite"].position
+	AudioManager.play_sfx("laser")
+	_beam(muzzle, target, Color(0.45, 0.95, 1.0, 0.9), 16.0, 0.16)
+	_impact_ring(target, Color(0.6, 0.97, 1.0, 0.85))
+	_burst(target, Color(0.6, 0.95, 1.0), 18, 180)
+	_flash_screen(Color(0.4, 0.85, 1.0, 0.20))
+	_shake_camera(1.7)
+	await _hitstop(0.10)
+	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
+	await _damage_enemy(e, maxi(dmg, 1))
+
+## Eine einzelne Rakete fliegt im Bogen zum Ziel und detoniert.
+func _launch_rocket(from: Vector2, to: Vector2) -> void:
+	var r := Sprite2D.new()
+	r.texture = SpriteFactory.circle(4, Color(0.95, 0.92, 0.86))
+	r.position = from
+	var smoke := CPUParticles2D.new()
+	smoke.amount = 18
+	smoke.lifetime = 0.45
+	smoke.direction = Vector2(-1, 0)
+	smoke.spread = 30.0
+	smoke.gravity = Vector2(0, 20)
+	smoke.initial_velocity_min = 20.0
+	smoke.initial_velocity_max = 55.0
+	smoke.scale_amount_min = 0.6
+	smoke.scale_amount_max = 1.4
+	smoke.color = Color(1.0, 0.6, 0.25, 0.8)
+	smoke.texture = SpriteFactory.circle(3, Color.WHITE)
+	r.add_child(smoke)
+	add_child(r)
+	var mid := (from + to) * 0.5 + Vector2(0, -randf_range(50, 100))
+	var t := create_tween()
+	t.tween_property(r, "position", mid, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.tween_property(r, "position", to, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.tween_callback(func():
+		r.queue_free()
+		_explosion(to, 1.15)
+		AudioManager.play_sfx("boom")
+		_shake_camera(1.2))
+
+## Raketensalve: zwei Wellen kleiner Raketen auf alle Gegner.
+func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s startet %s!" % [d["name"], ab["name"]])
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.6, 0.2))
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	for wave in 2:
+		for e in alive:
+			if not e["alive"]:
+				continue
+			var aim: Vector2 = e["sprite"].position + Vector2(randf_range(-16, 16), randf_range(-14, 14))
+			_launch_rocket(_cannon_muzzle(s), aim)
+			AudioManager.play_sfx("rocket")
+			await get_tree().create_timer(0.09).timeout
+		await get_tree().create_timer(0.18).timeout
+	await get_tree().create_timer(0.35).timeout
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((ab["power"] + d["mag"] * 0.7) * randf_range(0.9, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+
+## Zielmarker, der über einem Gegner zusammenzieht (Orbital-Anvisierung).
+func _target_reticle(pos: Vector2) -> void:
+	var r := Sprite2D.new()
+	r.texture = SpriteFactory.circle(20, Color(0.5, 0.95, 1.0, 0.55))
+	r.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	r.position = pos
+	r.scale = Vector2(2.3, 2.3)
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	r.material = m
+	add_child(r)
+	var tw := create_tween()
+	tw.tween_property(r, "scale", Vector2(0.7, 0.7), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(r, "modulate:a", 1.0, 0.4)
+	tw.tween_callback(r.queue_free)
+
+## Gewaltige Strahlensäule, die von oben auf einen Punkt niederfährt.
+func _orbital_column(pos: Vector2) -> void:
+	var col := Polygon2D.new()
+	var w := 26.0
+	col.polygon = PackedVector2Array([Vector2(-w, -540), Vector2(w, -540),
+		Vector2(w * 0.45, 0), Vector2(-w * 0.45, 0)])
+	col.color = Color(0.6, 0.95, 1.0, 0.85)
+	col.position = pos
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	col.material = m
+	col.scale = Vector2(0.15, 1)
+	add_child(col)
+	var tw := create_tween()
+	tw.tween_property(col, "scale", Vector2(1, 1), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.14)
+	tw.tween_property(col, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(col.queue_free)
+
+## Rax' Ultimative „Orbitallaser": Zielmarker, dann niederfahrende Strahlensäulen
+## auf alle Gegner mit weißem Blitz, Beben und Zeitlupe.
+func _ultimate_rax(h: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s aktiviert sein Overload-Protokoll!" % d["name"])
+	if h.has("bob"):
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.55)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), Color(0.4, 0.9, 1.0))
+	s.modulate = Color(1.4, 1.5, 1.7)
+	_burst(s.position, Color(0.5, 0.95, 1.0), 16, 150)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("★ ORBITALLASER ★", Color(0.5, 0.9, 1.0))
+	await get_tree().create_timer(0.5).timeout
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	for e in alive:
+		_target_reticle(e["sprite"].position)
+	await get_tree().create_timer(0.55).timeout
+	AudioManager.play_sfx("laser")
+	_flash_screen(Color(0.6, 0.9, 1.0, 0.5))
+	_shake_camera(2.4)
+	for e in alive:
+		_orbital_column(e["sprite"].position)
+		_explosion(e["sprite"].position, 1.6)
+	AudioManager.play_sfx("bigboom")
+	await _hitstop(0.16)
+	s.modulate = Color.WHITE
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((d["mag"] * 2.5 + 40) * randf_range(0.95, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+	_undim(dim)
+	h["bob"] = _idle_bob(s, 2.0)
 
 ## Dunkelt den Schauplatz ab (hinter den Kämpfern) für Ultimate-Inszenierungen.
 func _dim_world(alpha: float) -> ColorRect:
@@ -1503,10 +1797,11 @@ func _slash_arc(pos: Vector2) -> void:
 	tw.parallel().tween_property(arc, "modulate:a", 0.0, 0.22)
 	tw.tween_callback(arc.queue_free)
 
-## Partikel-Explosion mit Glut, Rauch und Lichtblitz.
-func _explosion(pos: Vector2) -> void:
+## Partikel-Explosion mit Glut, Rauch und Lichtblitz. `power` skaliert die
+## Wucht (1.0 = normal; >1 für große Feuerzauber → Stoßwelle, Glutregen).
+func _explosion(pos: Vector2, power := 1.0) -> void:
 	var flash := Sprite2D.new()
-	flash.texture = SpriteFactory.circle(26, Color(1.0, 0.9, 0.6))
+	flash.texture = SpriteFactory.circle(26, Color(1.0, 0.92, 0.66))
 	flash.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	flash.position = pos
 	flash.scale = Vector2(0.3, 0.3)
@@ -1515,12 +1810,36 @@ func _explosion(pos: Vector2) -> void:
 	flash.material = mat
 	add_child(flash)
 	var ft := create_tween()
-	ft.tween_property(flash, "scale", Vector2(2.4, 2.4), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	ft.parallel().tween_property(flash, "modulate:a", 0.0, 0.25)
+	ft.tween_property(flash, "scale", Vector2(2.4, 2.4) * power, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ft.parallel().tween_property(flash, "modulate:a", 0.0, 0.25 + 0.1 * (power - 1.0))
 	ft.tween_callback(flash.queue_free)
-	_burst(pos, Color(1.0, 0.55, 0.12), 16, 160)
-	_burst(pos, Color(0.45, 0.40, 0.42, 0.6), 8, 60)
+	_burst(pos, Color(1.0, 0.55, 0.12), int(16 * power), 160 * power)
+	_burst(pos, Color(1.0, 0.85, 0.4), int(10 * power), 120 * power)
+	_burst(pos, Color(0.45, 0.40, 0.42, 0.6), int(8 * power), 60 * power)
 	_impact_ring(pos, Color(1.0, 0.7, 0.3, 0.8))
+	# Bei großen Explosionen eine zweite, verzögerte Stoßwelle + Glutregen.
+	if power > 1.3:
+		_impact_ring(pos, Color(1.0, 0.85, 0.5, 0.6))
+		var embers := CPUParticles2D.new()
+		embers.position = pos
+		embers.one_shot = true
+		embers.explosiveness = 0.85
+		embers.amount = int(18 * power)
+		embers.lifetime = 0.8
+		embers.direction = Vector2(0, -1)
+		embers.spread = 70.0
+		embers.gravity = Vector2(0, 320)
+		embers.initial_velocity_min = 80.0 * power
+		embers.initial_velocity_max = 200.0 * power
+		embers.scale_amount_min = 0.5
+		embers.scale_amount_max = 1.6
+		embers.color = Color(1.0, 0.6, 0.2)
+		embers.texture = SpriteFactory.circle(3, Color.WHITE)
+		embers.emitting = true
+		add_child(embers)
+		var et := embers.create_tween()
+		et.tween_interval(1.4)
+		et.tween_callback(embers.queue_free)
 
 ## Einmaliger Partikel-Ausbruch (CPUParticles2D, räumt sich selbst auf).
 func _burst(pos: Vector2, color: Color, amount: int, speed: float) -> void:

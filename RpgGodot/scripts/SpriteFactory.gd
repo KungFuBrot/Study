@@ -337,6 +337,8 @@ static func character(id: String, dir: String, frame: int) -> Texture2D:
 
 ## Feldfigur mit Zustand: laufend → Lauf-Animation, sonst Idle (je 4 Frames).
 static func field_char(id: String, walking: bool, frame: int) -> Texture2D:
+	if id == "rax":
+		return robot_field(walking, frame)
 	var base: String = FIELD_DTII.get(id, "elf_f")
 	var anim := "run" if walking else "idle"
 	return dtii("%s_%s_anim_f%d" % [base, anim, frame % 4])
@@ -461,6 +463,8 @@ static func hero_battle(id: String) -> Texture2D:
 	return hero_battle_frame(id, 0)
 
 static func hero_battle_frame(id: String, frame: int) -> Texture2D:
+	if id == "rax":
+		return robot_battle(frame)
 	var def: Dictionary = HERO_DTII.get(id, HERO_DTII["serena"])
 	return dtii("%s_idle_anim_f%d" % [def["base"], frame % 4])
 
@@ -485,6 +489,117 @@ static func hero_battle_art(id: String) -> Texture2D:
 			var ch: String = rows[y][x]
 			if art["map"].has(ch):
 				img.set_pixel(x, y, art["map"][ch])
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+## ---------- Roboter-Held „Rax" (prozedural, mehrteilig animiert) ----------
+## DTII hat keinen Roboter, und ein Roboter eignet sich bestens für scharfe,
+## geometrische Pixel-Art. Vier Frames animieren Visor-Scan, Antennenblinken
+## und den pulsierenden Brustkern — das Bild bleibt gestochen scharf (Nearest).
+## Er blickt nach rechts (wie die DTII-Helden), im Kampf wird per flip_h gespiegelt.
+
+const ROBOT_PAL := {
+	"ml": Color(0.78, 0.83, 0.90), "mm": Color(0.52, 0.58, 0.67),
+	"md": Color(0.30, 0.34, 0.42), "jt": Color(0.13, 0.15, 0.21),
+	"eye": Color(0.45, 0.96, 1.0), "acc": Color(0.96, 0.63, 0.22),
+}
+
+## Vier Pulsphasen für den Brustkern (hell → dunkel → hell).
+static func _robot_core(frame: int) -> Color:
+	var lv: float = [1.0, 0.72, 0.5, 0.72][frame % 4]
+	return Color(0.55, 0.22, 0.06).lerp(Color(1.0, 0.72, 0.32), lv)
+
+static func robot_battle(frame: int) -> Texture2D:
+	var key := "robot_b_%d" % (frame % 4)
+	if _cache.has(key):
+		return _cache[key]
+	var p := ROBOT_PAL
+	var ml: Color = p["ml"]; var mm: Color = p["mm"]; var md: Color = p["md"]
+	var jt: Color = p["jt"]; var eye: Color = p["eye"]; var acc: Color = p["acc"]
+	var core := _robot_core(frame)
+	var ant := Color(1.0, 0.38, 0.30) if frame % 2 == 0 else Color(0.5, 0.19, 0.16)
+	var img := _img(24, 28)
+	# Antenne mit blinkender Spitze
+	img.set_pixel(9, 0, ant)
+	img.fill_rect(Rect2i(9, 1, 1, 3), md)
+	# Kopf-Kuppel
+	img.fill_rect(Rect2i(6, 4, 12, 7), ml)
+	img.set_pixel(6, 4, Color(0, 0, 0, 0)); img.set_pixel(17, 4, Color(0, 0, 0, 0))
+	img.fill_rect(Rect2i(6, 10, 12, 1), mm)
+	img.fill_rect(Rect2i(17, 5, 1, 5), mm)
+	# Visor (Front rechts) + wandernder Scan-Punkt
+	img.fill_rect(Rect2i(12, 5, 5, 1), md)
+	img.fill_rect(Rect2i(12, 6, 5, 3), jt)
+	var sx: int = 13 + [0, 1, 2, 1][frame % 4]
+	img.set_pixel(sx, 7, eye); img.set_pixel(sx, 8, eye)
+	# Hals
+	img.fill_rect(Rect2i(10, 11, 4, 1), md)
+	# Rumpf
+	img.fill_rect(Rect2i(5, 11, 14, 9), mm)
+	img.fill_rect(Rect2i(5, 11, 14, 1), ml)
+	img.fill_rect(Rect2i(5, 11, 1, 9), ml)
+	img.fill_rect(Rect2i(18, 11, 1, 9), md)
+	img.fill_rect(Rect2i(5, 19, 14, 1), md)
+	# Brustkern
+	img.fill_rect(Rect2i(10, 13, 4, 4), core)
+	img.fill_rect(Rect2i(11, 14, 2, 2), Color(1.0, 0.92, 0.66))
+	# Schultern mit Akzentkappen
+	img.fill_rect(Rect2i(3, 11, 3, 3), md); img.fill_rect(Rect2i(3, 11, 3, 1), acc)
+	img.fill_rect(Rect2i(18, 11, 3, 3), md); img.fill_rect(Rect2i(18, 11, 3, 1), acc)
+	# Linker Arm (Rückseite)
+	img.fill_rect(Rect2i(2, 13, 3, 6), mm); img.fill_rect(Rect2i(2, 13, 1, 6), md)
+	img.fill_rect(Rect2i(2, 19, 3, 2), md)
+	# Rechter Arm = Kanone (Front)
+	img.fill_rect(Rect2i(19, 12, 5, 3), md)
+	img.fill_rect(Rect2i(19, 15, 5, 3), mm); img.fill_rect(Rect2i(19, 15, 5, 1), ml)
+	img.fill_rect(Rect2i(23, 16, 1, 2), jt)
+	img.set_pixel(22, 16, eye)
+	# Hüfte + Beine + Füße
+	img.fill_rect(Rect2i(7, 20, 10, 2), md)
+	img.fill_rect(Rect2i(8, 22, 3, 5), mm); img.fill_rect(Rect2i(8, 22, 1, 5), md)
+	img.fill_rect(Rect2i(13, 22, 3, 5), mm); img.fill_rect(Rect2i(15, 22, 1, 5), md)
+	img.fill_rect(Rect2i(7, 26, 4, 2), md); img.fill_rect(Rect2i(13, 26, 4, 2), md)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+static func robot_field(walking: bool, frame: int) -> Texture2D:
+	var key := "robot_f_%d_%d" % [1 if walking else 0, frame % 4]
+	if _cache.has(key):
+		return _cache[key]
+	var p := ROBOT_PAL
+	var ml: Color = p["ml"]; var mm: Color = p["mm"]; var md: Color = p["md"]
+	var jt: Color = p["jt"]; var eye: Color = p["eye"]
+	var core := _robot_core(frame)
+	var ant := Color(1.0, 0.38, 0.30) if frame % 2 == 0 else Color(0.5, 0.19, 0.16)
+	var img := _img(16, 28)
+	# Antenne
+	img.set_pixel(7, 2, ant); img.fill_rect(Rect2i(7, 3, 1, 3), md)
+	# Kopf
+	img.fill_rect(Rect2i(5, 6, 7, 6), ml)
+	img.fill_rect(Rect2i(5, 11, 7, 1), mm)
+	img.fill_rect(Rect2i(8, 8, 3, 2), jt)
+	var sx: int = 9 + [0, 1, 1, 0][frame % 4]
+	img.set_pixel(sx, 8, eye)
+	# Rumpf
+	img.fill_rect(Rect2i(4, 12, 9, 7), mm)
+	img.fill_rect(Rect2i(4, 12, 9, 1), ml)
+	img.fill_rect(Rect2i(4, 12, 1, 7), ml)
+	img.fill_rect(Rect2i(12, 12, 1, 7), md)
+	img.fill_rect(Rect2i(7, 14, 3, 3), core)
+	img.set_pixel(8, 15, Color(1.0, 0.92, 0.66))
+	# Arme (rechts Kanone)
+	img.fill_rect(Rect2i(2, 13, 2, 5), mm)
+	img.fill_rect(Rect2i(13, 13, 3, 4), md); img.set_pixel(15, 14, jt)
+	# Beine + Füße (beim Gehen abwechselnd angehoben)
+	var lift_l := 2 if (walking and frame % 2 == 0) else 0
+	var lift_r := 2 if (walking and frame % 2 == 1) else 0
+	img.fill_rect(Rect2i(7, 19, 6, 1), md)
+	img.fill_rect(Rect2i(5, 20 - lift_l, 3, 5), mm)
+	img.fill_rect(Rect2i(9, 20 - lift_r, 3, 5), mm)
+	img.fill_rect(Rect2i(4, 25 - lift_l, 4, 2), md)
+	img.fill_rect(Rect2i(9, 25 - lift_r, 4, 2), md)
 	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t

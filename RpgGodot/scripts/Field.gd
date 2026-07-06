@@ -34,6 +34,8 @@ var state := "move"  # move | dialogue | shop | locked (Übergang läuft)
 var player: Sprite2D
 var follower: Sprite2D
 var follower_tile: Vector2i
+var follower2: Sprite2D       # zweiter Begleiter (Roboter Rax)
+var follower2_tile: Vector2i
 var camera: Camera2D
 var npc_nodes := {}  # Vector2i -> npc dict
 
@@ -350,6 +352,7 @@ func _spawn_party() -> void:
 	else:
 		player_tile = map["spawns"][spawn_id]
 	follower_tile = player_tile
+	follower2_tile = player_tile
 	player = Sprite2D.new()
 	player.centered = false
 	player.offset = CHAR_OFFSET
@@ -362,8 +365,15 @@ func _spawn_party() -> void:
 	follower.z_index = 9
 	add_child(follower)
 	_attach_drop_shadow(follower)
+	follower2 = Sprite2D.new()
+	follower2.centered = false
+	follower2.offset = CHAR_OFFSET
+	follower2.z_index = 8
+	add_child(follower2)
+	_attach_drop_shadow(follower2)
 	player.position = _tile_pos(player_tile)
 	follower.position = _tile_pos(follower_tile)
+	follower2.position = _tile_pos(follower2_tile)
 	_update_sprites()
 
 	camera = Camera2D.new()
@@ -404,6 +414,11 @@ func _update_sprites() -> void:
 		fd = facing
 	follower.texture = SpriteFactory.field_char("milo", moving, anim_frame)
 	follower.flip_h = fd.x < 0
+	var fd2 := follower_tile - follower2_tile
+	if fd2 == Vector2i.ZERO:
+		fd2 = fd
+	follower2.texture = SpriteFactory.field_char("rax", moving, anim_frame)
+	follower2.flip_h = fd2.x < 0
 
 func _process(delta: float) -> void:
 	# Weiterlaufende Idle-/Lauf-Animation (4 Frames, ~7 fps).
@@ -451,6 +466,7 @@ func _try_step(dir: Vector2i) -> void:
 		return
 	moving = true
 	var old := player_tile
+	var old_follower := follower_tile
 	player_tile = target
 	walk_frame = 1 - walk_frame
 	_update_sprites()
@@ -458,8 +474,10 @@ func _try_step(dir: Vector2i) -> void:
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(player, "position", _tile_pos(player_tile), STEP_TIME)
 	tw.tween_property(follower, "position", _tile_pos(old), STEP_TIME)
+	tw.tween_property(follower2, "position", _tile_pos(old_follower), STEP_TIME)
 	await tw.finished
 	follower_tile = old
+	follower2_tile = old_follower
 	moving = false
 	_after_step()
 
