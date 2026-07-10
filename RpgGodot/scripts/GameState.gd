@@ -94,6 +94,14 @@ func reset_party() -> void:
 			],
 			"ultimate": {"name": "Meteorregen",
 				"desc": "Brennende Meteore auf alle Feinde. (1x pro Kampf)"},
+			"summons": [
+				{"id": "ifrit", "name": "Ifrit", "attack": "Höllenfeuer",
+					"cost": 16, "unlock_level": 3, "power": 34,
+					"desc": "Feuerdämon — Höllenfeuer auf alle Gegner."},
+				{"id": "leviathan", "name": "Leviathan", "attack": "Sintflut",
+					"cost": 24, "unlock_level": 5, "power": 38,
+					"desc": "Wasserschlange — Sintflut auf alle Gegner."},
+			],
 		},
 		{
 			"id": "rax", "name": "Rax", "class": "Kampfroboter",
@@ -160,7 +168,12 @@ func award_xp(amount: int) -> Array:
 			m["def"] += g["def"]
 			m["hp"] = m["max_hp"]
 			m["mp"] = m["max_mp"]
-			ups.append({"name": m["name"], "level": m["level"]})
+			var up := {"name": m["name"], "level": m["level"]}
+			# Schaltet diese Stufe eine Beschwörung frei? (nur Milo hat "summons")
+			for sm in m.get("summons", []):
+				if sm["unlock_level"] == m["level"]:
+					up["unlock"] = sm["name"]
+			ups.append(up)
 	return ups
 
 func add_item(item_name: String, count := 1) -> void:

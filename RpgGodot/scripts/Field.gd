@@ -64,6 +64,7 @@ const LIGHTING := {
 const SOLID_ABOVE := ["t", "m", "R", "W", "D", "#", "I"]
 
 func _ready() -> void:
+	add_child(Fx.glow_environment())
 	map = MapData.get_map(map_id)
 	_build_tiles()
 	_spawn_npcs()

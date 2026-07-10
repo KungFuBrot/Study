@@ -63,7 +63,9 @@ void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 void fragment() {
-	vec4 col = texture(TEXTURE, UV);
+	// COLOR enthält hier bereits Textur * Modulate/Polygonfarbe — so funktioniert
+	// das Material auch auf untexturierten, eingefärbten Polygonen (Flutwelle).
+	vec4 col = COLOR;
 	float w = sin(world_pos.x * 0.13 + TIME * 1.1)
 			+ sin(world_pos.y * 0.19 - TIME * 0.8)
 			+ sin((world_pos.x + world_pos.y) * 0.09 + TIME * 0.6);
@@ -87,6 +89,34 @@ static func water_material() -> ShaderMaterial:
 		_water_mat = ShaderMaterial.new()
 		_water_mat.shader = _water_shader
 	return _water_mat
+
+## „Heiße" HDR-Farbe: RGB über 1.0 geboostet, damit echtes 2D-Bloom anspringt.
+## Im Web (gl_compatibility, kein HDR-2D) bleibt die Farbe unverändert — die
+## vorhandenen additiven Fake-Glows sind dort weiterhin der Look.
+static func hot(c: Color, boost := 1.8) -> Color:
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		return c
+	return Color(c.r * boost, c.g * boost, c.b * boost, c.a)
+
+## Echtes 2D-Bloom über WorldEnvironment (wirkt nur mit hdr_2d + Forward+;
+## im Web still ignoriert). Einmal pro Szene als Kind einhängen.
+static func glow_environment() -> WorldEnvironment:
+	var env := Environment.new()
+	env.background_mode = Environment.BG_CANVAS
+	env.glow_enabled = true
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+	env.glow_hdr_threshold = 1.1
+	env.glow_intensity = 0.5
+	env.glow_bloom = 0.0  # >0 legt einen globalen Helligkeitsschleier über alles
+	# Nur zwei enge Blur-Stufen — die weiten Standard-Stufen (3/5) waschen
+	# sonst die ganze Szene in der Farbe der hellsten Lichtquelle aus.
+	for i in range(1, 8):
+		env.set("glow_levels/%d" % i, 0.0)
+	env.set("glow_levels/1", 0.8)
+	env.set("glow_levels/3", 0.5)
+	var we := WorldEnvironment.new()
+	we.environment = env
+	return we
 
 ## Weiche radiale Falloff-Textur für PointLight2D (smoothstep, 128 px).
 static func light_texture() -> Texture2D:

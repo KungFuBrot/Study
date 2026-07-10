@@ -604,6 +604,167 @@ static func robot_field(walking: bool, frame: int) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## ---------- Beschwörungen: Ifrit & Leviathan (prozedural) ----------
+## Große Kino-Sprites für Milos Beschwörungen. Bewusst die größte Leinwand im
+## Spiel (Ifrit 40x48), damit die Nearest-Skalierung im Kampf scharf bleibt.
+## Der Leviathan ist modular (Kopf/Segment/Schwanz) — der Kampf setzt ihn zur
+## Laufzeit entlang einer Kurve zusammen, so schlängelt er wirklich.
+## Beide blicken nach rechts (im Kampf steht der Beschworene links der Gegner).
+
+const IFRIT_PAL := {
+	"body": Color(0.16, 0.10, 0.12), "body2": Color(0.26, 0.14, 0.15),
+	"ember": Color(0.85, 0.25, 0.10), "org": Color(1.0, 0.55, 0.15),
+	"hot": Color(1.0, 0.9, 0.45), "gold": Color(0.95, 0.78, 0.35),
+}
+
+static func ifrit(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "ifrit_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var p := IFRIT_PAL
+	var body: Color = p["body"]; var body2: Color = p["body2"]
+	var ember: Color = p["ember"]; var org: Color = p["org"]
+	var hot: Color = p["hot"]; var gold: Color = p["gold"]
+	var img := _img(40, 48)
+	# Geschwungene Hörner, Spitzen glühen abwechselnd
+	var tip := hot if f % 2 == 0 else org
+	for i in 6:
+		img.fill_rect(Rect2i(13 - i, 8 - i, 2, 2), body2)
+		img.fill_rect(Rect2i(25 + i, 8 - i, 2, 2), body2)
+	img.set_pixel(7, 2, tip); img.set_pixel(32, 2, tip)
+	# Kopf mit Stirnwulst, weißglühenden Augen und Fangzähnen
+	img.fill_rect(Rect2i(14, 7, 12, 8), body)
+	img.fill_rect(Rect2i(14, 7, 12, 1), body2)
+	img.fill_rect(Rect2i(19, 9, 2, 1), hot); img.fill_rect(Rect2i(23, 9, 2, 1), hot)
+	img.set_pixel(20, 10, org); img.set_pixel(24, 10, org)
+	img.fill_rect(Rect2i(18, 12, 7, 1), ember)
+	img.set_pixel(19, 13, gold); img.set_pixel(22, 13, gold); img.set_pixel(24, 13, gold)
+	# Flammenmähne: züngelt pro Frame anders (nur freie Pixel füllen)
+	for x in range(12, 28):
+		var hgt: int = 2 + ((x * 5 + f * 3) % 3)
+		for y in range(7 - hgt, 7):
+			if img.get_pixel(x, y).a < 0.01:
+				img.set_pixel(x, y, hot if y <= 7 - hgt else (org if y < 5 else ember))
+	# Schultern und Rumpf
+	img.fill_rect(Rect2i(8, 15, 24, 4), body2)
+	img.fill_rect(Rect2i(11, 19, 18, 13), body)
+	img.fill_rect(Rect2i(12, 19, 16, 2), body2)
+	# Pulsierende Glut-Risse in Brust und Bauch (2px hoch, damit sie leuchten)
+	var crack: Color = org.lerp(hot, [1.0, 0.62, 0.3, 0.62][f])
+	for c: Vector2i in [Vector2i(17, 21), Vector2i(18, 22), Vector2i(17, 23),
+			Vector2i(18, 24), Vector2i(19, 25), Vector2i(23, 20), Vector2i(22, 21),
+			Vector2i(23, 22), Vector2i(24, 23), Vector2i(20, 19)]:
+		img.fill_rect(Rect2i(c.x, c.y, 1, 2), crack)
+	img.fill_rect(Rect2i(19, 27, 3, 2), crack)
+	img.set_pixel(20, 27, hot)
+	# Arme mit Goldklauen: rechter (vorderer) greift nach vorn
+	img.fill_rect(Rect2i(29, 16, 4, 7), body2)
+	img.fill_rect(Rect2i(31, 21, 6, 5), body)
+	img.fill_rect(Rect2i(31, 21, 6, 1), ember)
+	img.set_pixel(37, 22, gold); img.set_pixel(37, 24, gold); img.set_pixel(36, 25, gold)
+	img.fill_rect(Rect2i(6, 16, 4, 8), body)
+	img.fill_rect(Rect2i(5, 23, 4, 3), body)
+	img.set_pixel(4, 24, gold); img.set_pixel(4, 26, gold)
+	# Unterkörper löst sich in hängende Flammenfetzen auf (schwebt)
+	for x in range(12, 29):
+		var dpt: int = 5 + ((x * 3 + f * 2) % 5) + (7 - absi(x - 20)) / 2
+		for y in range(32, mini(32 + dpt, 47)):
+			var t: float = float(y - 32) / float(dpt)
+			var c := body2
+			if t >= 0.85: c = hot
+			elif t >= 0.6: c = org
+			elif t >= 0.3: c = ember
+			img.set_pixel(x, y, c)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+const LEV_PAL := {
+	"deep": Color(0.06, 0.18, 0.30), "mid": Color(0.15, 0.45, 0.65),
+	"light": Color(0.55, 0.85, 1.0), "belly": Color(0.85, 0.95, 1.0),
+	"eye": Color(0.35, 1.0, 1.0),
+}
+
+static func leviathan_head(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "lev_head_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var p := LEV_PAL
+	var deep: Color = p["deep"]; var mid: Color = p["mid"]
+	var light: Color = p["light"]; var belly: Color = p["belly"]
+	var img := _img(28, 22)
+	var open := f >= 2  # Kiefer auf Frames 2/3 aufgerissen
+	# Flossenkamm am Hinterkopf
+	for i in 4:
+		img.fill_rect(Rect2i(4 + i * 2, 5 - i % 2, 2, 3 + i % 2), light)
+	# Schädel und zulaufende Schnauze
+	img.fill_rect(Rect2i(3, 7, 17, 7), mid)
+	img.fill_rect(Rect2i(3, 7, 17, 1), light)
+	img.fill_rect(Rect2i(18, 8, 9, 4), mid)
+	img.fill_rect(Rect2i(18, 8, 9, 1), light)
+	# Glühendes Auge
+	img.fill_rect(Rect2i(15, 9, 2, 2), p["eye"])
+	img.set_pixel(16, 9, belly)
+	# Oberkiefer-Zähne
+	img.set_pixel(25, 12, belly); img.set_pixel(22, 12, belly); img.set_pixel(19, 12, belly)
+	# Unterkiefer: geschlossen anliegend, offen nach unten geklappt
+	if open:
+		img.fill_rect(Rect2i(16, 15, 10, 3), deep)
+		img.fill_rect(Rect2i(16, 15, 10, 1), mid)
+		img.set_pixel(24, 14, belly); img.set_pixel(20, 14, belly)
+	else:
+		img.fill_rect(Rect2i(16, 13, 10, 3), deep)
+	# Hals-Stummel (Anschluss an die Segmente) + Bauch
+	img.fill_rect(Rect2i(0, 8, 4, 8), mid)
+	img.fill_rect(Rect2i(0, 14, 12, 2), belly)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+static func leviathan_segment(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "lev_seg_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var p := LEV_PAL
+	var img := _img(14, 14)
+	# Rückenflosse schimmert (wandert leicht pro Frame)
+	var fx: int = 5 + [0, 1, 1, 0][f]
+	img.fill_rect(Rect2i(fx, 1, 2, 3), p["light"])
+	img.set_pixel(fx + 1, 0, p["light"])
+	# Körperring mit Licht oben, Bauchstreifen unten
+	img.fill_rect(Rect2i(1, 4, 12, 7), p["mid"])
+	img.fill_rect(Rect2i(1, 4, 12, 1), p["light"])
+	img.fill_rect(Rect2i(1, 10, 12, 1), p["deep"])
+	img.fill_rect(Rect2i(2, 8, 10, 2), p["belly"])
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+static func leviathan_tail(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "lev_tail_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var p := LEV_PAL
+	var img := _img(16, 12)
+	# Ansatz rechts (schließt an ein Segment an), läuft nach links spitz zu
+	img.fill_rect(Rect2i(9, 3, 7, 6), p["mid"])
+	img.fill_rect(Rect2i(9, 3, 7, 1), p["light"])
+	img.fill_rect(Rect2i(10, 7, 6, 1), p["belly"])
+	img.fill_rect(Rect2i(5, 4, 4, 4), p["mid"])
+	# Gegabelte Schwanzflosse, Spitzen schimmern pro Frame
+	var shine: Color = p["light"] if f % 2 == 0 else p["belly"]
+	for i in 4:
+		img.set_pixel(4 - i, 4 - i + 2, p["light"] if i < 3 else shine)
+		img.set_pixel(4 - i, 6 + i, p["light"] if i < 3 else shine)
+	img.set_pixel(0, 1, shine); img.set_pixel(0, 10, shine)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
 ## ---------- Gegner (String-Pixel-Art) ----------
 
 const ENEMY_ART := {

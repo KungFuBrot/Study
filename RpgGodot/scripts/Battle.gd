@@ -30,6 +30,7 @@ var menu_index := 0
 var choice := -1
 var menu_labels: Array = []
 var current_menu: Array = []
+var menu_dim: Array = []  # Indizes gesperrter (grauer) Menüeinträge
 
 var msg_label: Label
 var menu_box: VBoxContainer
@@ -93,6 +94,25 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.95).timeout
 	_snap(dir, "show_ultimate")
 	await get_tree().create_timer(1.8).timeout
+	# Milos Beschwörungen (Level freischalten, MP auffüllen)
+	heroes[1]["data"]["level"] = 5
+	heroes[1]["data"]["mp"] = 99
+	var summons: Array = heroes[1]["data"]["summons"]
+	_summon_ifrit(heroes[1], summons[0])
+	await get_tree().create_timer(2.2).timeout
+	_snap(dir, "show_ifrit_1")
+	await get_tree().create_timer(0.6).timeout
+	_snap(dir, "show_ifrit_2")
+	await get_tree().create_timer(3.0).timeout
+	heroes[1]["data"]["mp"] = 99
+	_summon_leviathan(heroes[1], summons[1])
+	await get_tree().create_timer(3.0).timeout
+	_snap(dir, "show_leviathan_1")
+	await get_tree().create_timer(1.35).timeout
+	_snap(dir, "show_leviathan_2")
+	await get_tree().create_timer(1.0).timeout
+	_snap(dir, "show_leviathan_3")
+	await get_tree().create_timer(2.5).timeout
 	get_tree().quit()
 
 func _snap(dir: String, shot_name: String) -> void:
@@ -130,6 +150,7 @@ func _palette() -> Dictionary:
 ## ---------- Aufbau ----------
 
 func _build_scene() -> void:
+	add_child(Fx.glow_environment())
 	cam = Camera2D.new()
 	cam.position = Vector2(480, 270)
 	add_child(cam)
@@ -733,19 +754,43 @@ func _hero_turn(h: Dictionary) -> bool:
 				return false
 	return false
 
-## Untermenü: eine der Fähigkeiten (oder die Ultimative) wählen und ausführen.
+## Untermenü: Fähigkeiten, Beschwörungen (Milo) oder die Ultimative wählen.
 func _ability_menu(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
 	var abilities: Array = d["abilities"]
+	var summons: Array = d.get("summons", [])
 	var ult: Dictionary = d["ultimate"]
 	var entries := []
+	var dim := []
 	for ab in abilities:
 		entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
+	for sm in summons:
+		if d["level"] < sm["unlock_level"]:
+			dim.append(entries.size())
+			entries.append("◈ %s — ab Stufe %d" % [sm["name"], sm["unlock_level"]])
+		else:
+			entries.append("◈ %s (%d MP) — %s" % [sm["name"], sm["cost"], sm["desc"]])
 	entries.append("★ %s — %s" % [ult["name"],
 		"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
 	entries.append("Zurück")
-	var pick: int = await _menu(entries, h)
-	if pick == abilities.size():
+	var pick: int = await _menu(entries, h, dim)
+	if pick >= abilities.size() and pick < abilities.size() + summons.size():
+		var sm: Dictionary = summons[pick - abilities.size()]
+		if d["level"] < sm["unlock_level"]:
+			_say("%s erhört %s erst ab Stufe %d!" % [sm["name"], d["name"], sm["unlock_level"]])
+			AudioManager.play_sfx("error")
+			return false
+		if d["mp"] < sm["cost"]:
+			_say("Nicht genug MP!")
+			AudioManager.play_sfx("error")
+			return false
+		d["mp"] -= sm["cost"]
+		_refresh_party()
+		match sm["id"]:
+			"ifrit": await _summon_ifrit(h, sm)
+			"leviathan": await _summon_leviathan(h, sm)
+		return true
+	if pick == abilities.size() + summons.size():
 		if h["ult_used"]:
 			_say("Die ultimative Kraft ist in diesem Kampf bereits verbraucht!")
 			AudioManager.play_sfx("error")
@@ -756,7 +801,7 @@ func _ability_menu(h: Dictionary) -> bool:
 			"rax": await _ultimate_rax(h)
 			_: await _ultimate_milo(h)
 		return true
-	if pick > abilities.size():
+	if pick > abilities.size() + summons.size():
 		return false
 	var ab: Dictionary = abilities[pick]
 	if d["mp"] < ab["cost"]:
@@ -796,9 +841,10 @@ func _ally_entries() -> Array:
 
 ## ---------- Menüs (await auf Spieler-Eingabe) ----------
 
-func _menu(entries: Array, h: Dictionary) -> int:
+func _menu(entries: Array, h: Dictionary, dim_indices: Array = []) -> int:
 	_highlight_hero(h, true)
 	current_menu = entries
+	menu_dim = dim_indices
 	menu_index = 0
 	ui_state = "menu"
 	_redraw_menu()
@@ -838,8 +884,10 @@ func _redraw_menu() -> void:
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", 19)
 		l.text = ("> " if i == menu_index else "  ") + str(current_menu[i])
-		l.add_theme_color_override("font_color",
-			Color.WHITE if i == menu_index else Color(0.65, 0.65, 0.72))
+		var col := Color.WHITE if i == menu_index else Color(0.65, 0.65, 0.72)
+		if menu_dim.has(i):
+			col = Color(0.62, 0.62, 0.68) if i == menu_index else Color(0.42, 0.42, 0.5)
+		l.add_theme_color_override("font_color", col)
 		menu_box.add_child(l)
 
 func _clear_menu() -> void:
@@ -1109,14 +1157,14 @@ func _beam(from: Vector2, to: Vector2, color: Color, width: float, hold: float) 
 		Vector2(length, 0.5), Vector2(0, 0.5)])
 	var glow := Polygon2D.new()
 	glow.polygon = pts
-	glow.color = color
+	glow.color = Fx.hot(color)
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	glow.material = mat
 	seg.add_child(glow)
 	var core := Polygon2D.new()
 	core.polygon = pts
-	core.color = Color(1, 1, 1, 0.95)
+	core.color = Fx.hot(Color(1, 1, 1, 0.95), 1.4)
 	core.scale = Vector2(1, 0.4)
 	seg.add_child(core)
 	seg.scale = Vector2(1, 0.1)
@@ -1233,7 +1281,7 @@ func _orbital_column(pos: Vector2) -> void:
 	var w := 26.0
 	col.polygon = PackedVector2Array([Vector2(-w, -540), Vector2(w, -540),
 		Vector2(w * 0.45, 0), Vector2(-w * 0.45, 0)])
-	col.color = Color(0.6, 0.95, 1.0, 0.85)
+	col.color = Fx.hot(Color(0.6, 0.95, 1.0, 0.85))
 	col.position = pos
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -1457,6 +1505,372 @@ func _ultimate_milo(h: Dictionary) -> void:
 		if e["alive"]:
 			var dmg: int = int((d["mag"] * 2.5 + 40) * randf_range(0.95, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
+	_undim(dim)
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+	h["bob"] = _idle_bob(s, 2.0)
+
+## ---------- Beschwörungen (Milo): Ifrit & Leviathan ----------
+
+## Kurzer Kamera-Stoß auf einen Fokuspunkt — Zoom-Punch für große Momente.
+func _punch_zoom(strength: float, focus: Vector2) -> void:
+	var base_pos: Vector2 = cam.position
+	var tw := create_tween()
+	tw.tween_property(cam, "zoom", Vector2.ONE * (1.0 + strength), 0.12) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(cam, "position", base_pos + (focus - base_pos) * 0.2, 0.12) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.12)
+	tw.tween_property(cam, "zoom", Vector2.ONE, 0.55) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(cam, "position", base_pos, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+## Beschwörungsportal am Boden: doppelter Zauberkreis, Ring und aufsteigende Funken.
+func _summon_portal(pos: Vector2, color: Color) -> void:
+	AudioManager.play_sfx("summon")
+	_cast_circle(pos, color)
+	_cast_circle(pos, color.lightened(0.35))
+	_impact_ring(pos, color)
+	var motes := CPUParticles2D.new()
+	motes.position = pos
+	motes.amount = 26
+	motes.lifetime = 0.9
+	motes.one_shot = true
+	motes.explosiveness = 0.2
+	motes.direction = Vector2(0, -1)
+	motes.spread = 26.0
+	motes.gravity = Vector2(0, -60)
+	motes.initial_velocity_min = 60.0
+	motes.initial_velocity_max = 140.0
+	motes.scale_amount_min = 0.5
+	motes.scale_amount_max = 1.3
+	motes.color = Color(color.r, color.g, color.b, 0.9)
+	motes.texture = SpriteFactory.circle(4, Color.WHITE)
+	add_child(motes)
+	motes.emitting = true
+	get_tree().create_timer(1.4).timeout.connect(motes.queue_free)
+
+## Feuersäule, die unter einem Gegner aus dem Boden bricht (Ifrits Höllenfeuer).
+func _fire_pillar(pos: Vector2) -> void:
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var col := Polygon2D.new()
+	var w := 30.0
+	col.polygon = PackedVector2Array([Vector2(-w * 0.5, 0), Vector2(w * 0.5, 0),
+		Vector2(w, -430), Vector2(-w, -430)])
+	col.color = Fx.hot(Color(1.0, 0.5, 0.12, 0.9))
+	col.position = pos + Vector2(0, 34)
+	col.material = m
+	col.scale = Vector2(1, 0.04)
+	add_child(col)
+	var core := Polygon2D.new()
+	core.polygon = PackedVector2Array([Vector2(-w * 0.22, 0), Vector2(w * 0.22, 0),
+		Vector2(w * 0.4, -420), Vector2(-w * 0.4, -420)])
+	core.color = Fx.hot(Color(1.0, 0.9, 0.5, 0.95), 1.4)
+	core.material = m
+	col.add_child(core)
+	var tw := create_tween()
+	tw.tween_property(col, "scale:y", 1.0, 0.12) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.16)
+	tw.tween_property(col, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(col.queue_free)
+
+## Ifrit: Feuerportal, der Dämon steigt aus dem Boden, Höllenfeuer-Eruption
+## unter allen Gegnern. Wiederholbar (MP), freigeschaltet ab Stufe 3.
+func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var org := Color(1.0, 0.55, 0.15)
+	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	if h.has("bob"):
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.65)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), org)
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
+	s.modulate = Color(1.5, 1.2, 0.9)
+	var rise := create_tween()
+	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("◈ IFRIT ◈", org)
+	var gate := Vector2(455, 372)
+	_punch_zoom(0.10, gate + Vector2(0, -110))
+	_summon_portal(gate, org)
+	# Boden birst: dunkle Gesteinskeile fliegen aus dem Portal
+	for i in 6:
+		var shard := Polygon2D.new()
+		shard.polygon = PackedVector2Array([Vector2(-5, 0), Vector2(5, 0), Vector2(0, -14)])
+		shard.color = Color(0.18, 0.12, 0.14)
+		shard.position = gate
+		shard.rotation = randf_range(-0.5, 0.5)
+		add_child(shard)
+		var stw := create_tween()
+		stw.tween_property(shard, "position", gate +
+			Vector2(randf_range(-90, 90), randf_range(-120, -30)), 0.5) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		stw.parallel().tween_property(shard, "modulate:a", 0.0, 0.5)
+		stw.tween_callback(shard.queue_free)
+	await get_tree().create_timer(0.55).timeout
+	# Ifrit steigt aus dem Feuer, Frames werden lebendig getickt
+	var ifr := Sprite2D.new()
+	ifr.texture = SpriteFactory.ifrit(0)
+	ifr.position = gate + Vector2(0, 130)
+	ifr.scale = Vector2(4.6, 4.6)
+	ifr.modulate = Color(0.4, 0.2, 0.2, 0.0)
+	add_child(ifr)
+	var fr := [0]
+	var tick := Timer.new()
+	tick.wait_time = 0.16
+	tick.autostart = true
+	ifr.add_child(tick)
+	tick.timeout.connect(func():
+		fr[0] += 1
+		ifr.texture = SpriteFactory.ifrit(fr[0]))
+	AudioManager.play_sfx("roar")
+	_burst(gate, org, 22, 190)
+	_explosion(gate, 1.1)
+	_shake_camera(1.2)
+	var up := create_tween()
+	up.tween_property(ifr, "position", gate + Vector2(0, -105), 0.55) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	up.parallel().tween_property(ifr, "modulate", Color(1.25, 1.05, 0.9, 1.0), 0.4)
+	await up.finished
+	# Aufladen: Glutschein hinter dem Dämon schwillt an
+	var glow := Sprite2D.new()
+	glow.texture = SpriteFactory.circle(60, Color(1.0, 0.45, 0.12, 0.5))
+	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var gm := CanvasItemMaterial.new()
+	gm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glow.material = gm
+	glow.position = ifr.position
+	glow.z_index = -1
+	glow.scale = Vector2(0.3, 0.3)
+	add_child(glow)
+	AudioManager.play_sfx("charge")
+	var gtw := create_tween()
+	gtw.tween_property(glow, "scale", Vector2(3.2, 3.2), 0.55) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await get_tree().create_timer(0.55).timeout
+	_ult_banner("HÖLLENFEUER", Color(1.0, 0.75, 0.25))
+	glow.queue_free()
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	# Eruption: gestaffelte Feuersäulen unter jedem Gegner
+	for e in alive:
+		var pos: Vector2 = e["sprite"].position
+		_cast_circle(pos + Vector2(0, 34), Color(1.0, 0.3, 0.1))
+		_fire_pillar(pos)
+		_explosion(pos, 1.3)
+		AudioManager.play_sfx("eruption")
+		_shake_camera(1.4)
+		await get_tree().create_timer(0.14).timeout
+	await get_tree().create_timer(0.3).timeout
+	_flash_screen(Color(1.0, 0.55, 0.15, 0.6))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.2)
+	await _hitstop(0.14)
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((d["mag"] * 1.7 + sm["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+	# Ifrit verglüht nach oben
+	_burst(ifr.position, org, 26, 170)
+	var out := create_tween()
+	out.tween_property(ifr, "modulate", Color(1.6, 0.8, 0.4, 0.0), 0.5)
+	out.parallel().tween_property(ifr, "position:y", ifr.position.y - 60.0, 0.5)
+	out.tween_callback(ifr.queue_free)
+	s.modulate = Color.WHITE
+	_undim(dim)
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+	h["bob"] = _idle_bob(s, 2.0)
+
+## Baut den modularen Schlangenkörper: Kopf, Segmente, Schwanz als Kinder.
+func _leviathan_body(scale_f: float) -> Node2D:
+	var body := Node2D.new()
+	var parts: Array = []
+	var tail := Sprite2D.new()
+	tail.texture = SpriteFactory.leviathan_tail(0)
+	var segs := 10
+	for i in range(segs, 0, -1):
+		var seg := Sprite2D.new()
+		seg.texture = SpriteFactory.leviathan_segment(i % 4)
+		seg.scale = Vector2.ONE * scale_f * (0.75 + 0.25 * (1.0 - float(i) / segs))
+		seg.visible = false
+		body.add_child(seg)
+	tail.scale = Vector2.ONE * scale_f * 0.75
+	tail.visible = false
+	body.add_child(tail)
+	var head := Sprite2D.new()
+	head.texture = SpriteFactory.leviathan_head(0)
+	head.scale = Vector2.ONE * scale_f
+	head.visible = false
+	body.add_child(head)
+	# Reihenfolge für die Kurven-Platzierung: Kopf zuerst, dann Segmente, Schwanz
+	parts.append(head)
+	for i in segs:
+		parts.append(body.get_child(segs - 1 - i))
+	parts.append(tail)
+	body.set_meta("parts", parts)
+	return body
+
+## Platziert alle Schlangenteile entlang einer Bogenkurve mit Sinus-Schlängeln.
+func _serpent_place(body: Node2D, t: float, p0: Vector2, p1: Vector2, p2: Vector2) -> void:
+	var parts: Array = body.get_meta("parts")
+	for i in parts.size():
+		var ti: float = t - float(i) * 0.045
+		var node: Sprite2D = parts[i]
+		if ti <= 0.0 or ti >= 1.0:
+			node.visible = ti > 0.0
+			continue
+		node.visible = true
+		var u := 1.0 - ti
+		var pos: Vector2 = p0 * u * u + p1 * 2.0 * u * ti + p2 * ti * ti
+		var der: Vector2 = (p1 - p0) * 2.0 * u + (p2 - p1) * 2.0 * ti
+		var dir := der.normalized()
+		var ripple := sin(t * 9.0 - float(i) * 0.8) * 12.0 * minf(1.0, ti * 4.0)
+		node.position = pos + Vector2(-dir.y, dir.x) * ripple
+		node.rotation = dir.angle()
+		node.flip_v = absf(node.rotation) > PI * 0.55
+		var f := int(t * 14.0 + i) % 4
+		if i == 0:
+			node.texture = SpriteFactory.leviathan_head(f)
+		elif i == parts.size() - 1:
+			node.texture = SpriteFactory.leviathan_tail(f)
+		else:
+			node.texture = SpriteFactory.leviathan_segment(f)
+
+## Leviathan: die Arena flutet, die Seeschlange bricht aus dem Strudel und
+## fegt über die Gegner, dann begräbt eine Flutwelle alles. Ab Stufe 5.
+func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var blue := Color(0.4, 0.8, 1.0)
+	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	if h.has("bob"):
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.6)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), blue)
+	_cast_circle(s.position + Vector2(0, 40), Color(0.7, 0.95, 1.0))
+	s.modulate = Color(0.9, 1.2, 1.6)
+	var rise := create_tween()
+	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("◈ LEVIATHAN ◈", blue)
+	_punch_zoom(0.08, Vector2(400, 330))
+	# Die Arena läuft mit Wasser voll (echter Shimmer-Shader)
+	var water := Polygon2D.new()
+	water.polygon = PackedVector2Array([Vector2(0, 0), Vector2(960, 0),
+		Vector2(960, 220), Vector2(0, 220)])
+	water.color = Color(0.25, 0.55, 0.85, 0.55)
+	water.material = Fx.water_material()
+	water.position = Vector2(0, 560)
+	water.z_index = -2
+	add_child(water)
+	AudioManager.play_sfx("wave")
+	var flood := create_tween()
+	flood.tween_property(water, "position:y", 350.0, 1.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await flood.finished
+	# Strudel, dann bricht die Schlange heraus und stürzt über die Gegnerreihe
+	var pool := Vector2(260, 372)
+	_summon_portal(pool, blue)
+	_impact_ring(pool, Color(0.7, 0.95, 1.0))
+	await get_tree().create_timer(0.4).timeout
+	var serp := _leviathan_body(4.0)
+	add_child(serp)
+	AudioManager.play_sfx("roar")
+	AudioManager.play_sfx("splash")
+	_burst(pool, Color(0.75, 0.92, 1.0), 30, 240)
+	_shake_camera(1.6)
+	var p0 := pool + Vector2(-20, 40)
+	var p1 := Vector2(180, -70)
+	var p2 := Vector2(640, 430)
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	var hit_done := {}
+	var step := func(t: float) -> void:
+		_serpent_place(serp, t, p0, p1, p2)
+		# Beim Überflug: Gischt und Ringe über jedem Gegner
+		var u := 1.0 - t
+		var head_pos: Vector2 = p0 * u * u + p1 * 2.0 * u * t + p2 * t * t
+		for e in alive:
+			var key: int = e["sprite"].get_instance_id()
+			if not hit_done.has(key) and absf(head_pos.x - e["sprite"].position.x) < 40.0:
+				hit_done[key] = true
+				_impact_ring(e["sprite"].position, blue)
+				_burst(e["sprite"].position + Vector2(0, -20), Color(0.75, 0.92, 1.0), 14, 150)
+				AudioManager.play_sfx("splash")
+	var sweep := create_tween()
+	sweep.tween_method(step, 0.0, 1.0, 1.7)
+	await sweep.finished
+	_burst(p2 + Vector2(0, -40), Color(0.75, 0.92, 1.0), 26, 220)
+	serp.queue_free()
+	await get_tree().create_timer(0.15).timeout
+	# Flutwellen-Finale: eine Wasserwand fegt von rechts über die Gegner
+	var wave := Polygon2D.new()
+	wave.polygon = PackedVector2Array([Vector2(0, 0), Vector2(90, -80),
+		Vector2(150, -220), Vector2(235, -245), Vector2(310, -140),
+		Vector2(370, -40), Vector2(410, 0)])
+	wave.color = Color(0.3, 0.6, 0.92, 0.85)
+	wave.material = Fx.water_material()
+	# Steigt mittig aus der Flut auf (rechts der Gegner, links der Helden)
+	# und bricht dann nach links über die Gegnerreihe.
+	wave.position = Vector2(255, 470)
+	wave.scale = Vector2(1, 0.05)
+	wave.z_index = 1
+	add_child(wave)
+	var foam := CPUParticles2D.new()
+	foam.position = Vector2(190, -230)
+	foam.amount = 40
+	foam.lifetime = 0.4
+	foam.direction = Vector2(-1, -0.3)
+	foam.spread = 30.0
+	foam.gravity = Vector2(0, 240)
+	foam.initial_velocity_min = 120.0
+	foam.initial_velocity_max = 260.0
+	foam.scale_amount_min = 0.6
+	foam.scale_amount_max = 1.6
+	foam.color = Color(0.9, 0.97, 1.0, 0.9)
+	foam.texture = SpriteFactory.circle(4, Color.WHITE)
+	wave.add_child(foam)
+	foam.emitting = true
+	AudioManager.play_sfx("wave")
+	var wtw := create_tween()
+	wtw.tween_property(wave, "scale:y", 1.0, 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	wtw.tween_property(wave, "position:x", -560.0, 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await get_tree().create_timer(0.45).timeout
+	_flash_screen(Color(0.5, 0.8, 1.0, 0.55))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.2)
+	await _hitstop(0.16)
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((d["mag"] * 1.9 + sm["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+	wave.queue_free()
+	# Wasser läuft ab
+	var drain := create_tween()
+	drain.tween_property(water, "position:y", 570.0, 0.7) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	drain.parallel().tween_property(water, "modulate:a", 0.0, 0.7)
+	drain.tween_callback(water.queue_free)
+	s.modulate = Color.WHITE
 	_undim(dim)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
@@ -1813,6 +2227,7 @@ func _explosion(pos: Vector2, power := 1.0) -> void:
 	var flash := Sprite2D.new()
 	flash.texture = SpriteFactory.circle(26, Color(1.0, 0.92, 0.66))
 	flash.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	flash.modulate = Fx.hot(Color.WHITE)
 	flash.position = pos
 	flash.scale = Vector2(0.3, 0.3)
 	var mat := CanvasItemMaterial.new()
@@ -1866,7 +2281,7 @@ func _burst(pos: Vector2, color: Color, amount: int, speed: float) -> void:
 	p.initial_velocity_max = speed
 	p.scale_amount_min = 0.6
 	p.scale_amount_max = 1.6
-	p.color = color
+	p.color = Fx.hot(color)
 	p.texture = SpriteFactory.circle(3, Color.WHITE)
 	p.emitting = true
 	add_child(p)
@@ -1886,6 +2301,7 @@ func _cast_circle(pos: Vector2, color: Color) -> void:
 	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	glow.position = pos
 	glow.scale = Vector2(2.2, 0.7)
+	glow.modulate = Fx.hot(Color.WHITE, 1.5)
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	glow.material = mat
@@ -1896,6 +2312,7 @@ func _cast_circle(pos: Vector2, color: Color) -> void:
 	for i in 8:
 		var orb := Sprite2D.new()
 		orb.texture = SpriteFactory.circle(4, color)
+		orb.modulate = Fx.hot(Color.WHITE)
 		var ang := TAU * i / 8.0
 		orb.position = Vector2(cos(ang) * 46, sin(ang) * 46)
 		pivot.add_child(orb)
@@ -1910,6 +2327,7 @@ func _impact_ring(pos: Vector2, color: Color) -> void:
 	var ring := Sprite2D.new()
 	ring.texture = SpriteFactory.circle(24, color)
 	ring.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	ring.modulate = Fx.hot(Color.WHITE)
 	ring.position = pos
 	ring.scale = Vector2(0.2, 0.2)
 	var mat := CanvasItemMaterial.new()
@@ -2054,6 +2472,10 @@ func _victory() -> void:
 					_sparkle(h["sprite"].position, Color(1.0, 0.92, 0.4))
 					_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.45))
 			await get_tree().create_timer(1.5).timeout
+			if up.has("unlock"):
+				AudioManager.play_sfx("summon")
+				_say("%s kann nun %s beschwören!" % [up["name"], up["unlock"]])
+				await get_tree().create_timer(1.8).timeout
 	# Boss-Siege schalten den Fortschritt frei.
 	if enemy_ids.has("boss2"):
 		GameState.boss2_defeated = true

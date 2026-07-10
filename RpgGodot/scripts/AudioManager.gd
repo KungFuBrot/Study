@@ -259,6 +259,18 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 		"roar":
 			_tone(buf, 130, 35, 0.55, 0.40, "noise")
 			_tone(buf, 90, 45, 0.35, 0.30, "square")
+		"summon":
+			# Tiefes Grollen + aufsteigender Beschwörungs-Akkord
+			_tone(buf, 70, 480, 0.55, 0.28, "tri")
+			for f in [262, 330, 392, 523]:
+				_tone(buf, f, f * 1.02, 0.09, 0.20, "tri")
+		"eruption":
+			_tone(buf, 1600, 55, 0.50, 0.38, "noise")
+			_tone(buf, 120, 40, 0.35, 0.35, "tri")
+		"wave":
+			_tone(buf, 900, 200, 0.90, 0.30, "noise")
+		"splash":
+			_tone(buf, 1400, 300, 0.20, 0.28, "noise")
 		_:
 			return null
 	return _to_wav(buf, false)
