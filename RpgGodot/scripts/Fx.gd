@@ -78,6 +78,103 @@ void fragment() {
 }
 "
 
+# Zerfall in Pixelblöcken (passend zur Pixel-Art): progress 0→1 löst den
+# Körper auf, die Zerfallskante glüht kurz in edge_color.
+const DISSOLVE_SHADER_CODE := "
+shader_type canvas_item;
+uniform float progress : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 edge_color : source_color = vec4(1.0, 0.62, 0.25, 1.0);
+
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+void fragment() {
+	vec4 col = COLOR;
+	float n = hash(floor(UV * 22.0));
+	float d = n - progress * 1.15;
+	if (d < 0.0) {
+		col.a = 0.0;
+	} else if (d < 0.14 && col.a > 0.05) {
+		col.rgb = edge_color.rgb * 1.6;
+	}
+	COLOR = col;
+}
+"
+
+static var _dissolve_shader: Shader
+
+## Pro sterbender Figur ein eigenes Material (progress wird pro Instanz getweent).
+static func dissolve_material(edge := Color(1.0, 0.62, 0.25)) -> ShaderMaterial:
+	if _dissolve_shader == null:
+		_dissolve_shader = Shader.new()
+		_dissolve_shader.code = DISSOLVE_SHADER_CODE
+	var m := ShaderMaterial.new()
+	m.shader = _dissolve_shader
+	m.set_shader_parameter("progress", 0.0)
+	m.set_shader_parameter("edge_color", edge)
+	return m
+
+# Radiale Screen-Stoßwelle mit chromatischer Aberration auf dem Ring.
+const SHOCKWAVE_SHADER_CODE := "
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+uniform vec2 center = vec2(0.5, 0.5);
+uniform float radius = 0.0;
+uniform float width = 0.09;
+uniform float strength = 0.035;
+
+void fragment() {
+	vec2 uv = SCREEN_UV;
+	vec2 d = uv - center;
+	d.x *= 1.777;
+	float dist = length(d);
+	float ring = 1.0 - smoothstep(0.0, width, abs(dist - radius));
+	vec2 dir = normalize(d + vec2(0.00001));
+	dir.x /= 1.777;
+	vec2 off = dir * ring * strength * (1.0 - radius);
+	vec3 col;
+	col.r = texture(screen_tex, uv - off * 1.6).r;
+	col.g = texture(screen_tex, uv - off).g;
+	col.b = texture(screen_tex, uv - off * 0.4).b;
+	COLOR = vec4(col, 1.0);
+}
+"
+
+# Aufsteigendes Hitzeflimmern (UV-Wobble) für Feuer-Momente.
+const HAZE_SHADER_CODE := "
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
+uniform float strength = 0.004;
+
+void fragment() {
+	vec2 uv = SCREEN_UV;
+	uv.x += sin(uv.y * 70.0 + TIME * 9.0) * strength;
+	uv.y += cos(uv.x * 55.0 + TIME * 6.0) * strength * 0.5;
+	COLOR = texture(screen_tex, uv);
+}
+"
+
+static var _shock_shader: Shader
+static var _haze_shader: Shader
+
+## Pro Stoßwelle ein eigenes Material (center/radius werden getweent).
+static func shockwave_material() -> ShaderMaterial:
+	if _shock_shader == null:
+		_shock_shader = Shader.new()
+		_shock_shader.code = SHOCKWAVE_SHADER_CODE
+	var m := ShaderMaterial.new()
+	m.shader = _shock_shader
+	return m
+
+static func heat_haze_material() -> ShaderMaterial:
+	if _haze_shader == null:
+		_haze_shader = Shader.new()
+		_haze_shader.code = HAZE_SHADER_CODE
+	var m := ShaderMaterial.new()
+	m.shader = _haze_shader
+	return m
+
 static var _water_shader: Shader
 static var _water_mat: ShaderMaterial
 

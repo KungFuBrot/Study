@@ -37,6 +37,9 @@ var menu_box: VBoxContainer
 var party_box: VBoxContainer
 var cursor: Polygon2D
 var cam: Camera2D
+var cam_idle: Tween
+var live_lights := 0  # Deckel für kurzlebige Zauberlichter (Web-Performance)
+var shock_live := false
 var ui_layer: CanvasLayer
 var boss_bar_fill: ColorRect
 var boss_bar_holder: Control
@@ -131,7 +134,7 @@ func _palette() -> Dictionary:
 			"ray": Color(0.60, 0.85, 1.0, 0.05), "dust": Color(0.75, 0.92, 1.0, 0.55),
 			"grade_top": Color(0.65, 0.85, 1.0, 0.08), "grade_bottom": Color(0.03, 0.10, 0.35, 0.20),
 			"pool_hero": Color(0.65, 0.90, 1.0, 0.11), "pool_enemy": Color(0.45, 0.80, 1.0, 0.11),
-			"fg": Color(0.02, 0.04, 0.09),
+			"fg": Color(0.02, 0.04, 0.09), "ambient": Color(0.68, 0.76, 0.90),
 		}
 	var boss_fight := not boss_def.is_empty()
 	return {
@@ -144,7 +147,7 @@ func _palette() -> Dictionary:
 		"ray": Color(1.0, 0.80, 0.50, 0.05), "dust": Color(1.0, 0.85, 0.55, 0.50),
 		"grade_top": Color(0.95, 0.65, 0.35, 0.07), "grade_bottom": Color(0.08, 0.10, 0.35, 0.17),
 		"pool_hero": Color(1.0, 0.85, 0.55, 0.12), "pool_enemy": Color(0.70, 0.50, 1.0, 0.10),
-		"fg": Color(0.03, 0.02, 0.06),
+		"fg": Color(0.03, 0.02, 0.06), "ambient": Color(0.76, 0.72, 0.82),
 	}
 
 ## ---------- Aufbau ----------
@@ -156,6 +159,10 @@ func _build_scene() -> void:
 	add_child(cam)
 	cam.make_current()
 	var pal := _palette()
+	# Abgedunkeltes Ambiente + echte 2D-Lichter (Fackeln, Zauber) wie im Feld.
+	var cm := CanvasModulate.new()
+	cm.color = pal["ambient"]
+	add_child(cm)
 	# Hintergrund: weicher Farbverlauf passend zum Schauplatz.
 	var bg := Sprite2D.new()
 	bg.texture = SpriteFactory.gradient(8, 64, pal["bg_top"], pal["bg_bottom"])
@@ -164,16 +171,37 @@ func _build_scene() -> void:
 	bg.scale = Vector2(960.0 / 8, 540.0 / 64)
 	bg.z_index = -20
 	add_child(bg)
-	# Stalagmiten-Silhouetten im Hintergrund
-	for i in 7:
-		var stal := Polygon2D.new()
-		var w := 40.0 + fmod(i * 37.0, 50.0)
-		var h := 120.0 + fmod(i * 73.0, 140.0)
-		stal.polygon = PackedVector2Array([Vector2(-w / 2, 0), Vector2(0, -h), Vector2(w / 2, 0)])
-		stal.color = pal["stal"]
-		stal.position = Vector2(30 + i * 150.0, 360)
-		stal.z_index = -15
-		add_child(stal)
+	# Drei Tiefen-Silhouetten-Ebenen mit langsamem Sinus-Drift: ferne Ebene
+	# hell/dunstig Richtung Himmel, nahe Ebene dunkel — Faux-Parallax.
+	var stal_col: Color = pal["stal"]
+	var layer_specs: Array = [
+		{"z": -17, "y": 330.0, "n": 9, "h0": 80.0, "hv": 80.0, "w0": 70.0,
+			"col": stal_col.lerp(pal["bg_top"], 0.55), "amp": 5.0, "dur": 17.0},
+		{"z": -15, "y": 355.0, "n": 7, "h0": 120.0, "hv": 140.0, "w0": 40.0,
+			"col": stal_col, "amp": 9.0, "dur": 12.0},
+		{"z": -14, "y": 378.0, "n": 5, "h0": 150.0, "hv": 170.0, "w0": 90.0,
+			"col": stal_col.darkened(0.4), "amp": 14.0, "dur": 9.0},
+	]
+	for li in layer_specs.size():
+		var spec: Dictionary = layer_specs[li]
+		var layer := Node2D.new()
+		layer.z_index = spec["z"]
+		add_child(layer)
+		var n: int = spec["n"]
+		for i in n:
+			var stal := Polygon2D.new()
+			var w: float = spec["w0"] + fmod(i * 37.0 + li * 23.0, 50.0)
+			var hh: float = spec["h0"] + fmod(i * 73.0 + li * 41.0, spec["hv"])
+			stal.polygon = PackedVector2Array([Vector2(-w / 2, 0), Vector2(0, -hh), Vector2(w / 2, 0)])
+			stal.color = spec["col"]
+			stal.position = Vector2(fmod(30.0 + i * (980.0 / n) + li * 57.0, 1000.0) - 20.0, spec["y"])
+			layer.add_child(stal)
+		var drift := layer.create_tween().set_loops()
+		drift.tween_property(layer, "position:x", spec["amp"], spec["dur"] * 0.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		drift.tween_property(layer, "position:x", -spec["amp"], spec["dur"] * 0.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_add_sky(pal)
 	# Boden mit Verlauf + Steine als Dekor
 	var floor_s := Sprite2D.new()
 	floor_s.texture = SpriteFactory.gradient(8, 32, pal["floor_top"], pal["floor_bottom"])
@@ -191,6 +219,12 @@ func _build_scene() -> void:
 		add_child(stone)
 	_add_torch(Vector2(70, 160), pal)
 	_add_torch(Vector2(890, 160), pal)
+	# Weiches Fülllicht über der Gegnerseite: die Torches stehen am Rand,
+	# ohne Aufheller stünden die Monster fast im Schwarzen.
+	var fill := Fx.point_light(Color(1.0, 0.97, 0.9), 430.0, 0.85)
+	fill.position = Vector2(280, 235)
+	add_child(fill)
+	Fx.pulse(fill, 0.85, 2.6)
 	_add_god_rays(pal)
 	_add_fog(pal)
 	_add_dust_motes(pal)
@@ -243,6 +277,52 @@ func _build_scene() -> void:
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"], "xp": def.get("xp", 0),
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl})
+
+## Lebendiger Himmel über der Arena: pulsierende Glut in der Höhle,
+## wogende Aurora-Bänder in der Frostgrotte.
+func _add_sky(pal: Dictionary) -> void:
+	if arena_theme == "frost":
+		for i in 3:
+			var band := Polygon2D.new()
+			var pts := PackedVector2Array()
+			var y0 := 34.0 + i * 30.0
+			for k in 13:
+				pts.append(Vector2(k * 80.0, y0 + sin(k * 0.9 + i * 1.7) * 16.0))
+			for k in range(12, -1, -1):
+				pts.append(Vector2(k * 80.0, y0 + 24.0 + sin(k * 0.9 + i * 1.7) * 16.0))
+			band.polygon = pts
+			band.color = Color(0.4, 0.9, 0.8, 0.05 + 0.02 * i)
+			band.z_index = -18
+			var mat := CanvasItemMaterial.new()
+			mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			band.material = mat
+			add_child(band)
+			var tw := band.create_tween().set_loops()
+			tw.tween_property(band, "modulate", Color(0.7, 1.25, 1.1, 1.0), 3.2 + i * 0.8) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.parallel().tween_property(band, "position:x", -22.0, 3.2 + i * 0.8) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(band, "modulate", Color(1.15, 0.9, 1.3, 0.7), 3.6 + i * 0.7) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.parallel().tween_property(band, "position:x", 22.0, 3.6 + i * 0.7) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		return
+	for i in 4:
+		var blob := Sprite2D.new()
+		blob.texture = SpriteFactory.circle(26, Color(1.0, 0.45, 0.15, 0.10))
+		blob.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		blob.position = Vector2(120 + i * 240.0, 70 + fmod(i * 53.0, 60.0))
+		blob.scale = Vector2(2.5 + (i % 2), 1.6)
+		blob.z_index = -18
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		blob.material = mat
+		add_child(blob)
+		var tw := blob.create_tween().set_loops()
+		tw.tween_property(blob, "modulate:a", 0.4, 2.2 + i * 0.4) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(blob, "modulate:a", 1.0, 2.6 + i * 0.3) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Weicher Schatten unter einem Kämpfer (als Kind, skaliert also mit).
 func _attach_shadow(s: Sprite2D, rx: int, ry: int, foot_y: float) -> void:
@@ -353,6 +433,11 @@ func _add_torch(pos: Vector2, pal: Dictionary) -> void:
 	flicker.tween_property(glow, "scale", Vector2(3.4, 3.4), 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	flicker.tween_property(glow, "scale", Vector2(2.8, 2.8), 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	flicker.tween_property(glow, "scale", Vector2(3.2, 3.2), 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Echtes Punktlicht: die Fackel beleuchtet Wand und Boden ringsum.
+	var light := Fx.point_light(pal["flame"], 240.0, 1.0)
+	light.position = pos + Vector2(0, -14)
+	add_child(light)
+	Fx.flicker(light, 1.0)
 	var flame := CPUParticles2D.new()
 	flame.position = pos + Vector2(0, -14)
 	flame.amount = 14
@@ -563,21 +648,50 @@ func _build_ui() -> void:
 	menu_box.custom_minimum_size = Vector2(280, 0)
 	hb.add_child(menu_box)
 	party_box = VBoxContainer.new()
-	party_box.add_theme_constant_override("separation", 8)
+	party_box.add_theme_constant_override("separation", 5)
 	hb.add_child(party_box)
 	for h in heroes:
-		var row := VBoxContainer.new()
-		row.add_theme_constant_override("separation", 2)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
 		party_box.add_child(row)
+		# Porträt: Kopfausschnitt des Kampf-Sprites, gerahmt, blickt wie im
+		# Kampf nach links.
+		var pf := PanelContainer.new()
+		var pstyle := StyleBoxFlat.new()
+		pstyle.bg_color = Color(0.10, 0.10, 0.22)
+		pstyle.border_color = Color(0.75, 0.7, 0.5)
+		pstyle.set_border_width_all(2)
+		pstyle.set_corner_radius_all(6)
+		pstyle.set_content_margin_all(2)
+		pf.add_theme_stylebox_override("panel", pstyle)
+		row.add_child(pf)
+		var port := TextureRect.new()
+		var tex: Texture2D = SpriteFactory.hero_battle(h["data"]["id"])
+		# DTII-Frames haben oben viel Transparenz — erst den tatsächlich
+		# gefüllten Bereich ermitteln, dann dessen oberes Drittel als Kopf.
+		var used: Rect2i = tex.get_image().get_used_rect()
+		var at := AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(used.position.x, used.position.y,
+			used.size.x, maxi(int(used.size.y * 0.62), 1))
+		port.texture = at
+		port.custom_minimum_size = Vector2(34, 34)
+		port.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		port.flip_h = true
+		pf.add_child(port)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(col)
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", 16)
-		row.add_child(l)
+		col.add_child(l)
 		h["hp_label"] = l
 		var bars := HBoxContainer.new()
 		bars.add_theme_constant_override("separation", 10)
-		row.add_child(bars)
+		col.add_child(bars)
 		h["hp_fill"] = _make_bar(bars, BAR_W, 10, Color(0.35, 0.95, 0.45))
-		h["mp_fill"] = _make_bar(bars, 110, 10, Color(0.35, 0.55, 1.0))
+		h["mp_fill"] = _make_bar(bars, 110, 10, Color(0.35, 0.55, 1.0), Color(0.65, 0.75, 1.0, 0.85))
 	msg_label = Label.new()
 	msg_label.position = Vector2(30, 84)
 	msg_label.add_theme_font_size_override("font_size", 22)
@@ -599,7 +713,10 @@ func _build_ui() -> void:
 	_refresh_party()
 
 ## Kleine Statusleiste (dunkler Rahmen + farbige Füllung); liefert die Füllung.
-func _make_bar(parent: Control, w: int, h: int, color: Color) -> ColorRect:
+## Dahinter liegt eine „Ghost"-Füllung, die Verluste verzögert nachzieht —
+## der klassische Damage-Lag-Balken.
+func _make_bar(parent: Control, w: int, h: int, color: Color,
+		ghost_color := Color(1.0, 0.55, 0.4, 0.85)) -> ColorRect:
 	var holder := Control.new()
 	holder.custom_minimum_size = Vector2(w, h)
 	parent.add_child(holder)
@@ -607,11 +724,17 @@ func _make_bar(parent: Control, w: int, h: int, color: Color) -> ColorRect:
 	bg.size = Vector2(w, h)
 	bg.color = Color(0, 0, 0, 0.6)
 	holder.add_child(bg)
+	var ghost := ColorRect.new()
+	ghost.position = Vector2(1, 1)
+	ghost.size = Vector2(w - 2, h - 2)
+	ghost.color = ghost_color
+	holder.add_child(ghost)
 	var fill := ColorRect.new()
 	fill.position = Vector2(1, 1)
 	fill.size = Vector2(w - 2, h - 2)
 	fill.color = color
 	holder.add_child(fill)
+	fill.set_meta("ghost", ghost)
 	return fill
 
 ## Große Boss-HP-Leiste oben in der Mitte (erscheint beim Auftritt).
@@ -663,10 +786,20 @@ func _refresh_party() -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		hp_fill.color = Color(0.35, 0.95, 0.45) if hp_ratio > 0.5 \
 			else (Color(0.95, 0.8, 0.25) if hp_ratio > 0.25 else Color(0.95, 0.3, 0.2))
+		_lag_ghost(hp_fill, maxf((BAR_W - 2) * hp_ratio, 0.0))
 		var mp_fill: ColorRect = h["mp_fill"]
 		var mp_tw := mp_fill.create_tween()
 		mp_tw.tween_property(mp_fill, "size:x", maxf(108.0 * d["mp"] / d["max_mp"], 0.0), 0.35) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_lag_ghost(mp_fill, maxf(108.0 * d["mp"] / d["max_mp"], 0.0))
+
+## Zieht die Ghost-Füllung eines Balkens mit Verzögerung nach.
+func _lag_ghost(fill: ColorRect, target_w: float) -> void:
+	var ghost: ColorRect = fill.get_meta("ghost")
+	var tw := ghost.create_tween()
+	tw.tween_interval(0.4)
+	tw.tween_property(ghost, "size:x", target_w, 0.45) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _refresh_boss_bar(e: Dictionary) -> void:
 	if boss_bar_fill == null:
@@ -701,6 +834,7 @@ func _run_battle() -> void:
 	for i in enemies.size():
 		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
 	_start_idle_animations()
+	_camera_idle()
 	if not boss_def.is_empty():
 		await _boss_entrance()
 	else:
@@ -1012,11 +1146,59 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
 
+## Screen-Stoßwelle: Verzerrungs-Ring mit chromatischer Aberration läuft vom
+## Weltpunkt nach außen. Max. eine gleichzeitig (Vollbild-Shader).
+func _shockwave(pos: Vector2) -> void:
+	if shock_live:
+		return
+	shock_live = true
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := Fx.shockwave_material()
+	mat.set_shader_parameter("center", pos / Vector2(960, 540))
+	rect.material = mat
+	ui_layer.add_child(rect)
+	# Vor Panel/Text einsortieren (Kinder 0-2 sind Blur/Grade/Vignette),
+	# damit die UI nicht mitwabert.
+	ui_layer.move_child(rect, 3)
+	var tw := create_tween()
+	tw.tween_method(func(r: float): mat.set_shader_parameter("radius", r), 0.0, 0.9, 0.5)
+	tw.tween_callback(func():
+		shock_live = false
+		rect.queue_free())
+
+## Kurzlebiges Zauberlicht am Effektort: klingt über dur ab und räumt sich weg.
+func _spell_light(pos: Vector2, color: Color, radius: float, dur: float, energy := 1.2) -> void:
+	if live_lights >= 8:
+		return
+	live_lights += 1
+	var l := Fx.point_light(color, radius, energy)
+	l.position = pos
+	add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "energy", 0.0, dur)
+	tw.tween_callback(func():
+		live_lights -= 1
+		l.queue_free())
+
+## Kurze Wirk-Pose: zurücklehnen + strecken, während der Zauberkreis aufleuchtet.
+func _anim_cast(s: Sprite2D) -> void:
+	var base: Vector2 = s.scale
+	var tw := create_tween()
+	tw.tween_property(s, "rotation", 0.12, 0.18) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(s, "scale", base * Vector2(0.95, 1.08), 0.18)
+	tw.tween_property(s, "rotation", 0.0, 0.25) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(s, "scale", base, 0.25)
+
 ## Kritischer Treffer: großer Schriftzug, extra Funken, stärkeres Beben.
 func _crit_fx(pos: Vector2) -> void:
 	_float_text(pos + Vector2(-30, -46), "KRITISCH!", Color(1.0, 0.62, 0.1), 36)
 	_burst(pos, Color(1.0, 0.75, 0.2), 16, 200)
 	_shake_camera(1.9)
+	_punch_zoom(0.07, pos)
 
 ## Angriffsposition: vor dem Gegner stehen, beim breiten Boss weiter außen.
 func _strike_offset(e: Dictionary) -> float:
@@ -1055,6 +1237,7 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.82, 0.35))
+	_anim_cast(s)
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
 	await raise.finished
@@ -1168,6 +1351,7 @@ func _beam(from: Vector2, to: Vector2, color: Color, width: float, hold: float) 
 	core.scale = Vector2(1, 0.4)
 	seg.add_child(core)
 	seg.scale = Vector2(1, 0.1)
+	_spell_light((from + to) * 0.5, color, 220.0, 0.4)
 	var tw := seg.create_tween()
 	tw.tween_property(seg, "scale", Vector2(1, width), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_interval(hold)
@@ -1320,6 +1504,7 @@ func _ultimate_rax(h: Dictionary) -> void:
 	AudioManager.play_sfx("laser")
 	_flash_screen(Color(0.6, 0.9, 1.0, 0.5))
 	_shake_camera(2.4)
+	_punch_zoom(0.12, Vector2(280, 250))
 	for e in alive:
 		_orbital_column(e["sprite"].position)
 		_explosion(e["sprite"].position, 1.6)
@@ -1426,6 +1611,7 @@ func _ultimate_serena(h: Dictionary) -> void:
 	_flash_screen(Color(1, 1, 1, 0.8))
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.4)
+	_punch_zoom(0.12, Vector2(280, 250))
 	await _hitstop(0.16)
 	s.modulate = Color.WHITE
 	for e in alive:
@@ -1499,6 +1685,7 @@ func _ultimate_milo(h: Dictionary) -> void:
 	_flash_screen(Color(1.0, 0.6, 0.2, 0.55))
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.4)
+	_punch_zoom(0.12, Vector2(280, 250))
 	await _hitstop(0.14)
 	s.modulate = Color.WHITE
 	for e in alive:
@@ -1514,9 +1701,27 @@ func _ultimate_milo(h: Dictionary) -> void:
 
 ## ---------- Beschwörungen (Milo): Ifrit & Leviathan ----------
 
+## Träge Idle-Kamera: minimales Atmen in Zoom und Position, wirkt „gefilmt".
+func _camera_idle() -> void:
+	if cam_idle != null:
+		cam_idle.kill()
+	cam_idle = create_tween().set_loops()
+	cam_idle.tween_property(cam, "zoom", Vector2(1.015, 1.015), 6.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	cam_idle.parallel().tween_property(cam, "position", Vector2(484, 268), 6.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	cam_idle.tween_property(cam, "zoom", Vector2.ONE, 6.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	cam_idle.parallel().tween_property(cam, "position", Vector2(480, 270), 6.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
 ## Kurzer Kamera-Stoß auf einen Fokuspunkt — Zoom-Punch für große Momente.
+## (Nutzt zoom/position; _shake_camera rüttelt am offset — kein Konflikt.)
 func _punch_zoom(strength: float, focus: Vector2) -> void:
-	var base_pos: Vector2 = cam.position
+	if cam_idle != null:
+		cam_idle.kill()
+		cam_idle = null
+	var base_pos := Vector2(480, 270)
 	var tw := create_tween()
 	tw.tween_property(cam, "zoom", Vector2.ONE * (1.0 + strength), 0.12) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -1527,6 +1732,7 @@ func _punch_zoom(strength: float, focus: Vector2) -> void:
 		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 	tw.parallel().tween_property(cam, "position", base_pos, 0.4) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(_camera_idle)
 
 ## Beschwörungsportal am Boden: doppelter Zauberkreis, Ring und aufsteigende Funken.
 func _summon_portal(pos: Vector2, color: Color) -> void:
@@ -1578,6 +1784,7 @@ func _fire_pillar(pos: Vector2) -> void:
 	tw.tween_interval(0.16)
 	tw.tween_property(col, "modulate:a", 0.0, 0.3)
 	tw.tween_callback(col.queue_free)
+	_spell_light(pos, Color(1.0, 0.55, 0.15), 260.0, 0.55, 1.5)
 
 ## Ifrit: Feuerportal, der Dämon steigt aus dem Boden, Höllenfeuer-Eruption
 ## unter allen Gegnern. Wiederholbar (MP), freigeschaltet ab Stufe 3.
@@ -1592,6 +1799,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), org)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
+	_anim_cast(s)
 	s.modulate = Color(1.5, 1.2, 0.9)
 	var rise := create_tween()
 	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
@@ -1623,6 +1831,10 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	ifr.scale = Vector2(4.6, 4.6)
 	ifr.modulate = Color(0.4, 0.2, 0.2, 0.0)
 	add_child(ifr)
+	# Ifrits Präsenz beleuchtet die Arena (Kind → skaliert mit dem Sprite)
+	var ilight := Fx.point_light(Color(1.0, 0.55, 0.2), 65.0, 1.4)
+	ifr.add_child(ilight)
+	Fx.flicker(ilight, 1.4)
 	var fr := [0]
 	var tick := Timer.new()
 	tick.wait_time = 0.16
@@ -1662,6 +1874,15 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
+	# Hitzeflimmern über der Gegnerzone, solange die Eruption tobt
+	var haze := ColorRect.new()
+	haze.position = Vector2(40, 120)
+	haze.size = Vector2(430, 300)
+	haze.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	haze.material = Fx.heat_haze_material()
+	ui_layer.add_child(haze)
+	ui_layer.move_child(haze, 3)
+	get_tree().create_timer(1.8).timeout.connect(haze.queue_free)
 	# Eruption: gestaffelte Feuersäulen unter jedem Gegner
 	for e in alive:
 		var pos: Vector2 = e["sprite"].position
@@ -1675,6 +1896,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	_flash_screen(Color(1.0, 0.55, 0.15, 0.6))
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.2)
+	_punch_zoom(0.12, Vector2(300, 280))
 	await _hitstop(0.14)
 	for e in alive:
 		if e["alive"]:
@@ -1714,6 +1936,9 @@ func _leviathan_body(scale_f: float) -> Node2D:
 	head.texture = SpriteFactory.leviathan_head(0)
 	head.scale = Vector2.ONE * scale_f
 	head.visible = false
+	var hlight := Fx.point_light(Color(0.4, 0.9, 1.0), 55.0, 1.2)
+	head.add_child(hlight)
+	Fx.pulse(hlight, 1.2, 0.9)
 	body.add_child(head)
 	# Reihenfolge für die Kurven-Platzierung: Kopf zuerst, dann Segmente, Schwanz
 	parts.append(head)
@@ -1762,6 +1987,7 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), blue)
 	_cast_circle(s.position + Vector2(0, 40), Color(0.7, 0.95, 1.0))
+	_anim_cast(s)
 	s.modulate = Color(0.9, 1.2, 1.6)
 	var rise := create_tween()
 	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
@@ -1858,6 +2084,8 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	_flash_screen(Color(0.5, 0.8, 1.0, 0.55))
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.2)
+	_punch_zoom(0.12, Vector2(300, 300))
+	_shockwave(Vector2(280, 300))
 	await _hitstop(0.16)
 	for e in alive:
 		if e["alive"]:
@@ -2089,9 +2317,17 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 		AudioManager.play_sfx("die")
 		var s: Sprite2D = e["sprite"]
 		_burst(s.position, Color(0.7, 0.6, 0.9), 14, 140)
+		# Der Körper zerfällt in glühende Pixelblöcke (Dissolve-Shader);
+		# Schatten/Glow/Spiegelung (Kinder) blenden parallel aus.
+		var dm := Fx.dissolve_material()
+		s.material = dm
 		var tw := create_tween()
-		tw.tween_property(s, "modulate:a", 0.0, 0.45)
-		tw.parallel().tween_property(s, "scale", s.scale * Vector2(1.3, 0.08), 0.45)
+		tw.tween_method(func(p: float): dm.set_shader_parameter("progress", p),
+			0.0, 1.0, 0.55)
+		for c in s.get_children():
+			if c is CanvasItem:
+				var ct := create_tween()
+				ct.tween_property(c, "modulate:a", 0.0, 0.35)
 		await tw.finished
 		(e["sprite"] as Sprite2D).visible = false
 	else:
@@ -2156,13 +2392,18 @@ func _shake(s: Sprite2D) -> void:
 		tw.tween_property(s, "position:x", orig.x + (8 if i % 2 == 0 else -8), 0.04)
 	tw.tween_property(s, "position:x", orig.x, 0.04)
 	var flash := create_tween()
-	flash.tween_property(s, "modulate", Color(1, 0.35, 0.35), 0.08)
+	flash.tween_property(s, "modulate", Fx.hot(Color(1.0, 0.45, 0.4), 1.6), 0.08)
 	flash.tween_property(s, "modulate", Color.WHITE, 0.15)
-	# Kurzer Quetsch-Impuls verkauft die Wucht des Treffers.
+	# Quetsch-Impuls + Rotations-Wobble verkaufen die Wucht des Treffers.
 	var base: Vector2 = s.scale
 	var squash := create_tween()
 	squash.tween_property(s, "scale", base * Vector2(1.12, 0.88), 0.06)
 	squash.tween_property(s, "scale", base, 0.14) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var wob := create_tween()
+	wob.tween_property(s, "rotation", 0.09, 0.05)
+	wob.tween_property(s, "rotation", -0.06, 0.07)
+	wob.tween_property(s, "rotation", 0.0, 0.10) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _shake_camera(strength := 1.0) -> void:
@@ -2201,13 +2442,20 @@ func _float_text(pos: Vector2, text: String, color: Color, size := 30) -> void:
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_outline_color", Color.BLACK)
 	l.add_theme_constant_override("outline_size", 7)
-	l.scale = Vector2(0.3, 0.3)
+	l.add_theme_constant_override("shadow_offset_x", 3)
+	l.add_theme_constant_override("shadow_offset_y", 3)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	l.scale = Vector2(0.2, 0.2)
 	l.pivot_offset = Vector2(20, 20)
 	add_child(l)
+	# Überschwingender Pop, dann leicht bogenförmig davonschweben.
+	var drift := randf_range(-24.0, 24.0)
 	var tw := create_tween()
-	tw.tween_property(l, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", l.position.y - 44.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.6)
+	tw.tween_property(l, "scale", Vector2(1.4, 1.4), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(l, "position:y", l.position.y - 46.0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(l, "position:x", l.position.x + drift, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.55)
 	tw.tween_callback(l.queue_free)
 
 func _slash_arc(pos: Vector2) -> void:
@@ -2242,8 +2490,10 @@ func _explosion(pos: Vector2, power := 1.0) -> void:
 	_burst(pos, Color(1.0, 0.85, 0.4), int(10 * power), 120 * power)
 	_burst(pos, Color(0.45, 0.40, 0.42, 0.6), int(8 * power), 60 * power)
 	_impact_ring(pos, Color(1.0, 0.7, 0.3, 0.8))
+	_spell_light(pos, Color(1.0, 0.6, 0.25), 180.0 * power, 0.45)
 	# Bei großen Explosionen eine zweite, verzögerte Stoßwelle + Glutregen.
 	if power > 1.3:
+		_shockwave(pos)
 		_impact_ring(pos, Color(1.0, 0.85, 0.5, 0.6))
 		var embers := CPUParticles2D.new()
 		embers.position = pos
@@ -2374,6 +2624,7 @@ func _boss_entrance() -> void:
 	var frost: bool = boss_def.get("theme", "bone") == "frost"
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.4)
+	_punch_zoom(0.14, Vector2(230, 240))
 	_flash_screen(Color(0.2, 0.6, 1.0, 0.35) if frost else Color(0.8, 0.1, 0.1, 0.35))
 	var banner := Label.new()
 	banner.text = "☠  %s  ☠" % boss_def["name"].to_upper()

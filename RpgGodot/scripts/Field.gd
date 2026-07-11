@@ -186,11 +186,43 @@ func _add_ambience() -> void:
 			p.initial_velocity_max = 44.0
 			p.color = Color(0.95, 0.98, 1.0, 0.8)
 			p.texture = SpriteFactory.circle(1, Color.WHITE)
+		"world":
+			p.amount = 16
+			p.emission_rect_extents = Vector2(190, 120)
+			p.position = Vector2(6, 8)
+			p.direction = Vector2(0.2, -0.3)
+			p.gravity = Vector2(2, -2)
+			p.initial_velocity_min = 3.0
+			p.initial_velocity_max = 9.0
+			p.color = Color(1.0, 0.95, 0.6, 0.5)
+			p.texture = SpriteFactory.circle(1, Color.WHITE)
 		_:
 			p.queue_free()
 			return
 	# Am Spieler verankert, damit das Treiben die Kamera begleitet.
 	player.add_child(p)
+	if map_id == "world":
+		_add_cloud_shadows()
+
+## Weiche Wolkenschatten, die träge über die Überwelt ziehen.
+func _add_cloud_shadows() -> void:
+	var rows: Array = map["rows"]
+	var mw: float = (rows[0] as String).length() * TILE
+	var mh: float = rows.size() * TILE
+	for i in 3:
+		var cl := Sprite2D.new()
+		cl.texture = SpriteFactory.circle(60, Color(0, 0, 0, 0.10))
+		cl.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		cl.scale = Vector2(3.0 + i, 1.7 + i * 0.5)
+		cl.position = Vector2(mw * (0.15 + 0.3 * i), mh * (0.2 + 0.28 * i))
+		cl.z_index = 28
+		add_child(cl)
+		var dur := 46.0 + i * 14.0
+		var tw := cl.create_tween().set_loops()
+		tw.tween_property(cl, "position:x", cl.position.x + mw * 0.35, dur) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(cl, "position:x", cl.position.x, dur) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _build_tiles() -> void:
 	var rows: Array = map["rows"]
