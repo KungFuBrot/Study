@@ -54,9 +54,9 @@ var hud: Label
 
 # Dunkle Karten: Grundlicht + Laternenfarbe + Wandschmuck (Fackel/Kristall).
 const LIGHTING := {
-	"dungeon": {"ambient": Color(0.42, 0.38, 0.60), "lantern": Color(1.0, 0.78, 0.48),
+	"dungeon": {"ambient": Color(0.36, 0.32, 0.52), "lantern": Color(1.0, 0.78, 0.48),
 		"wall_prop": "torch"},
-	"dungeon2": {"ambient": Color(0.38, 0.48, 0.74), "lantern": Color(0.80, 0.92, 1.0),
+	"dungeon2": {"ambient": Color(0.32, 0.42, 0.66), "lantern": Color(0.80, 0.92, 1.0),
 		"wall_prop": "crystal"},
 }
 
@@ -78,6 +78,11 @@ func _ready() -> void:
 ## flackernde Wandlichter bringen das HD-2D-Licht zurück.
 func _add_lighting() -> void:
 	if not LIGHTING.has(map_id):
+		# Auch Tageslicht-Karten leicht abdunkeln — gedecktere, realistischere
+		# Grundstimmung statt Bilderbuch-Helligkeit.
+		var soft := CanvasModulate.new()
+		soft.color = Color(0.86, 0.84, 0.88)
+		add_child(soft)
 		return
 	var cfg: Dictionary = LIGHTING[map_id]
 	var cm := CanvasModulate.new()

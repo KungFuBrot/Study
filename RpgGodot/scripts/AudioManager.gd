@@ -137,15 +137,26 @@ func _render_song(song: Dictionary) -> AudioStreamWAV:
 	mix.resize(total)
 	_render_track(mix, song["mel"], spb, 0.16, "lead")
 	if song.has("harm"):
-		_render_track(mix, song["harm"], spb, 0.10, "tri")
-	_render_track(mix, song["bass"], spb, 0.20, "tri")
+		_render_track(mix, song["harm"], spb, 0.10, "pad")
+	_render_track(mix, song["bass"], spb, 0.22, "bass")
 	if song.get("drums", "") != "":
 		_render_drums(mix, song["drums"], spb, 0.30)
-	# Leichtes Echo (punktierte Achtel) macht den Klang räumlich.
-	var delay := int(0.375 * spb * RATE)
-	if delay > 0:
-		for i in range(delay, total):
-			mix[i] += mix[i - delay] * 0.25
+	# Zwei Echo-Stufen (punktierte Achtel + Viertel) geben Raumtiefe.
+	var d1 := int(0.375 * spb * RATE)
+	var d2 := int(0.75 * spb * RATE)
+	if d1 > 0:
+		for i in range(d1, total):
+			mix[i] += mix[i - d1] * 0.22
+	if d2 > 0:
+		for i in range(d2, total):
+			mix[i] += mix[i - d2] * 0.10
+	# Sanfter Tiefpass nimmt das digitale Kratzen, weiche Sättigung
+	# klebt die Stimmen zusammen (Analog-„Glue").
+	var lp := 0.0
+	for i in total:
+		lp += 0.55 * (mix[i] - lp)
+		var x := lp * 1.25
+		mix[i] = x / (1.0 + absf(x)) * 1.1
 	return _to_wav(mix, song["loop"])
 
 func _render_track(mix: PackedFloat32Array, notes: Array, spb: float, vol: float, wave: String) -> void:
@@ -156,27 +167,48 @@ func _render_track(mix: PackedFloat32Array, notes: Array, spb: float, vol: float
 			var length := int(n[1] * spb * RATE)
 			if n[0] >= 0:
 				var f := _freq(n[0])
-				var attack := int(0.005 * RATE)
-				var body := int(length * 0.85)
+				var attack := int((0.018 if wave == "pad" else 0.006) * RATE)
+				var body := int(length * 0.82)
+				# Phase pro Sample aufintegrieren — nur so bleibt das Vibrato
+				# über lange Noten stabil (fmod(t*f*vib) driftet mit t weg).
+				var ph := 0.0
 				for i in length:
 					var idx := pos + i
 					if idx >= total:
 						return
 					var t := float(i) / RATE
+					# Dezentes Vibrato, das erst nach dem Anschlag einschwingt.
+					var vib := 1.0 + 0.004 * sin(TAU * 5.5 * t) * minf(t * 3.0, 1.0)
+					ph += f * vib / RATE
 					var v: float
 					match wave:
 						"lead":
-							# Zwei leicht verstimmte Rechtecke = fetter Chorus-Klang.
-							var p1 := fmod(t * f, 1.0)
-							var p2 := fmod(t * f * 1.008, 1.0)
-							v = (0.6 if p1 < 0.5 else -0.6) + (0.4 if p2 < 0.5 else -0.4)
+							# Zwei verstimmte Sägezähne + leises Oktav-Rechteck:
+							# breiter Chorus-Lead statt dünnem Piepen.
+							var p1 := fmod(ph, 1.0)
+							var p2 := fmod(ph * 1.006 + 0.3, 1.0)
+							var p3 := fmod(ph * 0.5, 1.0)
+							v = (p1 - 0.5) * 0.9 + (p2 - 0.5) * 0.7 \
+								+ (0.25 if p3 < 0.5 else -0.25)
+						"pad":
+							# Zwei verstimmte Dreiecke = weiches, schwebendes Pad.
+							var q1 := fmod(ph, 1.0)
+							var q2 := fmod(ph * 1.012 + 0.5, 1.0)
+							v = (4.0 * absf(q1 - 0.5) - 1.0) * 0.6 \
+								+ (4.0 * absf(q2 - 0.5) - 1.0) * 0.5
+						"bass":
+							# Runder Bass: Sinus mit leichtem Dreieck-Obertonanteil.
+							v = sin(TAU * ph) * 0.8 \
+								+ (4.0 * absf(fmod(ph, 1.0) - 0.5) - 1.0) * 0.3
 						"tri":
-							v = 4.0 * absf(fmod(t * f, 1.0) - 0.5) - 1.0
+							v = 4.0 * absf(fmod(ph, 1.0) - 0.5) - 1.0
 						_:
-							v = 0.7 if fmod(t * f, 1.0) < 0.5 else -0.7
+							v = 0.7 if fmod(ph, 1.0) < 0.5 else -0.7
 					var env := 1.0
 					if i < attack: env = float(i) / attack
-					elif i > body: env = maxf(1.0 - float(i - body) / (length - body), 0.0)
+					elif i > body:
+						var rel := maxf(1.0 - float(i - body) / (length - body), 0.0)
+						env = rel * rel
 					mix[idx] += v * vol * env
 			pos += length
 			if pos >= total:
@@ -200,6 +232,7 @@ func _render_drums(mix: PackedFloat32Array, pattern: String, spb: float, vol: fl
 func _drum_hit(mix: PackedFloat32Array, start: int, dur: float, vol: float, kind: String) -> void:
 	var n := int(dur * RATE)
 	var phase := 0.0
+	var last := 0.0
 	for i in n:
 		var idx := start + i
 		if idx >= mix.size():
@@ -208,12 +241,20 @@ func _drum_hit(mix: PackedFloat32Array, start: int, dur: float, vol: float, kind
 		var v: float
 		match kind:
 			"kick":
-				phase += lerpf(150.0, 45.0, t) / RATE
+				# Pitch-Sweep + kurzer Klick am Anfang für Attack.
+				phase += lerpf(160.0, 42.0, t) / RATE
 				v = sin(phase * TAU)
+				if i < 30:
+					v += randf_range(-0.5, 0.5)
 			"snare":
-				v = randf_range(-1.0, 1.0) * 0.7 + sin(float(i) * 180.0 / RATE * TAU) * 0.3
+				v = randf_range(-1.0, 1.0) * 0.6 \
+					+ sin(float(i) * 190.0 / RATE * TAU) * 0.35 \
+					+ sin(float(i) * 285.0 / RATE * TAU) * 0.15
 			_:
-				v = randf_range(-1.0, 1.0)
+				# HiHat: differenziertes Rauschen = Hochpass, klingt metallischer.
+				var wn := randf_range(-1.0, 1.0)
+				v = (wn - last) * 1.4
+				last = wn
 		mix[idx] += v * vol * (1.0 - t) * (1.0 - t)
 
 func _render_sfx(id: String) -> AudioStreamWAV:
@@ -271,6 +312,18 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			_tone(buf, 900, 200, 0.90, 0.30, "noise")
 		"splash":
 			_tone(buf, 1400, 300, 0.20, 0.28, "noise")
+		"alarm":
+			# Zwei schrille Warntöne mit kurzer Pause
+			for i in 2:
+				_tone(buf, 1180, 1180, 0.12, 0.22, "square")
+				_tone(buf, 100, 100, 0.08, 0.0, "tri")
+		"whistle":
+			# Fallende Fliegerbombe: langer, absinkender Pfeifton
+			_tone(buf, 1650, 220, 0.95, 0.20, "tri")
+		"nuke":
+			# Detonation: langes tiefes Wummern + Sub-Grollen
+			_tone(buf, 700, 18, 1.30, 0.55, "noise")
+			_tone(buf, 60, 24, 0.90, 0.45, "tri")
 		_:
 			return null
 	return _to_wav(buf, false)

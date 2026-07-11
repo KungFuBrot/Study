@@ -462,11 +462,13 @@ const HERO_BATTLE_ART := {
 static func hero_battle(id: String) -> Texture2D:
 	return hero_battle_frame(id, 0)
 
-static func hero_battle_frame(id: String, frame: int) -> Texture2D:
+## anim: "idle" | "run" (DTII-Lauf-Frames) | "aim" (nur Rax, Schusspose).
+static func hero_battle_frame(id: String, frame: int, anim := "idle") -> Texture2D:
 	if id == "rax":
-		return robot_battle(frame)
+		return robot_battle_pose(anim, frame)
 	var def: Dictionary = HERO_DTII.get(id, HERO_DTII["serena"])
-	return dtii("%s_idle_anim_f%d" % [def["base"], frame % 4])
+	var set_name := "run" if anim == "run" else "idle"
+	return dtii("%s_%s_anim_f%d" % [def["base"], set_name, frame % 4])
 
 ## Waffe eines Helden (kleines Overlay-Sprite), oder null.
 static func hero_weapon(id: String) -> Texture2D:
@@ -511,16 +513,24 @@ static func _robot_core(frame: int) -> Color:
 	return Color(0.55, 0.22, 0.06).lerp(Color(1.0, 0.72, 0.32), lv)
 
 static func robot_battle(frame: int) -> Texture2D:
-	var key := "robot_b_%d" % (frame % 4)
+	return robot_battle_pose("idle", frame)
+
+## Posen: "idle" (Stand), "run" (Schwebe-Dash mit Düsenflamme, Beine angelegt),
+## "aim" (breiter Stand, Kanone ausgefahren). Alle 28 px breit, damit Zentrum
+## und Fußlinie über alle Posen identisch bleiben.
+static func robot_battle_pose(pose: String, frame: int) -> Texture2D:
+	if pose != "run" and pose != "aim":
+		pose = "idle"
+	var key := "robot_b_%s_%d" % [pose, frame % 4]
 	if _cache.has(key):
 		return _cache[key]
 	var p := ROBOT_PAL
 	var ml: Color = p["ml"]; var mm: Color = p["mm"]; var md: Color = p["md"]
 	var jt: Color = p["jt"]; var eye: Color = p["eye"]; var acc: Color = p["acc"]
 	var core := _robot_core(frame)
-	var ant := Color(1.0, 0.38, 0.30) if frame % 2 == 0 else Color(0.5, 0.19, 0.16)
-	var img := _img(24, 28)
-	# Antenne mit blinkender Spitze
+	var ant := Color(1.0, 0.38, 0.30) if (frame % 2 == 0 or pose == "aim") else Color(0.5, 0.19, 0.16)
+	var img := _img(28, 28)
+	# Antenne mit blinkender Spitze (in der Zielpose Dauerrot = "System scharf")
 	img.set_pixel(9, 0, ant)
 	img.fill_rect(Rect2i(9, 1, 1, 3), md)
 	# Kopf-Kuppel
@@ -528,11 +538,14 @@ static func robot_battle(frame: int) -> Texture2D:
 	img.set_pixel(6, 4, Color(0, 0, 0, 0)); img.set_pixel(17, 4, Color(0, 0, 0, 0))
 	img.fill_rect(Rect2i(6, 10, 12, 1), mm)
 	img.fill_rect(Rect2i(17, 5, 1, 5), mm)
-	# Visor (Front rechts) + wandernder Scan-Punkt
+	# Visor (Front rechts) + wandernder Scan-Punkt (beim Zielen: volle Leiste)
 	img.fill_rect(Rect2i(12, 5, 5, 1), md)
 	img.fill_rect(Rect2i(12, 6, 5, 3), jt)
-	var sx: int = 13 + [0, 1, 2, 1][frame % 4]
-	img.set_pixel(sx, 7, eye); img.set_pixel(sx, 8, eye)
+	if pose == "aim":
+		img.fill_rect(Rect2i(12, 7, 5, 1), eye)
+	else:
+		var sx: int = 13 + [0, 1, 2, 1][frame % 4]
+		img.set_pixel(sx, 7, eye); img.set_pixel(sx, 8, eye)
 	# Hals
 	img.fill_rect(Rect2i(10, 11, 4, 1), md)
 	# Rumpf
@@ -547,19 +560,96 @@ static func robot_battle(frame: int) -> Texture2D:
 	# Schultern mit Akzentkappen
 	img.fill_rect(Rect2i(3, 11, 3, 3), md); img.fill_rect(Rect2i(3, 11, 3, 1), acc)
 	img.fill_rect(Rect2i(18, 11, 3, 3), md); img.fill_rect(Rect2i(18, 11, 3, 1), acc)
-	# Linker Arm (Rückseite)
-	img.fill_rect(Rect2i(2, 13, 3, 6), mm); img.fill_rect(Rect2i(2, 13, 1, 6), md)
-	img.fill_rect(Rect2i(2, 19, 3, 2), md)
-	# Rechter Arm = Kanone (Front)
+	# Linker Arm (Rückseite); beim Zielen greift er stützend zur Kanone
+	if pose == "aim":
+		img.fill_rect(Rect2i(3, 13, 3, 3), mm)
+		img.fill_rect(Rect2i(5, 15, 12, 2), mm); img.fill_rect(Rect2i(5, 15, 12, 1), md)
+	else:
+		img.fill_rect(Rect2i(2, 13, 3, 6), mm); img.fill_rect(Rect2i(2, 13, 1, 6), md)
+		img.fill_rect(Rect2i(2, 19, 3, 2), md)
+	# Rechter Arm = Kanone (Front); beim Zielen ausgefahrener Lauf mit Mündung
 	img.fill_rect(Rect2i(19, 12, 5, 3), md)
-	img.fill_rect(Rect2i(19, 15, 5, 3), mm); img.fill_rect(Rect2i(19, 15, 5, 1), ml)
-	img.fill_rect(Rect2i(23, 16, 1, 2), jt)
-	img.set_pixel(22, 16, eye)
-	# Hüfte + Beine + Füße
+	if pose == "aim":
+		img.fill_rect(Rect2i(19, 15, 8, 3), mm); img.fill_rect(Rect2i(19, 15, 8, 1), ml)
+		img.fill_rect(Rect2i(25, 14, 2, 1), md)  # Mündungsbremse oben
+		img.fill_rect(Rect2i(27, 15, 1, 3), jt)
+		img.set_pixel(26, 16, eye); img.set_pixel(25, 16, eye)
+	else:
+		img.fill_rect(Rect2i(19, 15, 5, 3), mm); img.fill_rect(Rect2i(19, 15, 5, 1), ml)
+		img.fill_rect(Rect2i(23, 16, 1, 2), jt)
+		img.set_pixel(22, 16, eye)
+	# Hüfte + Beine
 	img.fill_rect(Rect2i(7, 20, 10, 2), md)
-	img.fill_rect(Rect2i(8, 22, 3, 5), mm); img.fill_rect(Rect2i(8, 22, 1, 5), md)
-	img.fill_rect(Rect2i(13, 22, 3, 5), mm); img.fill_rect(Rect2i(15, 22, 1, 5), md)
-	img.fill_rect(Rect2i(7, 26, 4, 2), md); img.fill_rect(Rect2i(13, 26, 4, 2), md)
+	match pose:
+		"run":
+			# Schwebe-Dash: Beine nach hinten angelegt, Düsenflamme darunter.
+			img.fill_rect(Rect2i(5, 22, 4, 3), mm); img.fill_rect(Rect2i(3, 23, 3, 2), md)
+			img.fill_rect(Rect2i(10, 22, 4, 3), mm); img.fill_rect(Rect2i(8, 24, 3, 2), md)
+			var flame1 := Color(1.0, 0.78, 0.25); var flame2 := Color(1.0, 0.5, 0.15)
+			if frame % 2 == 0:
+				img.fill_rect(Rect2i(9, 25, 5, 2), flame1)
+				img.fill_rect(Rect2i(7, 26, 3, 2), flame2)
+			else:
+				img.fill_rect(Rect2i(10, 25, 4, 2), flame2)
+				img.fill_rect(Rect2i(8, 26, 2, 1), flame1)
+		"aim":
+			# Breiter Schützenstand: Beine gespreizt, Knie gebeugt.
+			img.fill_rect(Rect2i(5, 22, 3, 3), mm); img.fill_rect(Rect2i(5, 22, 1, 3), md)
+			img.fill_rect(Rect2i(3, 25, 5, 3), md)
+			img.fill_rect(Rect2i(15, 22, 3, 3), mm); img.fill_rect(Rect2i(17, 22, 1, 3), md)
+			img.fill_rect(Rect2i(15, 25, 5, 3), md)
+		_:
+			img.fill_rect(Rect2i(8, 22, 3, 5), mm); img.fill_rect(Rect2i(8, 22, 1, 5), md)
+			img.fill_rect(Rect2i(13, 22, 3, 5), mm); img.fill_rect(Rect2i(15, 22, 1, 5), md)
+			img.fill_rect(Rect2i(7, 26, 4, 2), md); img.fill_rect(Rect2i(13, 26, 4, 2), md)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+## Kleine Rakete (blickt nach rechts, Drehung übernimmt die Flugbahn);
+## 2 Abgas-Frames für flackernden Schub.
+static func rocket(frame: int) -> Texture2D:
+	var key := "rocket_%d" % (frame % 2)
+	if _cache.has(key):
+		return _cache[key]
+	var body := Color(0.82, 0.84, 0.88); var dark := Color(0.45, 0.48, 0.55)
+	var nose := Color(0.90, 0.25, 0.18); var fin := Color(0.96, 0.63, 0.22)
+	var img := _img(14, 6)
+	img.fill_rect(Rect2i(4, 2, 7, 2), body)
+	img.fill_rect(Rect2i(4, 3, 7, 1), dark)
+	img.fill_rect(Rect2i(11, 2, 2, 2), nose)
+	img.set_pixel(13, 2, nose); img.set_pixel(13, 3, nose)
+	img.fill_rect(Rect2i(3, 1, 2, 1), fin); img.fill_rect(Rect2i(3, 4, 2, 1), fin)
+	img.fill_rect(Rect2i(3, 2, 1, 2), dark)
+	if frame % 2 == 0:
+		img.fill_rect(Rect2i(0, 2, 3, 2), Color(1.0, 0.78, 0.25))
+		img.set_pixel(0, 2, Color(1.0, 0.45, 0.15))
+	else:
+		img.fill_rect(Rect2i(1, 2, 2, 2), Color(1.0, 0.55, 0.18))
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
+## Fallende Fliegerbombe (Spitze unten), rot blinkendes Zünderlicht.
+static func bomb(frame: int) -> Texture2D:
+	var key := "bomb_%d" % (frame % 2)
+	if _cache.has(key):
+		return _cache[key]
+	var body := Color(0.30, 0.33, 0.38); var lite := Color(0.48, 0.52, 0.58)
+	var fin := Color(0.20, 0.22, 0.26); var warn := Color(0.95, 0.80, 0.20)
+	var img := _img(10, 16)
+	# Leitwerk oben
+	img.fill_rect(Rect2i(1, 0, 2, 4), fin); img.fill_rect(Rect2i(7, 0, 2, 4), fin)
+	img.fill_rect(Rect2i(4, 0, 2, 3), fin)
+	# Korpus
+	img.fill_rect(Rect2i(2, 3, 6, 9), body)
+	img.fill_rect(Rect2i(2, 3, 1, 9), lite)
+	img.fill_rect(Rect2i(3, 12, 4, 2), body)
+	img.fill_rect(Rect2i(4, 14, 2, 2), body)  # Spitze
+	# Warnstreifen + Zünderlicht
+	img.fill_rect(Rect2i(2, 7, 6, 1), warn)
+	var blink := Color(1.0, 0.25, 0.2) if frame % 2 == 0 else Color(0.45, 0.12, 0.1)
+	img.set_pixel(5, 5, blink)
 	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t

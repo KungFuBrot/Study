@@ -12,6 +12,9 @@ uniform float top_blur = 3.0;
 uniform float bottom_blur = 2.2;
 uniform float focus_center = 0.5;
 uniform float focus_width = 0.18;
+uniform float desat : hint_range(0.0, 1.0) = 0.16;
+uniform float contrast = 1.06;
+uniform float grain = 0.02;
 
 void fragment() {
 	float d = abs(SCREEN_UV.y - focus_center) - focus_width;
@@ -29,7 +32,19 @@ void fragment() {
 	for (int i = 0; i < 12; i++) {
 		col += texture(screen_tex, SCREEN_UV + taps[i] * px);
 	}
-	COLOR = col / 13.0;
+	vec3 c = (col / 13.0).rgb;
+	// Filmischer Grade im SELBEN Pass: der Kompatibilitäts-Renderer kopiert
+	// den Screen nur einmal pro Layer — ein zweiter Screen-Shader würde die
+	// Unschärfe wieder verwerfen. Also: Entsättigung, Kontrast, kühle
+	// Schatten/warme Lichter und feines animiertes Filmkorn direkt hier.
+	float lum = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(c, vec3(lum), desat);
+	c = (c - 0.5) * contrast + 0.5;
+	c += (0.5 - lum) * vec3(-0.02, 0.0, 0.035);
+	float g = fract(sin(dot(floor(SCREEN_UV * vec2(960.0, 540.0))
+		+ vec2(TIME * 173.0, TIME * 311.0), vec2(127.1, 311.7))) * 43758.5453) - 0.5;
+	c += g * grain;
+	COLOR = vec4(c, 1.0);
 }
 "
 
