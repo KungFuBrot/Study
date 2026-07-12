@@ -1308,15 +1308,15 @@ func _ability_menu(h: Dictionary) -> bool:
 	var entries := []
 	var dim := []
 	for ab in abilities:
-		if d["level"] < ab.get("unlock_level", 0):
+		if not GameState.skill_unlocked(d, ab):
 			dim.append(entries.size())
-			entries.append("%s — ab Stufe %d" % [ab["name"], ab["unlock_level"]])
+			entries.append("%s — %s" % [ab["name"], GameState.skill_lock_hint(d, ab)])
 		else:
 			entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
 	for sm in summons:
-		if d["level"] < sm["unlock_level"]:
+		if not GameState.skill_unlocked(d, sm):
 			dim.append(entries.size())
-			entries.append("◈ %s — ab Stufe %d" % [sm["name"], sm["unlock_level"]])
+			entries.append("◈ %s — %s" % [sm["name"], GameState.skill_lock_hint(d, sm)])
 		else:
 			entries.append("◈ %s (%d MP) — %s" % [sm["name"], sm["cost"], sm["desc"]])
 	entries.append("★ %s — %s" % [ult["name"],
@@ -1325,8 +1325,8 @@ func _ability_menu(h: Dictionary) -> bool:
 	var pick: int = await _menu(entries, h, dim)
 	if pick >= abilities.size() and pick < abilities.size() + summons.size():
 		var sm: Dictionary = summons[pick - abilities.size()]
-		if d["level"] < sm["unlock_level"]:
-			_say("%s erhört %s erst ab Stufe %d!" % [sm["name"], d["name"], sm["unlock_level"]])
+		if not GameState.skill_unlocked(d, sm):
+			_say("%s ist noch %s!" % [sm["name"], GameState.skill_lock_hint(d, sm)])
 			AudioManager.play_sfx("error")
 			return false
 		if d["mp"] < sm["cost"]:
@@ -1353,8 +1353,8 @@ func _ability_menu(h: Dictionary) -> bool:
 	if pick > abilities.size() + summons.size():
 		return false
 	var ab: Dictionary = abilities[pick]
-	if d["level"] < ab.get("unlock_level", 0):
-		_say("%s ist erst ab Stufe %d einsatzbereit!" % [ab["name"], ab["unlock_level"]])
+	if not GameState.skill_unlocked(d, ab):
+		_say("%s ist noch %s!" % [ab["name"], GameState.skill_lock_hint(d, ab)])
 		AudioManager.play_sfx("error")
 		return false
 	if d["mp"] < ab["cost"]:
@@ -4363,6 +4363,8 @@ func _victory() -> void:
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
 		_say("Der Hort des Fürsten fließt zurück ins Land — sein Dank stärkt euch!")
 		await get_tree().create_timer(2.4).timeout
+		_say("Die letzten Siegel fallen: Klingentanz, Atombombe und Leviathans Pakt!")
+		await get_tree().create_timer(2.4).timeout
 		_say("Im Südwesten bröckelt der Wall aus Misstrauen um die Hassfestung ...")
 		await get_tree().create_timer(2.2).timeout
 	elif enemy_ids.has("boss"):
@@ -4374,6 +4376,8 @@ func _victory() -> void:
 			_sparkle(h["sprite"].position, Color(0.7, 1.0, 0.5))
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(0.7, 1.0, 0.5))
 		_say("Der Fluss atmet auf — die Segnung des klaren Wassers durchströmt euch!")
+		await get_tree().create_timer(2.4).timeout
+		_say("Siegel gebrochen: Fokusstoß, Raketensalve und Ifrits Pakt erwachen!")
 		await get_tree().create_timer(2.4).timeout
 		_say("Im Nordosten springen die goldenen Tore des Konzernturms auf ...")
 		await get_tree().create_timer(2.2).timeout

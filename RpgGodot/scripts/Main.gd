@@ -45,6 +45,9 @@ func _ready() -> void:
 func _shot_tour() -> void:
 	await get_tree().create_timer(2.0).timeout
 	_snap("title")
+	_show_intro()
+	await get_tree().create_timer(2.6).timeout
+	_snap("intro")
 	goto_map("town", "start")
 	await get_tree().create_timer(2.0).timeout
 	_snap("town")
@@ -163,6 +166,19 @@ func show_title() -> void:
 
 func _on_title_start() -> void:
 	GameState.reset_all()
+	_show_intro()
+
+## Erzähl-Auftakt: der Anfang der Geschichte, danach beginnt das Spiel.
+func _show_intro() -> void:
+	await _fade(1.0, 0.3)
+	_clear_screen()
+	var intro := Intro.new()
+	intro.done.connect(_on_intro_done)
+	add_child(intro)
+	current_screen = intro
+	await _fade(0.0, 0.6)
+
+func _on_intro_done() -> void:
 	goto_map("town", "start")
 
 func _clear_screen() -> void:

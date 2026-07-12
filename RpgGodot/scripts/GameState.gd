@@ -133,10 +133,10 @@ func reset_party() -> void:
 					"power": 10, "kind": "phys",
 					"desc": "Trifft alle Gegner."},
 				{"name": "Fokusstoß", "cost": 3, "target": "one",
-					"power": 16, "kind": "pierce",
+					"power": 16, "kind": "pierce", "unlock_flag": "boss_defeated",
 					"desc": "Durchbohrt die Verteidigung."},
 				{"name": "Klingentanz", "cost": 8, "target": "one",
-					"power": 6, "kind": "dance",
+					"power": 6, "kind": "dance", "unlock_flag": "boss2_defeated",
 					"desc": "Fünf Blitzschnitte im Stern, dann der Fallstreich."},
 			],
 			"ultimate": {"name": "Sternenklinge",
@@ -160,9 +160,11 @@ func reset_party() -> void:
 			"summons": [
 				{"id": "ifrit", "name": "Ifrit", "attack": "Höllenfeuer",
 					"cost": 16, "unlock_level": 1, "power": 34,
+					"unlock_flag": "boss_defeated",
 					"desc": "Feuerdämon — Höllenfeuer auf alle Gegner."},
 				{"id": "leviathan", "name": "Leviathan", "attack": "Sintflut",
 					"cost": 24, "unlock_level": 1, "power": 38,
+					"unlock_flag": "boss2_defeated",
 					"desc": "Wasserschlange — Sintflut auf alle Gegner."},
 			],
 		},
@@ -176,10 +178,10 @@ func reset_party() -> void:
 					"power": 22, "kind": "beam",
 					"desc": "Gebündelter Energiestrahl."},
 				{"name": "Raketensalve", "cost": 7, "target": "all",
-					"power": 15, "kind": "rocket",
+					"power": 15, "kind": "rocket", "unlock_flag": "boss_defeated",
 					"desc": "Raketen auf alle Gegner."},
 				{"name": "Atombombe", "cost": 14, "target": "all",
-					"power": 46, "kind": "nuke", "unlock_level": 1,
+					"power": 46, "kind": "nuke", "unlock_flag": "boss2_defeated",
 					"desc": "Taktischer Sprengkopf — verwüstet das Schlachtfeld."},
 			],
 			"ultimate": {"name": "Orbitallaser",
@@ -255,6 +257,25 @@ func award_xp(amount: int) -> Array:
 					up["unlock"] = sm["name"]
 			ups.append(up)
 	return ups
+
+## ---------- Fähigkeiten-Siegel ----------
+## Mächtige Fähigkeiten sind anfangs versiegelt; die Siegel fallen mit den
+## Boss-Siegen (nach Dungeon 1 und 2 je eines pro Held). Im dritten Dungeon
+## ist damit automatisch alles verfügbar.
+
+func skill_unlocked(member: Dictionary, ab: Dictionary) -> bool:
+	if member.get("level", 1) < ab.get("unlock_level", 0):
+		return false
+	var flag: String = ab.get("unlock_flag", "")
+	return flag == "" or get(flag)
+
+## Kurzer Hinweis, warum eine Fähigkeit noch gesperrt ist.
+func skill_lock_hint(member: Dictionary, ab: Dictionary) -> String:
+	var flag: String = ab.get("unlock_flag", "")
+	if flag != "" and not get(flag):
+		return {"boss_defeated": "versiegelt, bis der Schlotbaron fällt",
+			"boss2_defeated": "versiegelt, bis der Monopolfürst fällt"}.get(flag, "versiegelt")
+	return "ab Stufe %d" % ab.get("unlock_level", 0)
 
 func add_item(item_name: String, count := 1) -> void:
 	inventory[item_name] = inventory.get(item_name, 0) + count
