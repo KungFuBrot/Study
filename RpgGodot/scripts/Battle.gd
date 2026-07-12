@@ -424,9 +424,9 @@ func _build_scene() -> void:
 		var is_boss: bool = def.get("boss", false)
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		s.scale = Vector2(6, 6) if is_boss else Vector2(6.5, 6.5)
+		s.scale = Vector2(7.2, 7.2) if is_boss else Vector2(6.5, 6.5)
 		s.set_meta("base_scale", s.scale)
-		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
+		var home := Vector2(222, 222) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
 		var refl: Sprite2D
 		var mist: CPUParticles2D = null
@@ -436,6 +436,7 @@ func _build_scene() -> void:
 			_attach_glow_pool(s, foot, pal["pool_enemy"])
 			refl = _attach_reflection(s, foot, 0.10)
 			_attach_boss_aura(s, def.get("theme", "toxic"))
+			_attach_boss_life(s, def.get("theme", "toxic"), def["sprite"])
 		else:
 			var foot_e: float = s.texture.get_height() * 0.5 - 1.0
 			_attach_shadow(s, 9, 3, foot_e)
@@ -602,6 +603,75 @@ func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
 	ember.color = ember_col
 	ember.texture = SpriteFactory.circle(3, Color.WHITE)
 	s.add_child(ember)
+
+## Gesichtsposition der Boss-Sprites (lokale Pixel, Ursprung Sprite-Mitte).
+const BOSS_FACE := {
+	"boss": Vector2(3, -3), "boss2": Vector2(3, -4), "boss3": Vector2(1, -5),
+}
+
+## Lebenszeichen des Bosses: glimmende Augen-Glut (mit Blinzeln), giftiger
+## Atem aus dem Maul und ein tiefes Grollen mit Auren-Flackern.
+func _attach_boss_life(s: Sprite2D, theme: String, sprite_id: String) -> void:
+	var st: Dictionary = THEME_STYLE.get(theme, THEME_STYLE["toxic"])
+	var face: Vector2 = BOSS_FACE.get(sprite_id, Vector2(2, -7))
+	# Glut in den Augenhöhlen: kleiner additiver Schein, der pulsiert
+	# und hin und wieder kurz erlischt (Blinzeln).
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var eyes := Sprite2D.new()
+	eyes.texture = SpriteFactory.circle(3, Color(1.0, 0.9, 0.8))
+	eyes.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	eyes.material = mat
+	eyes.position = face
+	eyes.scale = Vector2(1.4, 0.7)
+	eyes.modulate = Color(st["ember"].r, st["ember"].g, st["ember"].b, 0.55)
+	s.add_child(eyes)
+	s.set_meta("eyes", eyes)
+	var pulse := eyes.create_tween().set_loops()
+	pulse.tween_property(eyes, "modulate:a", 0.30, 0.8) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(eyes, "modulate:a", 0.60, 0.8) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var blink := Timer.new()
+	blink.wait_time = randf_range(3.0, 6.0)
+	blink.autostart = true
+	blink.timeout.connect(func():
+		blink.wait_time = randf_range(3.0, 6.0)
+		if not is_instance_valid(eyes):
+			return
+		var b := create_tween()
+		b.tween_property(eyes, "scale:y", 0.06, 0.07)
+		b.tween_property(eyes, "scale:y", 0.7, 0.09))
+	s.add_child(blink)
+	# Atem: schwerer Dunst quillt rhythmisch aus dem Maul (Themenfarbe).
+	var breath := CPUParticles2D.new()
+	breath.position = face + Vector2(3, 3)
+	breath.amount = 5
+	breath.lifetime = 1.4
+	breath.direction = Vector2(1, 0.25)
+	breath.spread = 14.0
+	breath.gravity = Vector2(4, -5)
+	breath.initial_velocity_min = 4.0
+	breath.initial_velocity_max = 9.0
+	breath.scale_amount_min = 0.010
+	breath.scale_amount_max = 0.022
+	breath.color = Color(st["ember"].r, st["ember"].g, st["ember"].b, 0.28)
+	breath.texture = SpriteFactory.particle("smoke_07")
+	breath.show_behind_parent = false
+	s.add_child(breath)
+	# Grollen: alle paar Sekunden ein tiefer Laut + kurzes Aufflammen der Aura.
+	var growl := Timer.new()
+	growl.wait_time = randf_range(6.0, 10.0)
+	growl.autostart = true
+	growl.timeout.connect(func():
+		growl.wait_time = randf_range(6.0, 10.0)
+		if not is_instance_valid(s) or not s.visible:
+			return
+		AudioManager.play_sfx("growl")
+		var flare := create_tween()
+		flare.tween_property(eyes, "modulate:a", 1.0, 0.15)
+		flare.tween_property(eyes, "modulate:a", 0.5, 0.5))
+	s.add_child(growl)
 
 ## Grusel-Aufsatz für normale Monster: schwarzer Bodennebel wabert um die
 ## Füße, und in unregelmäßigen Abständen zuckt die Kreatur unruhig.
@@ -1098,6 +1168,10 @@ func _run_battle() -> void:
 		var u: Dictionary = units[i]
 		var s: Sprite2D = u["sprite"]
 		s.modulate.a = 0.0
+		# Der Boss marschiert nicht ein — er bekommt seinen großen Auftritt.
+		if u.get("is_boss", false):
+			s.position = u["home"]
+			continue
 		var tw := create_tween()
 		tw.tween_interval(i * 0.09)
 		tw.tween_property(s, "position", u["home"], 0.5) \
@@ -1107,7 +1181,8 @@ func _run_battle() -> void:
 	for i in heroes.size():
 		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0 + i * 0.3)
 	for i in enemies.size():
-		_idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
+		if not enemies[i]["is_boss"]:
+			enemies[i]["bob"] = _idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
 	_start_idle_animations()
 	_camera_idle()
 	if not boss_def.is_empty():
@@ -3587,6 +3662,12 @@ func _boss_enrage(e: Dictionary) -> void:
 	var tw := create_tween()
 	tw.tween_property(es, "modulate", rage_col, 0.3)
 	tw.tween_property(es, "modulate", tint, 0.4)
+	# Die Augen-Glut lodert in der Wut dauerhaft heller
+	if es.has_meta("eyes") and is_instance_valid(es.get_meta("eyes")):
+		var ey: Sprite2D = es.get_meta("eyes")
+		var et := create_tween()
+		et.tween_property(ey, "modulate:a", 1.0, 0.3)
+		et.parallel().tween_property(ey, "scale", Vector2(2.0, 1.0), 0.3)
 	_burst(es.position, st["burst"], 22, 190)
 	AudioManager.play_sfx("roar")
 	await get_tree().create_timer(1.0).timeout
@@ -3920,12 +4001,19 @@ func _boss_entrance() -> void:
 	var bars := create_tween().set_parallel(true)
 	bars.tween_property(bar_top, "position:y", 0.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	bars.tween_property(bar_bot, "position:y", 494.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	# Drei schwere Stampfer
-	for i in 3:
-		AudioManager.play_sfx("stomp")
-		_shake_camera(1.8)
-		await get_tree().create_timer(0.42).timeout
 	var st := _style()
+	# Erzähler kündigt an, dann materialisiert sich der Boss themengerecht.
+	_say(boss_def["entrance_line"])
+	var boss_e := {}
+	for e in enemies:
+		if e["is_boss"]:
+			boss_e = e
+	await _boss_reveal(boss_e, boss_def.get("theme", "toxic"))
+	boss_e["bob"] = _idle_bob(boss_e["sprite"], 1.9)
+	# Wortwechsel: der Boss stellt sich vor, die Helden antworten.
+	for line: Array in boss_def.get("intro", []):
+		_say("%s: „%s“" % [line[0], line[1]])
+		await get_tree().create_timer(2.2).timeout
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.4)
 	_punch_zoom(0.14, Vector2(230, 240))
@@ -3950,8 +4038,7 @@ func _boss_entrance() -> void:
 	tw.tween_interval(1.2)
 	tw.tween_property(banner, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(banner.queue_free)
-	_say(boss_def["entrance_line"])
-	await get_tree().create_timer(1.6).timeout
+	await get_tree().create_timer(1.2).timeout
 	# Balken raus, Boss-HP-Leiste rein
 	var out := create_tween().set_parallel(true)
 	out.tween_property(bar_top, "position:y", -46.0, 0.3)
@@ -3961,6 +4048,125 @@ func _boss_entrance() -> void:
 	if boss_bar_holder != null:
 		var bt := create_tween()
 		bt.tween_property(boss_bar_holder, "modulate:a", 1.0, 0.5)
+
+## Themengerechte Material-Werdung des Bosses: der Schlotbaron wälzt sich
+## aus einem Schlammloch, der Monopolfürst schwebt im Goldregen herab,
+## der Spalter verdichtet sich aus Glut und Schatten.
+func _boss_reveal(e: Dictionary, theme: String) -> void:
+	var s: Sprite2D = e["sprite"]
+	var home: Vector2 = e["home"]
+	var tint: Color = s.get_meta("tint", Color.WHITE)
+	match theme:
+		"gold":
+			# Goldregen — dann fährt der Fürst wie mit dem Chef-Aufzug herab.
+			var shower := CPUParticles2D.new()
+			shower.position = home + Vector2(0, -260)
+			shower.amount = 40
+			shower.lifetime = 1.2
+			shower.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			shower.emission_rect_extents = Vector2(70, 8)
+			shower.direction = Vector2(0, 1)
+			shower.spread = 8.0
+			shower.gravity = Vector2(0, 320)
+			shower.initial_velocity_min = 80.0
+			shower.initial_velocity_max = 140.0
+			shower.scale_amount_min = 0.5
+			shower.scale_amount_max = 1.1
+			shower.color = Color(1.0, 0.87, 0.4, 0.9)
+			shower.texture = SpriteFactory.circle(2, Color.WHITE)
+			add_child(shower)
+			AudioManager.play_sfx("coin")
+			s.position = home + Vector2(0, -320)
+			s.modulate = Color(tint.r, tint.g, tint.b, 0.0)
+			var down := create_tween()
+			down.tween_property(s, "modulate:a", 1.0, 0.25)
+			down.parallel().tween_property(s, "position:y", home.y, 0.9) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			await down.finished
+			AudioManager.play_sfx("stomp")
+			_shake_camera(2.2)
+			_burst(home + Vector2(0, 100), Color(1.0, 0.85, 0.35), 18, 170)
+			shower.emitting = false
+			var sf := create_tween()
+			sf.tween_interval(1.4)
+			sf.tween_callback(shower.queue_free)
+		"hate":
+			# Aus Glut und Schatten: erst ein schwarzer Schemen in einer
+			# aufsteigenden Glutsäule, dann flutet die Farbe hinein.
+			s.position = home
+			s.modulate = Color(0, 0, 0, 0.0)
+			AudioManager.play_sfx("screech")
+			var col := CPUParticles2D.new()
+			col.position = home + Vector2(0, 110)
+			col.amount = 50
+			col.lifetime = 1.1
+			col.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			col.emission_rect_extents = Vector2(60, 6)
+			col.direction = Vector2(0, -1)
+			col.spread = 10.0
+			col.gravity = Vector2(0, -240)
+			col.initial_velocity_min = 90.0
+			col.initial_velocity_max = 170.0
+			col.scale_amount_min = 0.5
+			col.scale_amount_max = 1.2
+			col.color = Color(1.0, 0.35, 0.12, 0.9)
+			col.texture = SpriteFactory.circle(2, Color.WHITE)
+			add_child(col)
+			var fade_in := create_tween()
+			fade_in.tween_property(s, "modulate:a", 1.0, 0.7)
+			await fade_in.finished
+			_shockring(home + Vector2(0, -20), 0.0)
+			AudioManager.play_sfx("eruption")
+			_flash_screen(Color(1.0, 0.2, 0.1, 0.3))
+			_shake_camera(1.8)
+			var flood := create_tween()
+			flood.tween_property(s, "modulate", tint, 0.6)
+			col.emitting = false
+			await flood.finished
+			var cf := create_tween()
+			cf.tween_interval(1.2)
+			cf.tween_callback(col.queue_free)
+		_:
+			# Aus dem Schlammloch: die Pfütze wächst, der Baron wälzt sich hoch.
+			var pool := Sprite2D.new()
+			pool.texture = SpriteFactory.circle(40, Color(0.35, 0.65, 0.18, 0.85))
+			pool.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			pool.position = home + Vector2(0, 110)
+			pool.scale = Vector2(0.2, 0.06)
+			pool.z_index = -9
+			add_child(pool)
+			AudioManager.play_sfx("splat")
+			var grow := create_tween()
+			grow.tween_property(pool, "scale", Vector2(3.6, 1.0), 0.5) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			await grow.finished
+			s.position = home + Vector2(0, 170)
+			s.modulate = Color(tint.r, tint.g, tint.b, 0.0)
+			AudioManager.play_sfx("wave")
+			var rise := create_tween()
+			rise.tween_property(s, "modulate:a", 1.0, 0.3)
+			rise.parallel().tween_property(s, "position:y", home.y, 1.0) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			# Schlammtropfen perlen vom aufsteigenden Körper ab
+			for k in 8:
+				var drip := Sprite2D.new()
+				drip.texture = SpriteFactory.circle(3, Color(0.45, 0.8, 0.2))
+				drip.position = home + Vector2(randf_range(-70, 70), randf_range(-60, 40))
+				add_child(drip)
+				var dt := create_tween()
+				dt.tween_interval(randf_range(0.3, 0.9))
+				dt.tween_property(drip, "position:y", drip.position.y + randf_range(60, 130), 0.4) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				dt.parallel().tween_property(drip, "modulate:a", 0.0, 0.4)
+				dt.tween_callback(drip.queue_free)
+			await rise.finished
+			_burst(home + Vector2(0, 70), Color(0.55, 1.0, 0.3), 14, 120)
+			_shake_camera(1.6)
+			var pf := create_tween()
+			pf.tween_interval(0.8)
+			pf.tween_property(pool, "modulate:a", 0.0, 0.8)
+			pf.tween_callback(pool.queue_free)
+	await get_tree().create_timer(0.3).timeout
 
 func _sparkle(pos: Vector2, color: Color) -> void:
 	for i in 8:

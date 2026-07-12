@@ -261,7 +261,7 @@ func _render_song(song: Dictionary) -> AudioStreamWAV:
 	# Optionale Arpeggio-Spur: perlende 16tel für treibende Kampf-Tracks.
 	if song.has("arp"):
 		_render_track(mix, song["arp"], spb, 0.085, "square")
-	_render_track(mix, song["bass"], spb, 0.22, "bass")
+	_render_track(mix, song["bass"], spb, 0.28, "bass")
 	if song.get("drums", "") != "":
 		_render_drums(mix, song["drums"], spb, 0.30)
 	# Zwei Echo-Stufen (punktierte Achtel + Viertel) geben Raumtiefe.
@@ -320,9 +320,11 @@ func _render_track(mix: PackedFloat32Array, notes: Array, spb: float, vol: float
 							v = (4.0 * absf(q1 - 0.5) - 1.0) * 0.6 \
 								+ (4.0 * absf(q2 - 0.5) - 1.0) * 0.5
 						"bass":
-							# Runder Bass: Sinus mit leichtem Dreieck-Obertonanteil.
+							# Runder Bass: Sinus + Dreieck-Oberton + Sub-Oktave
+							# (halbe Frequenz) für spürbares Fundament.
 							v = sin(TAU * ph) * 0.8 \
-								+ (4.0 * absf(fmod(ph, 1.0) - 0.5) - 1.0) * 0.3
+								+ (4.0 * absf(fmod(ph, 1.0) - 0.5) - 1.0) * 0.3 \
+								+ sin(TAU * ph * 0.5) * 0.55
 						"tri":
 							v = 4.0 * absf(fmod(ph, 1.0) - 0.5) - 1.0
 						_:
@@ -426,6 +428,10 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 		"roar":
 			_tone(buf, 130, 35, 0.55, 0.40, "noise")
 			_tone(buf, 90, 45, 0.35, 0.30, "square")
+		"growl":
+			# Leises, tiefes Grollen — der Boss atmet im Hintergrund
+			_tone(buf, 70, 38, 0.60, 0.16, "tri")
+			_tone(buf, 110, 50, 0.40, 0.10, "noise")
 		"summon":
 			# Tiefes Grollen + aufsteigender Beschwörungs-Akkord
 			_tone(buf, 70, 480, 0.55, 0.28, "tri")

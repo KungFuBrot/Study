@@ -32,7 +32,12 @@ const ENEMIES := {
 		"attack_line": "%s wirft sich mit rostigem Schrott auf %s!"},
 	"boss": {"name": "Schlotbaron", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130,
 		"sprite": "boss", "boss": true, "theme": "toxic", "song": "boss",
-		"entrance_line": "Die Schlote speien Gift — der Baron persönlich watet aus dem Schlamm!",
+		"entrance_line": "Der Schlamm brodelt — etwas Riesiges wälzt sich empor!",
+		"intro": [
+			["Schlotbaron", "Wer wagt es, meine Produktion zu stören?!"],
+			["Serena", "Euer Gift verseucht den Fluss von Lindenhain!"],
+			["Schlotbaron", "Gift? Man nennt das FORTSCHRITT. Und jetzt: versinkt im Schlamm!"],
+		],
 		"aoe_name": "Giftflut", "ultimate_name": "Schwarzer Himmel"},
 	# --- Konzernturm: die Kapitalisten ---
 	"gierschlund": {"name": "Gierschlund", "hp": 55, "atk": 18, "def": 5,
@@ -47,7 +52,12 @@ const ENEMIES := {
 		"attack_line": "%s treibt bei %s Schulden ein!"},
 	"boss2": {"name": "Monopolfürst", "hp": 560, "atk": 26, "def": 8, "gold": 1200, "xp": 190,
 		"sprite": "boss2", "boss": true, "theme": "gold", "song": "boss2",
-		"entrance_line": "Zeit ist Geld — und eure Zeit ist hiermit gekündigt!",
+		"entrance_line": "Goldstaub rieselt — die Chefetage fährt persönlich herab!",
+		"intro": [
+			["Monopolfürst", "Besucher! Habt ihr einen Termin? Der kostet extra."],
+			["Rax", "Berechnung abgeschlossen: Eure Bilanz ist ein Verbrechen."],
+			["Monopolfürst", "Alles hier gehört MIR. Auch eure Niederlage — Zeit ist Geld!"],
+		],
 		"aoe_name": "Münzhagel", "ultimate_name": "Feindliche Übernahme"},
 	# --- Hassfestung: die Rassisten und Nationalisten ---
 	"hetzer": {"name": "Hetzer", "hp": 72, "atk": 25, "def": 6,
@@ -65,7 +75,12 @@ const ENEMIES := {
 		"attack_line": "%s schleudert %s einen Fluch aus Hass entgegen!"},
 	"boss3": {"name": "Der Spalter", "hp": 680, "atk": 33, "def": 10, "gold": 900, "xp": 280,
 		"sprite": "boss3", "boss": true, "theme": "hate", "song": "boss3",
-		"entrance_line": "Ihr da! Ihr gehört hier nicht her — die Festung kennt nur Hass!",
+		"entrance_line": "Die Glut verdichtet sich zu einem Schatten — er nimmt Gestalt an!",
+		"intro": [
+			["Der Spalter", "Ihr?! IHR gehört nicht hierher. NIEMAND gehört zu NIEMANDEM!"],
+			["Milo", "Dein Hass endet heute. Lindenhain steht zusammen — alle."],
+			["Der Spalter", "Zusammen?! Ich SPALTE euch wie morsches Holz!"],
+		],
 		"aoe_name": "Hasstirade", "ultimate_name": "Mauer des Hasses"},
 }
 
