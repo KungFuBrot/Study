@@ -681,6 +681,50 @@ static func rocket(frame: int) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## Unregelmäßiger Gesteinsbrocken für den Meteorregen: grauer Fels mit
+## Poren, Lichtkante oben rechts und glühendem Saum unten links (Flugfront).
+static func meteor_rock(variant: int) -> Texture2D:
+	var key := "meteor_%d" % (variant % 4)
+	if _cache.has(key):
+		return _cache[key]
+	var base := Color(0.42, 0.38, 0.35); var dark := Color(0.26, 0.23, 0.21)
+	var lite := Color(0.58, 0.54, 0.50); var glow := Color(1.0, 0.55, 0.15)
+	var w := 16; var hh := 13
+	var img := _img(w, hh)
+	var rs := RandomNumberGenerator.new()
+	rs.seed = 991 + variant
+	for y in hh:
+		for x in w:
+			var dx := (x - w * 0.5 + 0.5) / (w * 0.46)
+			var dy := (y - hh * 0.5 + 0.5) / (hh * 0.46)
+			var edge := dx * dx + dy * dy + rs.randf_range(-0.16, 0.16)
+			if edge <= 1.0:
+				var c := base
+				if rs.randf() < 0.18:
+					c = dark
+				elif dx * 0.6 - dy * 0.8 > 0.35:
+					c = lite  # Licht von oben rechts
+				img.set_pixel(x, y, c)
+	# Poren/Krater
+	for i in 3 + variant % 2:
+		var px := rs.randi_range(3, w - 4)
+		var py := rs.randi_range(3, hh - 4)
+		img.set_pixel(px, py, dark)
+		img.set_pixel(px + 1, py, dark)
+	# Glutsaum unten links (in Flugrichtung)
+	for y in hh:
+		for x in w:
+			if img.get_pixel(x, y).a > 0:
+				var lx := x - 1; var ly := y + 1
+				var open_l := lx < 0 or img.get_pixel(lx, y).a == 0.0
+				var open_b := ly >= hh or img.get_pixel(x, ly).a == 0.0
+				if open_l or open_b:
+					if (x + y * 2) % 3 != 0:
+						img.set_pixel(x, y, glow)
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
 ## Fallende Fliegerbombe (Spitze unten), rot blinkendes Zünderlicht.
 static func bomb(frame: int) -> Texture2D:
 	var key := "bomb_%d" % (frame % 2)

@@ -10,6 +10,12 @@ signal _choice_made
 
 const BAR_W := 170
 const WEAPON_REST := -0.35  # Ruhewinkel der Waffe (leicht zum Gegner geneigt)
+# Griffposition (Faust) und Ruhewinkel pro Held — Schwert kampfbereit
+# geneigt, Stab aufrecht neben dem Körper aufgesetzt.
+const WEAPON_GRIP := {
+	"serena": {"pos": Vector2(-5, 4), "rest": -0.35},
+	"milo": {"pos": Vector2(-6, 2), "rest": 0.18},
+}
 
 # Kampf-Aufstellung (Zickzack in der Tiefe): Serena vordere Reihe oben,
 # Milo hintere Reihe Mitte (weiter rechts + kleiner → Tiefe), Rax vordere
@@ -83,6 +89,13 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.42).timeout
 	_snap(dir, "show_attack")
 	await get_tree().create_timer(1.2).timeout
+	# Serena Fokusstoß (Durchstöße + Kreuzschnitt)
+	_pierce(heroes[0], heroes[0]["data"]["abilities"][1], enemies[1])
+	await get_tree().create_timer(1.25).timeout
+	_snap(dir, "show_pierce_1")
+	await get_tree().create_timer(0.5).timeout
+	_snap(dir, "show_pierce_2")
+	await get_tree().create_timer(1.3).timeout
 	# Milo Feuerball (Explosion einfangen)
 	_fireball(heroes[1], heroes[1]["data"]["abilities"][0], enemies[0])
 	await get_tree().create_timer(1.85).timeout
@@ -122,6 +135,21 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.0).timeout
 	_snap(dir, "show_leviathan_3")
 	await get_tree().create_timer(2.5).timeout
+	# Milo Meteorregen (Gesteinsbrocken über dem ganzen Feld)
+	_ultimate_milo(heroes[1])
+	await get_tree().create_timer(2.1).timeout
+	_snap(dir, "show_meteor_1")
+	await get_tree().create_timer(0.6).timeout
+	_snap(dir, "show_meteor_2")
+	await get_tree().create_timer(2.4).timeout
+	# Übungsgegner wiederbeleben, damit die Atombombe Ziele hat
+	for e in enemies:
+		e["alive"] = true
+		e["hp"] = 999
+		var esp: Sprite2D = e["sprite"]
+		esp.visible = true
+		esp.material = null
+		esp.modulate = Color.WHITE
 	# Rax Atombombe zuletzt — sie reißt vermutlich alle Übungsgegner um.
 	_nuke(heroes[2], heroes[2]["data"]["abilities"][2])
 	await get_tree().create_timer(1.3).timeout
@@ -295,6 +323,10 @@ func _build_scene() -> void:
 			{"pos": Vector2(700 + (i % 2) * 60, 170 + i * 78), "scale": 4.0})
 		var hscale: float = form["scale"]
 		s.scale = Vector2(hscale, hscale)
+		# Kanonische Größe festhalten: alle Squash-/Pose-Tweens lesen sie von
+		# hier statt von s.scale — sonst friert ein überlappender Tween einen
+		# gestauchten Wert als "Normalgröße" ein und die Figur driftet.
+		s.set_meta("base_scale", s.scale)
 		s.flip_h = true  # DTII-Figuren blicken nach rechts → zum Gegner (links) drehen
 		var home: Vector2 = form["pos"]
 		s.position = home + Vector2(340, 0)
@@ -313,6 +345,7 @@ func _build_scene() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
 		s.scale = Vector2(6, 6) if is_boss else Vector2(6.5, 6.5)
+		s.set_meta("base_scale", s.scale)
 		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
 		var refl: Sprite2D
@@ -401,8 +434,11 @@ func _attach_weapon(s: Sprite2D, hero_id: String) -> Sprite2D:
 	# Textur-Ende) wird per offset zum Drehpunkt: die Waffe schwingt um die
 	# Faust statt um die Klingenmitte.
 	w.offset = Vector2(0, -tex.get_height() * 0.5 + 3.0)
-	w.position = Vector2(-7, 3)
-	w.rotation = WEAPON_REST
+	var grip: Dictionary = WEAPON_GRIP.get(hero_id, {"pos": Vector2(-7, 3), "rest": WEAPON_REST})
+	w.position = grip["pos"]
+	w.rotation = grip["rest"]
+	w.set_meta("rest", grip["rest"])
+	w.set_meta("grip_x", (grip["pos"] as Vector2).x)
 	w.scale = Vector2(0.85, 0.85)
 	w.z_index = 1
 	s.add_child(w)
@@ -1204,8 +1240,12 @@ func _menu_move(delta: int) -> void:
 ## ---------- Aktionen & Effekte ----------
 
 ## Kurzer Sprint mit Lauf-Frames (DTII-run bzw. Rax-Schwebe-Dash) + Geistertrail.
+## Der agierende Held zeichnet über seinen Nachbarn (z_index 2) — sonst
+## verdeckt z. B. Rax den vortretenden Zauberer; zu Hause gilt wieder die
+## Aufstellungsreihenfolge.
 func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	var s: Sprite2D = h["sprite"]
+	s.z_index = 2
 	h["anim"] = "run"
 	var frames := create_tween().set_loops()
 	frames.tween_interval(0.06)
@@ -1220,13 +1260,15 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	frames.kill()
 	h["anim"] = "idle"
 	s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle")
+	if to.is_equal_approx(h["home"]):
+		s.z_index = 0
 
 func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
 	_say("%s greift an!" % h["data"]["name"])
-	var base: Vector2 = s.scale
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	# 1) Ausholen: zurücklehnen, Waffe über die Schulter reißen (Anticipation).
 	var wind := create_tween()
 	wind.tween_property(s, "rotation", 0.16, 0.13) \
@@ -1242,9 +1284,10 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	lean.tween_property(s, "rotation", -0.10, 0.16)
 	lean.parallel().tween_property(s, "scale", base, 0.16)
 	await _sprint(h, strike_pos, 0.16)
-	# 3) Durchziehen: Waffe schwingt in einem Ruck durch den Gegner,
-	# der Körper macht einen Ausfallschritt hinterher.
+	# 3) Durchziehen: Waffe schwingt in einem Ruck durch den Gegner (mit
+	# Nachbildern), der Körper macht einen Ausfallschritt hinterher.
 	if wp != null:
+		_weapon_trail(wp, 0.12)
 		var swing := create_tween()
 		swing.tween_property(wp, "rotation", -1.9, 0.08) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -1267,7 +1310,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	settle.tween_property(s, "rotation", 0.0, 0.18) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if wp != null:
-		settle.parallel().tween_property(wp, "rotation", WEAPON_REST, 0.18)
+		settle.parallel().tween_property(wp, "rotation", wp.get_meta("rest", WEAPON_REST), 0.18)
 	await _sprint(h, h["home"], 0.22)
 	s.rotation = 0.0
 	s.scale = base
@@ -1310,7 +1353,7 @@ func _spell_light(pos: Vector2, color: Color, radius: float, dur: float, energy 
 
 ## Kurze Wirk-Pose: zurücklehnen + strecken, während der Zauberkreis aufleuchtet.
 func _anim_cast(s: Sprite2D) -> void:
-	var base: Vector2 = s.scale
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var tw := create_tween()
 	tw.tween_property(s, "rotation", 0.12, 0.18) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -1331,6 +1374,27 @@ func _strike_offset(e: Dictionary) -> float:
 	var es: Sprite2D = e["sprite"]
 	return es.texture.get_width() * es.scale.x * 0.5 + 30.0
 
+## Beschwörungs-Gemurmel: ein kleiner Mund-Overlay öffnet und schließt sich
+## im Sprechrhythmus auf dem Gesicht des Zauberers (DTII-Sprite hat keine
+## eigenen Gesichts-Frames). Räumt sich nach dur Sekunden selbst weg.
+func _chant(s: Sprite2D, dur: float) -> void:
+	var mouth := Sprite2D.new()
+	mouth.texture = SpriteFactory.circle(2, Color(0.30, 0.10, 0.10))
+	mouth.position = Vector2(-3.0, -3.2)
+	mouth.scale = Vector2(0.6, 0.4)
+	mouth.z_index = 1
+	s.add_child(mouth)
+	var tw := mouth.create_tween().set_loops()
+	tw.tween_property(mouth, "scale", Vector2(0.5, 0.85), 0.09) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(mouth, "scale", Vector2(0.65, 0.3), 0.08) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(mouth, "scale", Vector2(0.55, 0.65), 0.11) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	get_tree().create_timer(dur).timeout.connect(func():
+		if is_instance_valid(mouth):
+			mouth.queue_free())
+
 ## Vorbereitungspose vor einer Fähigkeit (wie beim Roboterlaser): der Held
 ## tritt vor und sammelt sichtbar Kraft — Zauberkreis, aufglühende Aura,
 ## einlaufende Funken, Wirk-Pose, Sammelton. Erst danach folgt die Wirkung.
@@ -1339,6 +1403,8 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 	await _sprint(h, h["home"] + Vector2(-56, 4), 0.18)
 	_cast_circle(s.position + Vector2(0, 40), color)
 	_anim_cast(s)
+	if sfx == "summon":
+		_chant(s, 1.1)  # der Zauberer murmelt die Beschwörungsformel
 	AudioManager.play_sfx(sfx)
 	_spell_light(s.position, color, 150.0, 0.8, 1.0)
 	var mat := CanvasItemMaterial.new()
@@ -1397,9 +1463,7 @@ func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 		if e["alive"]:
 			var dmg: int = int((ab["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
 			await _damage_enemy(e, maxi(dmg, 1))
-	var back := create_tween()
-	back.tween_property(s, "position", h["home"], 0.25)
-	await back.finished
+	await _sprint(h, h["home"], 0.25)
 
 func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
@@ -1465,39 +1529,108 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await _hitstop(0.11)
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
-	var back := create_tween()
-	back.tween_property(s, "position", h["home"], 0.2)
-	await back.finished
+	await _sprint(h, h["home"], 0.2)
 
-## Fokusstoß: schneller Sturmangriff, drei Hiebe, ignoriert die Verteidigung.
+## Nachbilder der Waffe während eines schnellen Schwungs/Stoßes.
+func _weapon_trail(wp: Sprite2D, dur: float) -> void:
+	var steps := maxi(int(dur / 0.03), 2)
+	for i in steps:
+		await get_tree().create_timer(0.03).timeout
+		if not is_instance_valid(wp):
+			return
+		var g := Sprite2D.new()
+		g.texture = wp.texture
+		g.offset = wp.offset
+		g.modulate = Color(0.8, 0.9, 1.0, 0.5)
+		g.z_index = 1
+		add_child(g)
+		g.global_transform = wp.global_transform
+		var gt := g.create_tween()
+		gt.tween_property(g, "modulate:a", 0.0, 0.15)
+		gt.tween_callback(g.queue_free)
+
+## Kreuzschnitt: zwei gegenläufige Lichtklingen reißen über dem Ziel auf.
+func _cross_slash(pos: Vector2) -> void:
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for ang in [-0.6, 0.65]:
+		var blade := Polygon2D.new()
+		blade.polygon = PackedVector2Array([
+			Vector2(-78, -4), Vector2(0, -7), Vector2(78, -4),
+			Vector2(78, 4), Vector2(0, 7), Vector2(-78, 4)])
+		blade.color = Color(1, 1, 1, 0.95)
+		blade.material = mat
+		blade.position = pos
+		blade.rotation = ang
+		blade.scale = Vector2(0.15, 1.0)
+		add_child(blade)
+		var bt := create_tween()
+		bt.tween_property(blade, "scale", Vector2(1.25, 1.0), 0.09) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		bt.tween_property(blade, "modulate:a", 0.0, 0.22)
+		bt.tween_callback(blade.queue_free)
+	_flash_screen(Color(1, 1, 1, 0.30))
+	_burst(pos, Color(1.0, 0.98, 0.85), 14, 190)
+	_spell_light(pos, Color(1.0, 0.95, 0.7), 200.0, 0.4)
+
+## Fokusstoß: Konzentration, drei blitzschnelle Durchstöße quer durch den
+## Gegner (mit Körper- und Waffen-Nachbildern, Seiten im Wechsel), kurze
+## Stille — dann reißt der Kreuzschnitt auf. Ignoriert die Verteidigung.
 func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s setzt %s ein!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
-	# Konzentration vor dem Sturmangriff.
+	var wp: Sprite2D = h["weapon"]
 	await _stance(h, Color(1.0, 0.95, 0.5))
-	var tw := create_tween()
-	tw.tween_property(s, "position", es.position + Vector2(_strike_offset(e), 0), 0.14) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_ghost_trail(s, 0.14)
-	await tw.finished
-	for i in 3:
+	var center: Vector2 = es.position
+	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
+	var passes := [
+		[center + Vector2(96, -10), center + Vector2(-98, 8)],
+		[center + Vector2(-98, 16), center + Vector2(96, -14)],
+		[center + Vector2(98, 12), center + Vector2(-96, -10)],
+	]
+	for p: Array in passes:
+		var from: Vector2 = p[0]
+		var to: Vector2 = p[1]
+		var dir_right: bool = to.x > from.x
+		# Blitz-Reposition zur Startseite, Klinge nach vorn gerichtet.
+		s.position = from
+		s.flip_h = not dir_right
+		if wp != null:
+			wp.position.x = -grip_x if dir_right else grip_x
+			wp.rotation = 1.35 if dir_right else -1.35
+		_burst(from, Color(1.0, 0.98, 0.8, 0.7), 5, 60)
+		var dash := create_tween()
+		dash.tween_property(s, "position", to, 0.11) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_ghost_trail(s, 0.11)
+		if wp != null:
+			_weapon_trail(wp, 0.11)
 		AudioManager.play_sfx("slash")
-		_slash_arc(es.position + Vector2(randf_range(-14, 14), randf_range(-14, 14)))
-		_burst(es.position, Color(1.0, 0.95, 0.6), 7, 110)
-		await get_tree().create_timer(0.11).timeout
+		_slash_arc(center + Vector2(randf_range(-12, 12), randf_range(-12, 12)))
+		_burst(center, Color(1.0, 0.95, 0.6), 7, 110)
+		await dash.finished
+		await get_tree().create_timer(0.05).timeout
+	# Landen, Waffe senken, ein Atemzug Stille ...
+	s.flip_h = true
+	if wp != null:
+		wp.position.x = grip_x
+		wp.rotation = wp.get_meta("rest", WEAPON_REST)
+	s.position = center + Vector2(-96, 0)
+	await get_tree().create_timer(0.26).timeout
+	# ... dann reißt der Kreuzschnitt auf.
+	_cross_slash(center)
+	AudioManager.play_sfx("bigboom")
 	_impact_ring(es.position, Color(1.0, 0.95, 0.5, 0.8))
+	_shake_camera(1.8)
 	var crit := randf() < 0.12
-	await _hitstop(0.11 if crit else 0.06)
+	await _hitstop(0.12 if crit else 0.08)
 	var dmg: int = int((ab["power"] + d["atk"]) * randf_range(0.95, 1.15) * (1.6 if crit else 1.0))
 	if crit:
 		_crit_fx(es.position)
 	await _damage_enemy(e, maxi(dmg, 1))
-	var back := create_tween()
-	back.tween_property(s, "position", h["home"], 0.22) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	await back.finished
+	await _sprint(h, h["home"], 0.22)
 
 ## ---------- Roboter-Held Rax: Laser, Raketen, Orbital-Ultimate ----------
 
@@ -1544,7 +1677,7 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
 	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
-	var base: Vector2 = s.scale
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var snap := create_tween()
 	snap.tween_property(s, "scale", base * Vector2(1.06, 0.94), 0.06)
 	snap.tween_property(s, "scale", base, 0.10) \
@@ -2064,6 +2197,7 @@ func _ultimate_milo(h: Dictionary) -> void:
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
+	_chant(s, 1.3)
 	s.modulate = Color(1.5, 1.2, 1.6)
 	var rise := create_tween()
 	rise.tween_property(s, "position:y", s.position.y - 34.0, 0.6) \
@@ -2075,40 +2209,61 @@ func _ultimate_milo(h: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
-	# Meteore schlagen gestaffelt im Gegnergebiet ein
-	for i in 6:
-		var target: Dictionary = alive[i % alive.size()]
-		var impact: Vector2 = target["sprite"].position + Vector2(randf_range(-50, 50), randf_range(-30, 30))
+	# Gesteinsbrocken prasseln über das GANZE Feld: jeder zweite gezielt auf
+	# einen Gegner, der Rest schlägt wahllos zwischen den Reihen ein.
+	for i in 13:
+		var impact: Vector2
+		if i % 2 == 0 and alive.size() > 0:
+			var target: Dictionary = alive[(i / 2) % alive.size()]
+			impact = target["sprite"].position + Vector2(randf_range(-40, 40), randf_range(-24, 24))
+		else:
+			impact = Vector2(randf_range(60, 900), randf_range(230, 390))
+		var big := randf_range(2.2, 3.8)  # Brocken unterschiedlicher Größe
 		var meteor := Sprite2D.new()
-		meteor.texture = SpriteFactory.circle(12, Color(1.0, 0.45, 0.1))
-		var core := Sprite2D.new()
-		core.texture = SpriteFactory.circle(6, Color(1.0, 0.9, 0.5))
-		meteor.add_child(core)
+		meteor.texture = SpriteFactory.meteor_rock(i)
+		meteor.scale = Vector2(big, big)
+		meteor.rotation = randf_range(-0.4, 0.4)
+		# Feuerschweif: additive Flamme, die dem Brocken nach oben rechts folgt
+		var tail := Sprite2D.new()
+		tail.texture = SpriteFactory.particle("flame_05")
+		tail.rotation = PI * 0.25  # zeigt nach oben rechts (gegen Flugrichtung)
+		tail.position = Vector2(14, -12)
+		tail.scale = Vector2(0.2, 0.45)
+		tail.modulate = Color(1.0, 0.6, 0.2, 0.9)
+		var tmat := CanvasItemMaterial.new()
+		tmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		tail.material = tmat
+		meteor.add_child(tail)
 		var trail := CPUParticles2D.new()
-		trail.amount = 20
-		trail.lifetime = 0.3
+		trail.amount = 18
+		trail.lifetime = 0.4
 		trail.direction = Vector2(1, -1)
-		trail.spread = 20.0
+		trail.spread = 24.0
 		trail.gravity = Vector2.ZERO
-		trail.initial_velocity_min = 60.0
-		trail.initial_velocity_max = 120.0
-		trail.scale_amount_min = 0.6
-		trail.scale_amount_max = 1.4
-		trail.color = Color(1.0, 0.55, 0.1, 0.85)
-		trail.texture = SpriteFactory.circle(4, Color.WHITE)
+		trail.initial_velocity_min = 50.0
+		trail.initial_velocity_max = 110.0
+		trail.scale_amount_min = 0.06
+		trail.scale_amount_max = 0.14
+		trail.color = Color(1.0, 0.55, 0.1, 0.8)
+		trail.texture = SpriteFactory.particle("smoke_07")
 		meteor.add_child(trail)
-		meteor.position = impact + Vector2(randf_range(120, 260), -420)
+		meteor.position = impact + Vector2(randf_range(140, 300), -440)
 		add_child(meteor)
-		AudioManager.play_sfx("meteor")
+		if i % 2 == 0:
+			AudioManager.play_sfx("meteor")
+		var dur := randf_range(0.34, 0.48)
 		var fall := create_tween()
-		fall.tween_property(meteor, "position", impact, 0.32) \
+		fall.tween_property(meteor, "position", impact, dur) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		# Nur leicht taumeln — der Feuerschweif ist ein Kind und würde bei
+		# starker Drehung plötzlich in Flugrichtung zeigen.
+		fall.parallel().tween_property(meteor, "rotation", meteor.rotation + randf_range(0.25, 0.6), dur)
 		fall.tween_callback(func():
 			meteor.queue_free()
-			_explosion(impact)
+			_explosion(impact, 0.9 + big * 0.16)
 			AudioManager.play_sfx("boom")
 			_shake_camera(1.5))
-		await get_tree().create_timer(0.16).timeout
+		await get_tree().create_timer(0.11).timeout
 	await get_tree().create_timer(0.5).timeout
 	_flash_screen(Color(1.0, 0.6, 0.2, 0.55))
 	AudioManager.play_sfx("bigboom")
@@ -2228,6 +2383,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), org)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
 	_anim_cast(s)
+	_chant(s, 1.8)
 	s.modulate = Color(1.5, 1.2, 0.9)
 	var rise := create_tween()
 	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
@@ -2416,6 +2572,7 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), blue)
 	_cast_circle(s.position + Vector2(0, 40), Color(0.7, 0.95, 1.0))
 	_anim_cast(s)
+	_chant(s, 1.8)
 	s.modulate = Color(0.9, 1.2, 1.6)
 	var rise := create_tween()
 	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
@@ -2562,9 +2719,7 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	_float_text(target["sprite"].position, "+%d" % amount, Color(0.5, 1.0, 0.6))
 	_refresh_party()
 	await get_tree().create_timer(0.7).timeout
-	var back := create_tween()
-	back.tween_property(s, "position", h["home"], 0.2)
-	await back.finished
+	await _sprint(h, h["home"], 0.2)
 
 func _enemy_turn(e: Dictionary) -> void:
 	var alive_heroes := []
@@ -2582,7 +2737,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	# In Stellung gehen: zurückweichen, ducken, bedrohlich aufglühen —
 	# erst dann folgt der Sturmangriff (Anticipation wie bei den Helden).
 	var es: Sprite2D = e["sprite"]
-	var base_scale: Vector2 = es.scale
+	var base_scale: Vector2 = es.get_meta("base_scale", es.scale)
 	var ehome: Vector2 = e["home"]
 	var amat := CanvasItemMaterial.new()
 	amat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -2634,9 +2789,10 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 	_say("%s beschwört den %s!" % [e["name"], boss_def["aoe_name"]])
 	AudioManager.play_sfx("roar")
 	var es: Sprite2D = e["sprite"]
+	var ebase: Vector2 = es.get_meta("base_scale", es.scale)
 	var pump := create_tween()
-	pump.tween_property(es, "scale", es.scale * 1.25, 0.35).set_trans(Tween.TRANS_QUAD)
-	pump.tween_property(es, "scale", es.scale, 0.15)
+	pump.tween_property(es, "scale", ebase * 1.25, 0.35).set_trans(Tween.TRANS_QUAD)
+	pump.tween_property(es, "scale", ebase, 0.15)
 	await pump.finished
 	_flash_screen(Color(0.3, 0.7, 1.0, 0.40) if frost else Color(1.0, 0.15, 0.1, 0.40))
 	AudioManager.play_sfx("bigboom")
@@ -2844,7 +3000,7 @@ func _shake(s: Sprite2D) -> void:
 	flash.tween_property(s, "modulate", Fx.hot(Color(1.0, 0.45, 0.4), 1.6), 0.08)
 	flash.tween_property(s, "modulate", Color.WHITE, 0.15)
 	# Quetsch-Impuls + Rotations-Wobble verkaufen die Wucht des Treffers.
-	var base: Vector2 = s.scale
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var squash := create_tween()
 	squash.tween_property(s, "scale", base * Vector2(1.12, 0.88), 0.06)
 	squash.tween_property(s, "scale", base, 0.14) \
