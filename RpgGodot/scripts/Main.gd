@@ -23,15 +23,20 @@ func _ready() -> void:
 	# Bildschirm-Steuerung für Geräte ohne Tastatur (Web/Touch); bleibt über
 	# allen Szenen bestehen und speist die Input-Actions ein.
 	add_child(TouchControls.new())
-	goto_map("town", "start")
-	if OS.get_environment("SHOT") != "":
-		_shot_tour()
-	elif OS.get_environment("SPELLSHOT") != "":
+	if OS.get_environment("SPELLSHOT") != "":
+		goto_map("town", "start")
 		await get_tree().create_timer(0.5).timeout
 		start_battle(["slime", "bat", "skeleton"], "dungeon", Vector2i(4, 10))
+	else:
+		show_title()
+		if OS.get_environment("SHOT") != "":
+			_shot_tour()
 
 ## Temporärer Debug-Rundgang: Screenshots von Feld und Bosskampf (env SHOT=Zielordner).
 func _shot_tour() -> void:
+	await get_tree().create_timer(2.0).timeout
+	_snap("title")
+	goto_map("town", "start")
 	await get_tree().create_timer(2.0).timeout
 	_snap("town")
 	goto_map("world", "from_town")
@@ -121,6 +126,20 @@ func _show_ending() -> void:
 	await _fade(0.0, 0.8)
 
 func _on_ending_restart() -> void:
+	show_title()
+
+## Blendet den Titelbildschirm ein (Spielstart und nach dem Abspann).
+func show_title() -> void:
+	await _fade(1.0, 0.25)
+	_clear_screen()
+	var title := Title.new()
+	title.start_game.connect(_on_title_start)
+	add_child(title)
+	current_screen = title
+	AudioManager.play_music("title")
+	await _fade(0.0, 0.5)
+
+func _on_title_start() -> void:
 	GameState.reset_all()
 	goto_map("town", "start")
 
