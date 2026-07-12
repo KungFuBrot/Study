@@ -944,6 +944,29 @@ func _start_idle_animations() -> void:
 		tw.tween_callback(glint.queue_free))
 	add_child(glint_timer)
 
+## Idle-Wippen zentral anhalten/neustarten — verhindert, dass ein laufender
+## Bob-Loop in Dash-/Teleport-Animationen hineinpfuscht oder doppelt stapelt.
+func _pause_bob(u: Dictionary) -> void:
+	if u.get("bob") != null:
+		(u["bob"] as Tween).kill()
+		u["bob"] = null
+
+func _resume_bob(u: Dictionary, period: float) -> void:
+	_pause_bob(u)
+	u["bob"] = _idle_bob(u["sprite"], period)
+
+## Ein wiederbelebter Held rappelt sich auf (Pose + Wippen zurücksetzen).
+func _restore_if_revived(hero: Dictionary) -> void:
+	if hero["data"]["hp"] <= 0:
+		return
+	var s: Sprite2D = hero["sprite"]
+	if absf(s.rotation) > 0.01 or s.modulate.a < 0.95:
+		var tw := create_tween()
+		tw.tween_property(s, "rotation", 0.0, 0.35) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(s, "modulate", Color.WHITE, 0.35)
+		_resume_bob(hero, 2.0)
+
 func _idle_bob(s: Sprite2D, period: float) -> Tween:
 	var tw := create_tween().set_loops()
 	tw.tween_property(s, "position:y", s.position.y - 4.0, period * 0.5) \
@@ -1217,7 +1240,9 @@ func _hero_turn(h: Dictionary) -> bool:
 			0:
 				var t := await _pick_enemy()
 				if t < 0: continue
+				_pause_bob(h)
 				await _hero_attack(h, enemies[t])
+				_resume_bob(h, 2.0)
 				return false
 			1:
 				var used_ab: bool = await _ability_menu(h)
@@ -1304,25 +1329,32 @@ func _ability_menu(h: Dictionary) -> bool:
 		"all":
 			d["mp"] -= ab["cost"]
 			_refresh_party()
+			_pause_bob(h)
 			match ab["kind"]:
 				"rocket": await _rocket_all(h, ab)
 				"nuke": await _nuke(h, ab)
 				_: await _whirl_all(h, ab)
+			_resume_bob(h, 2.0)
 		"one":
 			var t: int = await _pick_enemy()
 			if t < 0: return false
 			d["mp"] -= ab["cost"]
 			_refresh_party()
+			_pause_bob(h)
 			match ab["kind"]:
 				"magic": await _fireball(h, ab, enemies[t])
 				"beam": await _laser(h, ab, enemies[t])
 				"dance": await _blade_dance(h, ab, enemies[t])
 				_: await _pierce(h, ab, enemies[t])
+			_resume_bob(h, 2.0)
 		"ally":
 			var a: int = await _menu(_ally_entries(), h)
 			d["mp"] -= ab["cost"]
 			_refresh_party()
+			_pause_bob(h)
 			await _heal_ally(h, ab, heroes[a])
+			_resume_bob(h, 2.0)
+			_restore_if_revived(heroes[a])
 	return true
 
 ## Auswahl-Einträge „Für <Name>" für alle Party-Mitglieder (beliebige Größe).
@@ -1434,6 +1466,8 @@ func _item_menu(h: Dictionary) -> bool:
 	GameState.use_item(item_name)
 	td["hp"] = mini(td["hp"] + item["hp"], td["max_hp"])
 	td["mp"] = mini(td["mp"] + item["mp"], td["max_mp"])
+	# Falls das Item einen Gefallenen zurückholt: aufrappeln lassen.
+	_restore_if_revived(heroes[target])
 	AudioManager.play_sfx("heal")
 	_sparkle(heroes[target]["sprite"].position, Color(0.4, 1.0, 0.5))
 	_float_text(heroes[target]["sprite"].position, "+" + item_name, Color(0.5, 1.0, 0.6))
@@ -2382,7 +2416,7 @@ func _ultimate_rax(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	_say("%s aktiviert sein Overload-Protokoll!" % d["name"])
-	if h.has("bob"):
+	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.55)
 	AudioManager.play_sfx("ult_charge")
@@ -2461,7 +2495,7 @@ func _ultimate_serena(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	_say("%s entfesselt ihre ultimative Kraft!" % d["name"])
-	if h.has("bob"):
+	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.55)
 	AudioManager.play_sfx("ult_charge")
@@ -2528,7 +2562,7 @@ func _ultimate_milo(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	_say("%s entfesselt seine ultimative Kraft!" % d["name"])
-	if h.has("bob"):
+	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.55)
 	AudioManager.play_sfx("ult_charge")
@@ -2713,7 +2747,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var org := Color(1.0, 0.55, 0.15)
 	_say("%s beschwört %s!" % [d["name"], sm["name"]])
-	if h.has("bob"):
+	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.65)
 	AudioManager.play_sfx("ult_charge")
@@ -2902,7 +2936,7 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var blue := Color(0.4, 0.8, 1.0)
 	_say("%s beschwört %s!" % [d["name"], sm["name"]])
-	if h.has("bob"):
+	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.6)
 	AudioManager.play_sfx("ult_charge")
@@ -3066,10 +3100,15 @@ func _enemy_turn(e: Dictionary) -> void:
 	if alive_heroes.is_empty():
 		return
 	e["acts"] += 1
+	# Wippen anhalten, solange der Gegner agiert (sonst kämpft der Bob-Loop
+	# gegen die Angriffs-Tweens um die Position).
+	_pause_bob(e)
+	var bob_period := 1.9 if e["is_boss"] else 1.6
 	# In der Wut-Phase entfesselt der Boss einmalig seine Ultimative.
 	if e["is_boss"] and e["enraged"] and not e.get("ult_used", false):
 		e["ult_used"] = true
 		await _boss_ultimate(e, alive_heroes)
+		_resume_bob(e, bob_period)
 		return
 	# In Stellung gehen: zurückweichen, ducken, bedrohlich aufglühen —
 	# erst dann folgt der Sturmangriff (Anticipation wie bei den Helden).
@@ -3102,6 +3141,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	await windup.finished
 	if e["is_boss"] and e["acts"] % 3 == 0:
 		await _boss_aoe(e, alive_heroes)
+		_resume_bob(e, bob_period)
 		return
 	var target: Dictionary = alive_heroes[randi() % alive_heroes.size()]
 	var line: String = e.get("attack_line", "")
@@ -3112,6 +3152,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	# Fernkämpfer werfen ihr Fraktions-Geschoss statt zu stürmen.
 	if e.get("proj", "") != "":
 		await _enemy_ranged(e, target)
+		_resume_bob(e, bob_period)
 		await get_tree().create_timer(0.25).timeout
 		return
 	var tw := create_tween()
@@ -3127,6 +3168,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	var back := create_tween()
 	back.tween_property(es, "position", e["home"], 0.25).set_trans(Tween.TRANS_QUAD)
 	await back.finished
+	_resume_bob(e, bob_period)
 	await get_tree().create_timer(0.25).timeout
 
 ## Bézier-Bogenflug für Wurfgeschosse (tween_method-Helfer).
@@ -3593,7 +3635,11 @@ func _ult_mauer(targets: Array) -> void:
 		ft.parallel().tween_property(frag, "modulate:a", 0.0, 0.35)
 		ft.tween_callback(frag.queue_free)
 	wall.queue_free()
-	dust.queue_free()
+	# Staub sanft auslaufen lassen statt hart zu löschen.
+	dust.emitting = false
+	var df := create_tween()
+	df.tween_interval(1.2)
+	df.tween_callback(dust.queue_free)
 	await get_tree().create_timer(0.5).timeout
 
 func _damage_hero(target: Dictionary, dmg: int) -> void:
@@ -3603,6 +3649,8 @@ func _damage_hero(target: Dictionary, dmg: int) -> void:
 	_shake_camera()
 	_refresh_party()
 	if target["data"]["hp"] <= 0:
+		# Gefallene wippen nicht mehr — sonst „atmet" der Ohnmächtige weiter.
+		_pause_bob(target)
 		var faint := create_tween()
 		faint.tween_property(target["sprite"], "modulate", Color(0.4, 0.4, 0.55, 0.6), 0.4)
 		faint.parallel().tween_property(target["sprite"], "rotation", -PI / 2, 0.4)
@@ -3616,6 +3664,7 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 		_refresh_boss_bar(e)
 	if e["hp"] <= 0:
 		e["alive"] = false
+		_pause_bob(e)
 		if e["is_boss"]:
 			await _boss_death(e)
 			return

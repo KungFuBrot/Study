@@ -213,7 +213,9 @@ const SONGS := {
 func _ready() -> void:
 	music_player = AudioStreamPlayer.new()
 	music_player.bus = "Master"
-	music_player.volume_db = -8.0
+	# Echte Musikstücke sind kräftiger gemastert als der Synth — etwas leiser
+	# fahren, damit die SFX durchkommen.
+	music_player.volume_db = -9.0
 	add_child(music_player)
 	for i in 6:
 		var p := AudioStreamPlayer.new()
@@ -221,8 +223,24 @@ func _ready() -> void:
 		add_child(p)
 		sfx_players.append(p)
 
+## Echte Musikstücke (CC0, Juhani Junkala — siehe assets/music/LICENSE.txt).
+## Wo eine Datei existiert, spielt sie; sonst greift der Chiptune-Synth
+## (z. B. für die kurzen Sieg-/Niederlage-Jingles).
+const MUSIC_DIR := "res://assets/music/"
+
 func play_music(id: String) -> void:
-	if not SONGS.has(id) or id == current_music:
+	if id == current_music:
+		return
+	var path := MUSIC_DIR + id + ".ogg"
+	if ResourceLoader.exists(path):
+		current_music = id
+		var stream: AudioStream = load(path)
+		if stream is AudioStreamOggVorbis:
+			stream.loop = true
+		music_player.stream = stream
+		music_player.play()
+		return
+	if not SONGS.has(id):
 		return
 	current_music = id
 	if not _music_cache.has(id):

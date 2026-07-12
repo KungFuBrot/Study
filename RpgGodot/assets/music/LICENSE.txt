@@ -1,0 +1,24 @@
+Musik: "JRPG Music Packs" #1-#5 von Juhani Junkala (SubspaceAudio)
+Lizenz: CC0 1.0 (Public Domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Quellen:
+- https://opengameart.org/content/jrpg-pack-1-exploration
+- https://opengameart.org/content/jrpg-pack-2-towns
+- https://opengameart.org/content/jrpg-pack-3-evil
+- https://opengameart.org/content/jrpg-pack-4-calm
+- https://opengameart.org/content/jrpg-pack-5-action
+
+Zuordnung (Originaltitel):
+- title.ogg    = Calm1 - A Place I Call Home
+- town.ogg     = Town1 - Home Town
+- world.ogg    = Exploration1 - Grasslands
+- dungeon.ogg  = Exploration2 - Military Base
+- dungeon2.ogg = Exploration5 - Sneaking Around
+- dungeon3.ogg = Evil2 - Catacombs
+- battle.ogg   = Action3 - Preparing For Battle
+- boss.ogg     = Evil1 - Ancient Evil Awakens
+- boss2.ogg    = Action2 - Army Approaching
+- boss3.ogg    = Evil3 - Apocalypse
+- ending.ogg   = Calm3 - Peaceful Days
+
+Vielen Dank an Juhani Junkala für die großartige Musik!
