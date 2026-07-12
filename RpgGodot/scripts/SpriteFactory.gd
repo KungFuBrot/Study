@@ -51,6 +51,38 @@ const FIELD_DTII := {
 }
 const FIELD_SPRITE_H := 28  # DTII-Figurenhöhe (für die Bodenausrichtung im Feld)
 
+## ---------- Kenney Particle Pack (CC0): weiche Rauch-/Feuer-/Blitztexturen ----------
+
+const KPART := "res://assets/kenney/particles/"
+
+static func particle(name: String) -> Texture2D:
+	var key := "kp_" + name
+	if _cache.has(key):
+		return _cache[key]
+	var t: Texture2D = load(KPART + name + ".png")
+	_cache[key] = t
+	return t
+
+## Fels-/Bodenrauschen (FastNoiseLite-FBM): organische Struktur statt
+## flacher Verläufe. Klein rendern und hochskalieren (linear) = weich.
+static func noise_texture(w: int, h: int, dark: Color, base: Color, nseed: int, freq := 0.05) -> Texture2D:
+	var key := "noise_%d_%d_%d_%f" % [w, h, nseed, freq]
+	if _cache.has(key):
+		return _cache[key]
+	var n := FastNoiseLite.new()
+	n.seed = nseed
+	n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n.fractal_octaves = 4
+	n.frequency = freq
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for y in h:
+		for x in w:
+			var v := (n.get_noise_2d(x, y) + 1.0) * 0.5
+			img.set_pixel(x, y, dark.lerp(base, v))
+	var t := ImageTexture.create_from_image(img)
+	_cache[key] = t
+	return t
+
 ## ---------- Kenney Roguelike/RPG Pack (CC0) für Überwelt-Bodenkacheln ----------
 
 const KENNEY_SHEET := "res://assets/kenney/roguelikeSheet.png"
@@ -606,26 +638,45 @@ static func robot_battle_pose(pose: String, frame: int) -> Texture2D:
 	_cache[key] = t
 	return t
 
-## Kleine Rakete (blickt nach rechts, Drehung übernimmt die Flugbahn);
-## 2 Abgas-Frames für flackernden Schub.
+## Richtige Rakete (blickt nach rechts, Drehung übernimmt die Flugbahn):
+## Metallrumpf mit Lichtkante, roter Bugkegel, Leitwerk, Ring-Details;
+## 2 Abgas-Frames — der große weiche Feuerschweif kommt zur Laufzeit
+## als additives Kenney-Flammen-Sprite dazu.
 static func rocket(frame: int) -> Texture2D:
 	var key := "rocket_%d" % (frame % 2)
 	if _cache.has(key):
 		return _cache[key]
-	var body := Color(0.82, 0.84, 0.88); var dark := Color(0.45, 0.48, 0.55)
-	var nose := Color(0.90, 0.25, 0.18); var fin := Color(0.96, 0.63, 0.22)
-	var img := _img(14, 6)
-	img.fill_rect(Rect2i(4, 2, 7, 2), body)
-	img.fill_rect(Rect2i(4, 3, 7, 1), dark)
-	img.fill_rect(Rect2i(11, 2, 2, 2), nose)
-	img.set_pixel(13, 2, nose); img.set_pixel(13, 3, nose)
-	img.fill_rect(Rect2i(3, 1, 2, 1), fin); img.fill_rect(Rect2i(3, 4, 2, 1), fin)
-	img.fill_rect(Rect2i(3, 2, 1, 2), dark)
+	var hull := Color(0.80, 0.82, 0.87); var lite := Color(0.95, 0.96, 1.0)
+	var dark := Color(0.42, 0.45, 0.53); var joint := Color(0.25, 0.27, 0.33)
+	var nose := Color(0.85, 0.22, 0.16); var nose_l := Color(1.0, 0.45, 0.35)
+	var fin := Color(0.55, 0.58, 0.66)
+	var img := _img(22, 10)
+	# Rumpf (leicht spindelförmig): Mitte 4px hoch, Enden 2px
+	img.fill_rect(Rect2i(5, 3, 11, 4), hull)
+	img.fill_rect(Rect2i(5, 3, 11, 1), lite)      # Lichtkante oben
+	img.fill_rect(Rect2i(5, 6, 11, 1), dark)      # Schattenkante unten
+	# Bugkegel (zugespitzt)
+	img.fill_rect(Rect2i(16, 3, 2, 4), nose)
+	img.fill_rect(Rect2i(16, 3, 2, 1), nose_l)
+	img.fill_rect(Rect2i(18, 4, 2, 2), nose)
+	img.set_pixel(20, 4, nose); img.set_pixel(20, 5, nose)
+	img.set_pixel(21, 4, nose_l)
+	# Trennring + Bullauge
+	img.fill_rect(Rect2i(15, 3, 1, 4), joint)
+	img.set_pixel(12, 4, Color(0.45, 0.96, 1.0)); img.set_pixel(12, 5, Color(0.25, 0.6, 0.75))
+	# Leitwerk hinten (oben/unten ausgestellt)
+	img.fill_rect(Rect2i(4, 1, 3, 2), fin); img.set_pixel(4, 0, fin)
+	img.fill_rect(Rect2i(4, 7, 3, 2), fin); img.set_pixel(4, 9, fin)
+	img.fill_rect(Rect2i(5, 2, 2, 1), dark); img.fill_rect(Rect2i(5, 7, 2, 1), dark)
+	# Heckplatte + Düse
+	img.fill_rect(Rect2i(4, 3, 1, 4), joint)
+	img.fill_rect(Rect2i(3, 4, 1, 2), joint)
+	# Abgas-Kern direkt an der Düse (2 Frames, der weiche Rest ist Laufzeit-FX)
 	if frame % 2 == 0:
-		img.fill_rect(Rect2i(0, 2, 3, 2), Color(1.0, 0.78, 0.25))
-		img.set_pixel(0, 2, Color(1.0, 0.45, 0.15))
+		img.fill_rect(Rect2i(1, 4, 2, 2), Color(1.0, 0.85, 0.35))
+		img.set_pixel(0, 4, Color(1.0, 0.55, 0.15)); img.set_pixel(0, 5, Color(1.0, 0.55, 0.15))
 	else:
-		img.fill_rect(Rect2i(1, 2, 2, 2), Color(1.0, 0.55, 0.18))
+		img.fill_rect(Rect2i(1, 4, 2, 2), Color(1.0, 0.62, 0.2))
 	var t := _tex(_outlined(img))
 	_cache[key] = t
 	return t

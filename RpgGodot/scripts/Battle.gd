@@ -184,6 +184,18 @@ func _build_scene() -> void:
 	bg.scale = Vector2(960.0 / 8, 540.0 / 64)
 	bg.z_index = -20
 	add_child(bg)
+	# Felswand mit echter Struktur hinter den Silhouetten: FastNoiseLite-FBM
+	# statt flachem Verlauf — die Fackeln haben damit etwas zu beleuchten.
+	var wall := Sprite2D.new()
+	wall.texture = SpriteFactory.noise_texture(240, 100,
+		pal["bg_bottom"], (pal["stal"] as Color).lightened(0.18), 7, 0.06)
+	wall.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	wall.centered = false
+	wall.scale = Vector2(4, 4)
+	wall.position = Vector2(0, -20)
+	wall.z_index = -19
+	wall.modulate = Color(1, 1, 1, 0.62)
+	add_child(wall)
 	# Drei Tiefen-Silhouetten-Ebenen mit langsamem Sinus-Drift: ferne Ebene
 	# hell/dunstig Richtung Himmel, nahe Ebene dunkel — Faux-Parallax.
 	var stal_col: Color = pal["stal"]
@@ -224,12 +236,35 @@ func _build_scene() -> void:
 	floor_s.scale = Vector2(960.0 / 8, 200.0 / 32)
 	floor_s.z_index = -12
 	add_child(floor_s)
+	# Bodenstruktur: felsiges Rauschen über dem Verlauf (halbtransparent)
+	var floor_tex := Sprite2D.new()
+	floor_tex.texture = SpriteFactory.noise_texture(240, 50,
+		(pal["floor_bottom"] as Color).darkened(0.25),
+		(pal["floor_top"] as Color).lightened(0.08), 11, 0.09)
+	floor_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	floor_tex.centered = false
+	floor_tex.position = Vector2(0, 340)
+	floor_tex.scale = Vector2(4, 4)
+	floor_tex.z_index = -12
+	floor_tex.modulate = Color(1, 1, 1, 0.55)
+	add_child(floor_tex)
 	for i in 24:
 		var stone := Sprite2D.new()
 		stone.texture = SpriteFactory.circle(3 + (i % 4), pal["stone"])
 		stone.position = Vector2(40 + i * 39.0, 350 + fmod(i * 61.3, 160.0))
 		stone.z_index = -11
 		add_child(stone)
+	# Verstreute Requisiten machen den Boden glaubwürdig (Knochen/Risse/Eis).
+	var prop_kinds: Array = ["icecrack", "pebble", "crack"] if arena_theme == "frost" \
+		else ["bones", "crack", "pebble"]
+	for i in 6:
+		var pr := Sprite2D.new()
+		pr.texture = SpriteFactory.prop(prop_kinds[i % prop_kinds.size()])
+		pr.position = Vector2(60 + fmod(i * 157.0, 840.0), 365 + fmod(i * 83.0, 140.0))
+		pr.scale = Vector2(3, 3)
+		pr.z_index = -10
+		pr.modulate = Color(0.9, 0.88, 0.9)
+		add_child(pr)
 	_add_torch(Vector2(70, 160), pal)
 	_add_torch(Vector2(890, 160), pal)
 	# Weiches Fülllicht über der Gegnerseite: die Torches stehen am Rand,
@@ -463,9 +498,29 @@ func _add_torch(pos: Vector2, pal: Dictionary) -> void:
 	light.position = pos + Vector2(0, -14)
 	add_child(light)
 	Fx.flicker(light, 1.0)
+	# Echte, züngelnde Flamme: additives Kenney-Flammen-Sprite, das im
+	# Flackertakt Höhe und Neigung wechselt.
+	var tongue := Sprite2D.new()
+	tongue.texture = SpriteFactory.particle("flame_02")
+	tongue.position = pos + Vector2(0, -22)
+	tongue.scale = Vector2(0.14, 0.16)
+	tongue.modulate = Color(pal["flame"], 0.95)
+	tongue.material = mat
+	tongue.z_index = -8
+	add_child(tongue)
+	var lick := tongue.create_tween().set_loops()
+	lick.tween_property(tongue, "scale", Vector2(0.12, 0.19), 0.16) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	lick.parallel().tween_property(tongue, "rotation", 0.10, 0.16)
+	lick.tween_property(tongue, "scale", Vector2(0.15, 0.14), 0.13) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	lick.parallel().tween_property(tongue, "rotation", -0.08, 0.13)
+	lick.tween_property(tongue, "scale", Vector2(0.13, 0.17), 0.19) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	lick.parallel().tween_property(tongue, "rotation", 0.0, 0.19)
 	var flame := CPUParticles2D.new()
 	flame.position = pos + Vector2(0, -14)
-	flame.amount = 14
+	flame.amount = 10
 	flame.lifetime = 0.7
 	flame.direction = Vector2(0, -1)
 	flame.spread = 16.0
@@ -1315,42 +1370,46 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	# --- Aufladung: eine glühende Feuerkugel wächst in der Hand und pulsiert ---
 	var hand := s.position + Vector2(-44, -4)
 	var ball := Sprite2D.new()
-	ball.texture = SpriteFactory.circle(15, Color(1.0, 0.5, 0.12))
-	ball.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	ball.texture = SpriteFactory.particle("fire_01")
 	ball.position = hand
-	ball.scale = Vector2(0.15, 0.15)
+	ball.scale = Vector2(0.04, 0.04)
 	var bmat := CanvasItemMaterial.new()
 	bmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	ball.material = bmat
+	ball.modulate = Color(1.0, 0.62, 0.2)
 	var core := Sprite2D.new()
-	core.texture = SpriteFactory.circle(8, Color(1.0, 0.96, 0.7))
-	core.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	core.texture = SpriteFactory.particle("flare_01")
+	core.scale = Vector2(0.45, 0.45)
+	core.modulate = Color(1.0, 0.95, 0.7)
 	ball.add_child(core)
+	# Wabern: das Feuer dreht langsam, damit es lebt
+	var churn := ball.create_tween().set_loops()
+	churn.tween_property(core, "rotation", TAU, 1.2)
 	var trail := CPUParticles2D.new()
-	trail.amount = 34
+	trail.amount = 20
 	trail.lifetime = 0.4
 	trail.direction = Vector2(1, 0)
 	trail.spread = 30.0
 	trail.gravity = Vector2.ZERO
 	trail.initial_velocity_min = 40.0
 	trail.initial_velocity_max = 95.0
-	trail.scale_amount_min = 0.6
-	trail.scale_amount_max = 1.6
-	trail.color = Color(1.0, 0.5, 0.1, 0.85)
-	trail.texture = SpriteFactory.circle(4, Color.WHITE)
+	trail.scale_amount_min = 0.25
+	trail.scale_amount_max = 0.45
+	trail.color = Color(1.0, 0.5, 0.1, 0.8)
+	trail.texture = SpriteFactory.particle("flame_02")
 	ball.add_child(trail)
 	add_child(ball)
 	AudioManager.play_sfx("charge")
 	var charge := create_tween()
-	charge.tween_property(ball, "scale", Vector2(1.1, 1.1), 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	charge.tween_property(ball, "scale", Vector2(0.92, 0.92), 0.12).set_trans(Tween.TRANS_SINE)
+	charge.tween_property(ball, "scale", Vector2(0.30, 0.30), 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	charge.tween_property(ball, "scale", Vector2(0.26, 0.26), 0.12).set_trans(Tween.TRANS_SINE)
 	await charge.finished
 	# --- Abschuss: der große Feuerball rast zum Ziel und wächst dabei ---
 	AudioManager.play_sfx("fire")
 	var fly := create_tween()
 	fly.tween_property(ball, "position", e["sprite"].position, 0.34) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	fly.parallel().tween_property(ball, "scale", Vector2(2.7, 2.7), 0.34)
+	fly.parallel().tween_property(ball, "scale", Vector2(0.7, 0.7), 0.34)
 	fly.parallel().tween_property(ball, "rotation", TAU, 0.34)
 	await fly.finished
 	ball.queue_free()
@@ -1506,28 +1565,53 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 func _launch_rocket(from: Vector2, to: Vector2) -> void:
 	var r := Sprite2D.new()
 	r.texture = SpriteFactory.rocket(0)
-	r.scale = Vector2(2.4, 2.4)
+	r.scale = Vector2(2.0, 2.0)
 	r.position = from
+	# Weicher Feuerschweif: additives Kenney-Flammen-Sprite hinter der Düse.
+	var exhaust := Sprite2D.new()
+	exhaust.texture = SpriteFactory.particle("flame_05")
+	exhaust.rotation = -PI / 2  # Flamme zeigt nach links (nach hinten)
+	exhaust.position = Vector2(-16, 0)
+	exhaust.scale = Vector2(0.16, 0.30)
+	exhaust.modulate = Color(1.0, 0.75, 0.35, 0.95)
+	var exm := CanvasItemMaterial.new()
+	exm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	exhaust.material = exm
+	r.add_child(exhaust)
+	# Rauchspur aus echten Rauch-Puffs, die hängen bleiben und aufquellen.
 	var smoke := CPUParticles2D.new()
-	smoke.amount = 22
-	smoke.lifetime = 0.55
+	smoke.amount = 26
+	smoke.lifetime = 0.7
 	smoke.direction = Vector2(-1, 0)
-	smoke.spread = 24.0
-	smoke.gravity = Vector2(0, -14)
-	smoke.initial_velocity_min = 14.0
-	smoke.initial_velocity_max = 38.0
-	smoke.scale_amount_min = 0.8
-	smoke.scale_amount_max = 1.8
-	smoke.color = Color(0.75, 0.74, 0.72, 0.55)
-	smoke.texture = SpriteFactory.circle(3, Color.WHITE)
+	smoke.spread = 18.0
+	smoke.gravity = Vector2(0, -20)
+	smoke.initial_velocity_min = 10.0
+	smoke.initial_velocity_max = 30.0
+	smoke.scale_amount_min = 0.05
+	smoke.scale_amount_max = 0.14
+	smoke.color = Color(0.78, 0.77, 0.75, 0.4)
+	smoke.texture = SpriteFactory.particle("smoke_07")
 	smoke.position = Vector2(-14, 0)  # am Heck, in lokalen Koordinaten
 	r.add_child(smoke)
 	add_child(r)
+	# Mündungsblitz am Startrohr
+	var muzzle := Sprite2D.new()
+	muzzle.texture = SpriteFactory.particle("muzzle_02")
+	muzzle.position = from
+	muzzle.rotation = (to - from).angle() - PI / 2
+	muzzle.scale = Vector2(0.4, 0.4)
+	muzzle.material = exm
+	muzzle.modulate = Color(1.0, 0.85, 0.5)
+	add_child(muzzle)
+	var mt := muzzle.create_tween()
+	mt.tween_property(muzzle, "modulate:a", 0.0, 0.12)
+	mt.tween_callback(muzzle.queue_free)
 	# Abgasflamme flackern lassen
 	var flick := create_tween().set_loops()
 	flick.tween_interval(0.05)
 	flick.tween_callback(func():
-		r.texture = SpriteFactory.rocket(randi() % 2))
+		r.texture = SpriteFactory.rocket(randi() % 2)
+		exhaust.scale = Vector2(randf_range(0.13, 0.19), randf_range(0.26, 0.36)))
 	# Quadratische Bézier-Bahn: Kontrollpunkt hoch über dem Startrohr →
 	# steiler Aufstieg, dann Sturz ins Ziel.
 	var ctrl := from + Vector2(randf_range(-40, 10), -randf_range(110, 170))
@@ -1669,22 +1753,42 @@ func _mushroom_cloud(pos: Vector2) -> void:
 	st.parallel().tween_property(stem, "position:y", pos.y - 80.0, 0.8)
 	st.tween_property(stem, "modulate:a", 0.0, 0.9)
 	st.tween_callback(stem.queue_free)
+	# Glühende Pilzkappe aus echten Rauch-Puffs (additiv = Feuerschein) ...
 	for i in 5:
 		var puff := Sprite2D.new()
-		puff.texture = SpriteFactory.circle(18, Color(1.0, lerpf(0.75, 0.45, i / 4.0), 0.2, 0.8))
-		puff.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		puff.texture = SpriteFactory.particle("smoke_04")
 		puff.material = addm
+		puff.modulate = Color(1.0, lerpf(0.75, 0.45, i / 4.0), 0.2, 0.85)
 		puff.position = pos + Vector2(randf_range(-8, 8), -10)
-		puff.scale = Vector2(0.5, 0.5)
+		puff.rotation = randf_range(0.0, TAU)
+		puff.scale = Vector2(0.12, 0.12)
 		add_child(puff)
 		var side := randf_range(-52, 52) * (0.4 + i * 0.15)
 		var pt := create_tween()
 		pt.tween_interval(0.12 + i * 0.05)
 		pt.tween_property(puff, "position", pos + Vector2(side, -152.0 - i * 14.0), 1.1) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		pt.parallel().tween_property(puff, "scale", Vector2(2.0 + i * 0.3, 1.6 + i * 0.25), 1.1)
+		pt.parallel().tween_property(puff, "scale", Vector2.ONE * (0.5 + i * 0.09), 1.1)
+		pt.parallel().tween_property(puff, "rotation", puff.rotation + randf_range(-0.8, 0.8), 1.1)
 		pt.parallel().tween_property(puff, "modulate:a", 0.0, 1.3)
 		pt.tween_callback(puff.queue_free)
+	# ... darüber dunkler Nachrauch, der träge weiterzieht
+	for i in 3:
+		var gray := Sprite2D.new()
+		gray.texture = SpriteFactory.particle("smoke_04")
+		gray.modulate = Color(0.35, 0.33, 0.33, 0.0)
+		gray.position = pos + Vector2(randf_range(-20, 20), -60 - i * 20.0)
+		gray.rotation = randf_range(0.0, TAU)
+		gray.scale = Vector2(0.25, 0.25)
+		add_child(gray)
+		var gt := create_tween()
+		gt.tween_interval(0.5 + i * 0.2)
+		gt.tween_property(gray, "modulate:a", 0.5, 0.4)
+		gt.parallel().tween_property(gray, "position:y", gray.position.y - 90.0, 2.0) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		gt.parallel().tween_property(gray, "scale", Vector2(0.7, 0.7), 2.0)
+		gt.tween_property(gray, "modulate:a", 0.0, 0.8)
+		gt.tween_callback(gray.queue_free)
 	var emb := CPUParticles2D.new()
 	emb.position = pos
 	emb.amount = 40
@@ -2729,26 +2833,94 @@ func _slash_arc(pos: Vector2) -> void:
 	tw.parallel().tween_property(arc, "modulate:a", 0.0, 0.22)
 	tw.tween_callback(arc.queue_free)
 
-## Partikel-Explosion mit Glut, Rauch und Lichtblitz. `power` skaliert die
-## Wucht (1.0 = normal; >1 für große Feuerzauber → Stoßwelle, Glutregen).
+## Explosion aus echten Partikeltexturen (Kenney CC0): Lichtblitz,
+## rollender Feuerball, aufquellender Rauch, Trümmer und Brandfleck.
+## `power` skaliert die Wucht (>1 für große Feuerzauber → Stoßwelle, Glutregen).
 func _explosion(pos: Vector2, power := 1.0) -> void:
-	var flash := Sprite2D.new()
-	flash.texture = SpriteFactory.circle(26, Color(1.0, 0.92, 0.66))
-	flash.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	flash.modulate = Fx.hot(Color.WHITE)
-	flash.position = pos
-	flash.scale = Vector2(0.3, 0.3)
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Greller Kernblitz
+	var flash := Sprite2D.new()
+	flash.texture = SpriteFactory.particle("flare_01")
+	flash.modulate = Fx.hot(Color(1.0, 0.95, 0.8))
+	flash.position = pos
+	flash.scale = Vector2(0.25, 0.25)
 	flash.material = mat
 	add_child(flash)
 	var ft := create_tween()
-	ft.tween_property(flash, "scale", Vector2(2.4, 2.4) * power, 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	ft.parallel().tween_property(flash, "modulate:a", 0.0, 0.25 + 0.1 * (power - 1.0))
+	ft.tween_property(flash, "scale", Vector2(1.5, 1.5) * power, 0.2) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ft.parallel().tween_property(flash, "modulate:a", 0.0, 0.24 + 0.1 * (power - 1.0))
 	ft.tween_callback(flash.queue_free)
-	_burst(pos, Color(1.0, 0.55, 0.12), int(16 * power), 160 * power)
-	_burst(pos, Color(1.0, 0.85, 0.4), int(10 * power), 120 * power)
-	_burst(pos, Color(0.45, 0.40, 0.42, 0.6), int(8 * power), 60 * power)
+	# Rollender Feuerball: zwei rotierende Feuer-Sprites, die aufblähen
+	for i in 2:
+		var fire := Sprite2D.new()
+		fire.texture = SpriteFactory.particle("fire_01")
+		fire.position = pos + Vector2(randf_range(-8, 8), randf_range(-6, 4))
+		fire.rotation = randf_range(0.0, TAU)
+		fire.scale = Vector2.ONE * 0.12
+		fire.material = mat
+		fire.modulate = Color(1.0, 0.75, 0.35) if i == 0 else Color(1.0, 0.5, 0.2)
+		add_child(fire)
+		var ff := create_tween()
+		ff.tween_property(fire, "scale", Vector2.ONE * (0.55 + 0.25 * i) * power, 0.3) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ff.parallel().tween_property(fire, "rotation", fire.rotation + randf_range(-1.4, 1.4), 0.45)
+		ff.parallel().tween_property(fire, "position:y", fire.position.y - 22.0 - 10.0 * i, 0.45)
+		ff.parallel().tween_property(fire, "modulate:a", 0.0, 0.42 + 0.08 * i)
+		ff.tween_callback(fire.queue_free)
+	# Aufquellender Rauch (normal geblendet, steigt und verweht)
+	var smoke := CPUParticles2D.new()
+	smoke.position = pos + Vector2(0, -6)
+	smoke.one_shot = true
+	smoke.explosiveness = 0.9
+	smoke.amount = int(6 * power)
+	smoke.lifetime = 1.1
+	smoke.direction = Vector2(0, -1)
+	smoke.spread = 40.0
+	smoke.gravity = Vector2(0, -50)
+	smoke.initial_velocity_min = 24.0
+	smoke.initial_velocity_max = 60.0 * power
+	smoke.scale_amount_min = 0.12
+	smoke.scale_amount_max = 0.30 * power
+	smoke.color = Color(0.42, 0.40, 0.40, 0.5)
+	smoke.texture = SpriteFactory.particle("smoke_04")
+	smoke.emitting = true
+	add_child(smoke)
+	get_tree().create_timer(2.0).timeout.connect(smoke.queue_free)
+	# Trümmer, die im Bogen wegfliegen
+	var debris := CPUParticles2D.new()
+	debris.position = pos
+	debris.one_shot = true
+	debris.explosiveness = 1.0
+	debris.amount = int(7 * power)
+	debris.lifetime = 0.6
+	debris.direction = Vector2(0, -1)
+	debris.spread = 65.0
+	debris.gravity = Vector2(0, 500)
+	debris.initial_velocity_min = 90.0
+	debris.initial_velocity_max = 190.0 * power
+	debris.scale_amount_min = 0.04
+	debris.scale_amount_max = 0.10
+	debris.color = Color(0.5, 0.42, 0.36)
+	debris.texture = SpriteFactory.particle("dirt_02")
+	debris.emitting = true
+	add_child(debris)
+	get_tree().create_timer(1.2).timeout.connect(debris.queue_free)
+	# Brandfleck am Boden, der langsam verblasst
+	var scorch := Sprite2D.new()
+	scorch.texture = SpriteFactory.particle("scorch_01")
+	scorch.position = pos + Vector2(0, 26)
+	scorch.scale = Vector2(0.6, 0.28) * power
+	scorch.modulate = Color(0.1, 0.08, 0.08, 0.55)
+	scorch.rotation = randf_range(-0.2, 0.2)
+	scorch.z_index = -9
+	add_child(scorch)
+	var sct := scorch.create_tween()
+	sct.tween_interval(1.6)
+	sct.tween_property(scorch, "modulate:a", 0.0, 2.2)
+	sct.tween_callback(scorch.queue_free)
+	_burst(pos, Color(1.0, 0.55, 0.12), int(12 * power), 160 * power)
 	_impact_ring(pos, Color(1.0, 0.7, 0.3, 0.8))
 	_spell_light(pos, Color(1.0, 0.6, 0.25), 180.0 * power, 0.45)
 	# Bei großen Explosionen eine zweite, verzögerte Stoßwelle + Glutregen.
