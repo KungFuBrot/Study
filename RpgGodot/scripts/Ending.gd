@@ -49,12 +49,12 @@ func _build_scene() -> void:
 	hill.scale = Vector2(9, 3.2)
 	hill.z_index = -10
 	add_child(hill)
-	var ids := ["serena", "milo"]
+	var ids := ["serena", "milo", "rax"]
 	for i in ids.size():
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.character(ids[i], "down", 0)
 		s.scale = Vector2(6, 6)
-		s.position = Vector2(430 + i * 100, 420)
+		s.position = Vector2(380 + i * 100, 420)
 		add_child(s)
 		var bob := s.create_tween().set_loops()
 		bob.tween_property(s, "position:y", s.position.y - 6.0, 1.2 + i * 0.3) \
@@ -74,12 +74,13 @@ func _build_text() -> void:
 	layer.add_child(vig)
 	var entries := [
 		["DAS ABENTEUER IST VOLLBRACHT", 40, Color(1.0, 0.85, 0.3), 60],
-		["Knochenkönig und Frostkoloss sind Geschichte.", 22, Color.WHITE, 140],
-		["Frieden kehrt in Finsterhöhle und Frostgrotte ein,", 22, Color.WHITE, 175],
-		["und Lindenhain feiert seine Helden.", 22, Color.WHITE, 210],
-		["Serena  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 265],
-		["Milo  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 295],
-		["Erbeutetes Gold: %d" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 330],
+		["Schlotbaron, Monopolfürst und Spalter sind Geschichte.", 22, Color.WHITE, 135],
+		["Der Fluss glitzert wieder, der Turm gehört allen,", 22, Color.WHITE, 168],
+		["und wo Hass gepredigt wurde, wächst jetzt Gras.", 22, Color.WHITE, 201],
+		["Serena  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 252],
+		["Milo  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 280],
+		["Rax  —  das Herz aus Stahl", 19, Color(0.75, 0.9, 0.85), 308],
+		["Erbeutetes Gold: %d — gespendet an Lindenhain" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 340],
 		["— DANKE FÜRS SPIELEN —", 26, Color(1.0, 0.85, 0.3), 480],
 	]
 	for i in entries.size():

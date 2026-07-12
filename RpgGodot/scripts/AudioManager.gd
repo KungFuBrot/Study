@@ -61,7 +61,7 @@ const SONGS := {
 		"bass": [[38, 2], [45, 2], [36, 2], [43, 2], [38, 2], [45, 2], [34, 2], [36, 2],
 			[38, 2], [45, 2], [41, 2], [48, 2], [43, 2], [50, 2], [38, 2], [38, 2]],
 		"drums": "k...h.s."},
-	# „Finsterhöhle" — E-phrygisch, karg und drohend, lange Pausen.
+	# „Schlotwerk" — E-phrygisch, karg und drohend, lange Pausen.
 	"dungeon": {"bpm": 66, "loop": true,
 		"mel": [[-1, 2], [64, 1.5], [65, 0.5], [64, 2], [62, 2],
 			[59, 1.5], [60, 0.5], [59, 2], [-1, 2], [55, 2],
@@ -70,7 +70,7 @@ const SONGS := {
 		"harm": [[40, 8], [41, 8], [40, 8], [38, 8]],
 		"bass": [[28, 8], [29, 8], [28, 8], [26, 8]],
 		"drums": "k.......s......."},
-	# „Frostgrotte" — a-Moll, glasig hohe Melodie, ohne Schlagzeug.
+	# „Konzernturm" — a-Moll, glasig kühle Marmor-Melodie, ohne Schlagzeug.
 	"dungeon2": {"bpm": 76, "loop": true,
 		"mel": [[76, 1], [74, 0.5], [72, 0.5], [71, 1], [69, 1],
 			[71, 1.5], [67, 0.5], [64, 2],
@@ -97,7 +97,7 @@ const SONGS := {
 		"bass": [[33, 0.5], [33, 0.5], [40, 0.5], [33, 0.5], [31, 0.5], [31, 0.5], [38, 0.5], [31, 0.5],
 			[29, 0.5], [29, 0.5], [36, 0.5], [29, 0.5], [28, 0.5], [28, 0.5], [35, 0.5], [28, 0.5]],
 		"drums": "kh.hsh.h"},
-	# „Knochenkönig" — d-phrygisch, stampfendes Riff mit chromatischen Reibungen.
+	# „Schlotbaron" — d-phrygisch, stampfendes Riff mit chromatischen Reibungen.
 	"boss": {"bpm": 148, "loop": true,
 		"mel": [[62, 0.5], [62, 0.5], [63, 0.5], [62, 0.5], [65, 1], [62, 0.5], [61, 0.5],
 			[62, 0.5], [62, 0.5], [63, 0.5], [65, 0.5], [68, 1], [67, 0.5], [65, 0.5],
@@ -110,7 +110,7 @@ const SONGS := {
 		"harm": [[50, 4], [51, 4], [50, 4], [46, 4], [50, 4], [51, 4], [48, 4], [50, 4]],
 		"bass": [[26, 0.5], [26, 0.5], [38, 0.5], [26, 0.5], [27, 0.5], [26, 0.5], [33, 0.5], [26, 0.5]],
 		"drums": "kk.sk.hs"},
-	# „Frostkoloss" — e-Moll episch mit hohem Gegenlauf und Leitton-Schluss.
+	# „Monopolfürst" — e-Moll episch mit hohem Gegenlauf und Leitton-Schluss.
 	"boss2": {"bpm": 152, "loop": true,
 		"mel": [[64, 0.5], [64, 0.5], [67, 0.5], [71, 0.5], [72, 1], [71, 0.5], [67, 0.5],
 			[69, 0.5], [71, 0.5], [72, 0.5], [74, 0.5], [71, 1], [67, 1],
@@ -123,6 +123,34 @@ const SONGS := {
 		"harm": [[52, 4], [48, 4], [50, 4], [47, 4], [52, 4], [48, 4], [50, 2], [51, 2], [52, 4]],
 		"bass": [[28, 0.5], [28, 0.5], [35, 0.5], [28, 0.5], [36, 0.5], [36, 0.5], [43, 0.5], [36, 0.5],
 			[38, 0.5], [38, 0.5], [45, 0.5], [38, 0.5], [35, 0.5], [35, 0.5], [42, 0.5], [35, 0.5]],
+		"drums": "kkhsk.hs"},
+	# „Hassfestung" — E-phrygisch, dumpfer Marsch über bösem Halbton-Drone.
+	"dungeon3": {"bpm": 100, "loop": true,
+		"mel": [[52, 1], [52, 0.5], [52, 0.5], [53, 1], [52, 1],
+			[55, 1], [53, 0.5], [52, 0.5], [53, 2],
+			[52, 1], [52, 0.5], [52, 0.5], [55, 1], [57, 1],
+			[59, 1], [57, 0.5], [55, 0.5], [53, 1], [52, 1],
+			[64, 1], [62, 0.5], [60, 0.5], [62, 1], [59, 1],
+			[60, 1], [59, 0.5], [57, 0.5], [59, 1], [55, 1],
+			[57, 1], [59, 0.5], [60, 0.5], [59, 1], [53, 1],
+			[52, 2], [53, 1], [52, 1]],
+		"harm": [[40, 8], [41, 8]],
+		"bass": [[28, 0.5], [28, 0.5], [35, 0.5], [28, 0.5],
+			[28, 0.5], [33, 0.5], [35, 0.5], [31, 0.5]],
+		"drums": "k.k.s.k."},
+	# „Der Spalter" — A-phrygisch, hetzendes Riff, das sich immer höher schraubt.
+	"boss3": {"bpm": 158, "loop": true,
+		"mel": [[57, 0.5], [57, 0.5], [58, 0.5], [57, 0.5], [60, 1], [58, 0.5], [57, 0.5],
+			[57, 0.5], [58, 0.5], [60, 0.5], [62, 0.5], [65, 1], [64, 0.5], [62, 0.5],
+			[64, 1], [62, 0.5], [60, 0.5], [62, 0.5], [60, 0.5], [58, 1],
+			[58, 1], [57, 0.5], [55, 0.5], [57, 2],
+			[69, 0.5], [-1, 0.5], [69, 0.5], [70, 0.5], [69, 0.5], [67, 0.5], [65, 1],
+			[64, 0.5], [65, 0.5], [67, 0.5], [69, 0.5], [70, 1], [69, 0.5], [67, 0.5],
+			[65, 0.5], [64, 0.5], [62, 0.5], [60, 0.5], [62, 0.5], [64, 0.5], [58, 1],
+			[57, 1], [58, 1], [57, 2]],
+		"harm": [[45, 4], [46, 4], [45, 4], [43, 2], [46, 2]],
+		"bass": [[33, 0.5], [33, 0.5], [40, 0.5], [33, 0.5],
+			[34, 0.5], [34, 0.5], [41, 0.5], [34, 0.5]],
 		"drums": "kkhsk.hs"},
 	# Sieg-Fanfare — C-Dur, kurzer Aufschwung mit Oktavsprung.
 	"victory": {"bpm": 132, "loop": false,
@@ -378,6 +406,18 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			# Fallende Fliegerbombe: langer, absinkender Pfeifton
 			_tone(buf, 1650, 220, 0.95, 0.20, "tri")
 		"nuke": _render_boom(buf, 3.0, 0.70, 0.9)
+		"splat":
+			# Nasser Schlammklatscher
+			_tone(buf, 300, 80, 0.12, 0.30, "noise")
+			_tone(buf, 140, 60, 0.10, 0.25, "tri")
+		"coin":
+			# Helles Münzklimpern (Quint-Sprung nach oben)
+			_tone(buf, 1560, 1560, 0.05, 0.20, "square")
+			_tone(buf, 2080, 2080, 0.09, 0.16, "square")
+		"screech":
+			# Kreischende Hetz-Attacke: fallendes Krächzen
+			_tone(buf, 2400, 400, 0.22, 0.24, "noise")
+			_tone(buf, 1800, 300, 0.18, 0.20, "square")
 		_:
 			return null
 	return _to_wav(buf, false)

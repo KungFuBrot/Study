@@ -1,17 +1,19 @@
 class_name MapData
 ## ASCII-Karten. Legende:
 ##  g Gras, t Baum, p Weg, w Wasser, b Brücke, m Berg,
-##  R Dach, W Hauswand, D Tür, f Dungeonboden, # Dungeonwand,
-##  i Eisboden, I Eiswand,
-##  T Stadt (Portal), C Höhle (Portal), F Frostgrotte (Portal), X Dungeon-Ausgang (Portal)
+##  R Dach, W Hauswand, D Tür, f Fabrikboden, # Fabrikwand,
+##  i Marmorboden, I Turmwand, y Festungsboden, Y Festungswand,
+##  T Stadt (Portal), C Schlotwerk (Portal), F Konzernturm (Portal),
+##  H Hassfestung (Portal), X Dungeon-Ausgang (Portal)
 
-const WALKABLE := ["g", "p", "b", "f", "i", "T", "C", "F", "X"]
+const WALKABLE := ["g", "p", "b", "f", "i", "y", "T", "C", "F", "H", "X"]
 
 const TILE_FOR_CHAR := {
 	"g": "grass", "t": "tree", "p": "path", "w": "water", "b": "bridge",
 	"m": "mount", "R": "roof", "W": "wall", "D": "door", "f": "floor",
-	"#": "dwall", "i": "ice", "I": "iwall", "T": "town_icon", "C": "cave",
-	"F": "icecave", "X": "path",
+	"#": "dwall", "i": "ice", "I": "iwall", "y": "hfloor", "Y": "hwall",
+	"T": "town_icon", "C": "factory_icon", "F": "tower_icon", "H": "keep_icon",
+	"X": "path",
 }
 
 const MAPS := {
@@ -44,17 +46,19 @@ const MAPS := {
 			{"id": "npc_elder", "name": "Ältester Theobald", "pos": Vector2i(7, 4),
 				"lines": [
 					"Willkommen in Lindenhain, Reisende!",
-					"Östlich des Flusses liegt eine dunkle Höhle.",
-					"Dort lauern Monster. Geht nicht unvorbereitet hinein!",
-					"Und noch etwas: Im Nordosten liegt die Frostgrotte,",
-					"versiegelt von der Magie des Knochenkönigs.",
-					"Nur wer ihn bezwingt, kann das Eis betreten."]},
+					"Drei Plagen würgen unser Land.",
+					"Im Osten verpestet das Schlotwerk den Fluss —",
+					"der Schlotbaron kippt seinen Giftschlamm einfach hinein.",
+					"Im Nordosten presst der Konzernturm die Dörfer aus,",
+					"und im Südwesten schürt eine Festung Hass und Zwietracht.",
+					"Beginnt beim Schlotwerk. Eines führt zum anderen:",
+					"Der Baron schmiert den Fürsten, der Fürst füttert den Hass."]},
 			{"id": "npc_kid", "name": "Pia", "pos": Vector2i(12, 8),
 				"lines": [
-					"Hihi! Serena, dein Schwert glitzert so schön!",
-					"Milo, zeigst du mir mal einen Feuerball? ... Nein? Menno."]},
+					"Der Fluss hat früher geglitzert! Jetzt ist er ganz braun.",
+					"Papa sagt, das kommt vom Schlotwerk. Macht ihr das wieder heil?"]},
 			{"id": "npc_shop", "name": "Händlerin Greta", "pos": Vector2i(15, 4), "shop": true,
-				"lines": ["Willkommen! Schaut euch ruhig um."]},
+				"lines": ["Willkommen! Faire Preise, gerechter Lohn — schaut euch um."]},
 		],
 	},
 	"world": {
@@ -76,23 +80,26 @@ const MAPS := {
 			"mggggggggggwwggmmmCmmm",
 			"mgggtggggggwwggmmmmmmm",
 			"mggggggggggwwggggggggm",
-			"mggtgggggggwwggggtgggm",
+			"mggtHggggggwwggggtgggm",
 			"mggggggggggwwggggggggm",
 			"mmmmmmmmmmmmmmmmmmmmmm",
 		],
 		"spawns": {"from_town": Vector2i(2, 4), "from_dungeon": Vector2i(18, 9),
-			"from_dungeon2": Vector2i(18, 3)},
+			"from_dungeon2": Vector2i(18, 3), "from_dungeon3": Vector2i(4, 12)},
 		"portals": [
 			{"pos": Vector2i(2, 3), "to": "town", "spawn": "from_world"},
 			{"pos": Vector2i(18, 10), "to": "dungeon", "spawn": "entrance"},
 			{"pos": Vector2i(18, 2), "to": "dungeon2", "spawn": "entrance",
 				"locked_until": "boss_defeated",
-				"locked_msg": "Eine Barriere aus ewigem Eis versperrt den Eingang. Die dunkle Magie des Knochenkönigs hält sie aufrecht — bezwingt ihn zuerst!"},
+				"locked_msg": "Die goldenen Tore des Konzernturms sind verriegelt. Am Portal prangt: „Kein Zutritt — erst wenn die Schmiergeld-Pipeline aus dem Schlotwerk versiegt.“ Bezwingt den Schlotbaron!"},
+			{"pos": Vector2i(4, 13), "to": "dungeon3", "spawn": "entrance",
+				"locked_until": "boss2_defeated",
+				"locked_msg": "Ein Wall aus Misstrauen umgibt die Hassfestung. Solange der Monopolfürst den Hass finanziert, ist hier kein Durchkommen — stürzt ihn zuerst!"},
 		],
 		"npcs": [],
 	},
 	"dungeon": {
-		"name": "Finsterhöhle",
+		"name": "Schlotwerk",
 		"music": "dungeon",
 		"encounters": true,
 		"ground": "floor",
@@ -118,7 +125,7 @@ const MAPS := {
 		"npcs": [],
 	},
 	"dungeon2": {
-		"name": "Frostgrotte",
+		"name": "Konzernturm",
 		"music": "dungeon2",
 		"encounters": true,
 		"ground": "ice",
@@ -140,6 +147,32 @@ const MAPS := {
 		"spawns": {"entrance": Vector2i(2, 1)},
 		"portals": [
 			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon2"},
+		],
+		"npcs": [],
+	},
+	"dungeon3": {
+		"name": "Hassfestung",
+		"music": "dungeon3",
+		"encounters": true,
+		"ground": "hfloor",
+		"rows": [
+			"YYYYYYYYYYYYYYYYYYYYYY",
+			"YXyyyyyyYYyyyyyyyyyyyY",
+			"YyyYYyyyyyyyyyYYYyyyyY",
+			"YyyYYyyyYYyyyyyyYYyyyY",
+			"YyyyyyyyYYyyyyyyyyyyyY",
+			"YyyyyyyyyyyyyYYyyyyyyY",
+			"YyyYYYyyyyyyyYYyyYYyyY",
+			"YyyyyyyyyYYyyyyyyYYyyY",
+			"YyyyyyyyyYYyyyyyyyyyyY",
+			"YyyYYyyyyyyyyyYYyyyyyY",
+			"YyyyyyyyyyyyyyyyyyyyyY",
+			"YyyyyyyyyyyyyyyyyyyyyY",
+			"YYYYYYYYYYYYYYYYYYYYYY",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon3"},
 		],
 		"npcs": [],
 	},

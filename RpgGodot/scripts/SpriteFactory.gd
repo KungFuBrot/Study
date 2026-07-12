@@ -28,19 +28,35 @@ const HERO_DTII := {
 
 # Gegner-ID → animiertes DTII-Sprite (alle 4 Frames), plus Kampfmaßstab.
 const MON_DTII := {
-	"slime": {"anim": "muddy_anim", "big": false},
-	"bat": {"anim": "imp_idle_anim", "big": false},
-	"skeleton": {"anim": "skelet_idle_anim", "big": false},
-	"frostwolf": {"anim": "ice_zombie_anim", "big": false},
-	"eisgeist": {"anim": "swampy_anim", "big": false},
+	# Schlotwerk (Umweltverschmutzer)
+	"schlammschleim": {"anim": "muddy_anim", "big": false},
+	"qualmgeist": {"anim": "swampy_anim", "big": false},
+	"muellgnom": {"anim": "goblin_idle_anim", "big": false},
 	"boss": {"anim": "big_zombie_idle_anim", "big": true},
-	"boss2": {"anim": "big_demon_idle_anim", "big": true},
+	# Konzernturm (Kapitalisten)
+	"gierschlund": {"anim": "chort_idle_anim", "big": false},
+	"paragraphengeist": {"anim": "necromancer_anim", "big": false},
+	"zinshund": {"anim": "wogol_idle_anim", "big": false},
+	"boss2": {"anim": "ogre_idle_anim", "big": true},
+	# Hassfestung (Rassisten und Nationalisten)
+	"hetzer": {"anim": "masked_orc_idle_anim", "big": false},
+	"wutgeist": {"anim": "imp_idle_anim", "big": false},
+	"schlaeger": {"anim": "orc_warrior_idle_anim", "big": false},
+	"hassprediger": {"anim": "orc_shaman_idle_anim", "big": false},
+	"boss3": {"anim": "big_demon_idle_anim", "big": true},
 }
 
 # Dungeon-Kacheln aus DTII (der Rest bleibt prozedural).
 const DTII_TILES := {
 	"floor": "floor_1", "dwall": "wall_mid",
 	"ice": "floor_2", "iwall": "wall_mid",
+	"hfloor": "floor_3", "hwall": "wall_mid",
+}
+
+# Requisiten, die direkt aus DTII-Frames kommen (statt PROP_ART).
+const DTII_PROPS := {
+	"banner_red": "wall_banner_red", "banner_yellow": "wall_banner_yellow",
+	"crate": "crate", "goo": "wall_goo",
 }
 
 # Feldfiguren (Erkundung) → DTII-Basissprite (16x28). Identisch zu den
@@ -214,9 +230,17 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			var ridge := absf(float(x) - 8.0) + float(15 - y) * 0.8
 			if ridge < 6.0: return Color(0.55, 0.50, 0.46) if n > 0.3 else Color(0.62, 0.58, 0.54)
 			return Color(0.40, 0.36, 0.34)
-		"cave":
-			var d2 := Vector2(x - 7.5, y - 9.0).length()
-			if d2 < 4.5: return Color(0.05, 0.04, 0.08)
+		"factory_icon":
+			# Qualmwolken über den Schloten
+			if y < 5 and (Vector2(x - 5, y - 3).length() < 2.3 or Vector2(x - 11, y - 2).length() < 2.0):
+				return Color(0.42, 0.55, 0.34)
+			# Zwei Schlote
+			if y >= 5 and y < 9 and (x == 4 or x == 5 or x == 10 or x == 11):
+				return Color(0.34, 0.31, 0.34)
+			# Fabrikhalle mit Sheddach
+			if y >= 9 and x > 1 and x < 15:
+				if y <= 10: return Color(0.28, 0.25, 0.29)
+				return Color(0.45, 0.41, 0.43) if (x % 4 != 0) else Color(0.38, 0.34, 0.37)
 			return _tile_color("mount", x, y)
 		"ice":
 			if (x * 2 + y) % 11 == 0: return Color(0.44, 0.62, 0.82)
@@ -227,12 +251,25 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 		"iwall":
 			if y % 4 == 0 or (x + (y / 4) * 2) % 6 == 0: return Color(0.12, 0.20, 0.36)
 			return Color(0.22, 0.34, 0.55) if n > 0.2 else Color(0.18, 0.29, 0.48)
-		"icecave":
-			var d3 := Vector2(x - 7.5, y - 9.0).length()
-			if d3 < 4.5: return Color(0.04, 0.08, 0.16)
-			var ridge2 := absf(float(x) - 8.0) + float(15 - y) * 0.8
-			if ridge2 < 6.0: return Color(0.60, 0.72, 0.86) if n > 0.3 else Color(0.68, 0.80, 0.92)
-			return Color(0.45, 0.54, 0.68)
+		"tower_icon":
+			# Schlanker Konzernturm mit goldener Spitze und Fensterbändern
+			if x > 5 and x < 11:
+				if y < 3: return Color(1.0, 0.84, 0.32)
+				if y < 14:
+					if y % 3 == 1 and x % 2 == 0: return Color(0.32, 0.52, 0.72)
+					return Color(0.80, 0.78, 0.76)
+			if y >= 13 and x > 3 and x < 13: return Color(0.58, 0.56, 0.58)
+			return _tile_color("mount", x, y)
+		"keep_icon":
+			# Rotes Banner über dem Tor
+			if x >= 7 and x <= 8 and y >= 1 and y < 4: return Color(0.72, 0.12, 0.14)
+			# Zinnenkranz
+			if y >= 4 and y < 6 and x > 2 and x < 14 and (x % 3 != 0): return Color(0.24, 0.21, 0.25)
+			# Festungskörper mit dunklem Tor
+			if y >= 6 and y < 14 and x > 2 and x < 14:
+				if x >= 7 and x <= 9 and y >= 10: return Color(0.08, 0.06, 0.09)
+				return Color(0.30, 0.26, 0.30) if n > 0.25 else Color(0.26, 0.22, 0.26)
+			return _tile_color("grass", x, y)
 		"town_icon":
 			if y > 9 and x > 2 and x < 13: return Color(0.75, 0.68, 0.55)
 			if y > 5 and y <= 9 and x > 1 and x < 14: return Color(0.66, 0.24, 0.20)
@@ -1293,7 +1330,7 @@ static func enemy_has_anim(id: String) -> bool:
 	return MON_DTII.has(id)
 
 static func enemy_frame(id: String, frame: int) -> Texture2D:
-	var def: Dictionary = MON_DTII.get(id, MON_DTII["slime"])
+	var def: Dictionary = MON_DTII.get(id, MON_DTII["schlammschleim"])
 	return dtii("%s_f%d" % [def["anim"], frame % ENEMY_FRAMES])
 
 ## Ist dieser Gegner ein großes Boss-Sprite (32x36 statt 16x16)?
@@ -1473,11 +1510,43 @@ const PROP_ART := {
 ## Requisiten-Sprite; flower0..flower3, tuft, pebble, crack, bones
 ## werden direkt gezeichnet, der Rest kommt aus PROP_ART.
 static func prop(kind: String) -> Texture2D:
+	if DTII_PROPS.has(kind):
+		return dtii(DTII_PROPS[kind])
 	var key := "prop_" + kind
 	if _cache.has(key):
 		return _cache[key]
 	var img: Image
-	if PROP_ART.has(kind):
+	if kind == "barrel":
+		# Giftfass: grüner Blechkörper, rostige Ringe, blubbernder Überlauf
+		img = _img(8, 10)
+		img.fill_rect(Rect2i(1, 1, 6, 9), Color(0.28, 0.48, 0.24))
+		img.fill_rect(Rect2i(1, 3, 6, 1), Color(0.42, 0.32, 0.18))
+		img.fill_rect(Rect2i(1, 7, 6, 1), Color(0.42, 0.32, 0.18))
+		img.fill_rect(Rect2i(2, 0, 4, 1), Color(0.55, 0.85, 0.30))
+		img.set_pixel(1, 0, Color(0.55, 0.85, 0.30))
+		img.set_pixel(2, 2, Color(0.38, 0.60, 0.30))
+		img.set_pixel(2, 5, Color(0.38, 0.60, 0.30))
+	elif kind == "coins":
+		# Kleiner Münzhaufen
+		img = _img(8, 5)
+		var g1 := Color(1.0, 0.84, 0.30)
+		var g2 := Color(0.80, 0.62, 0.16)
+		img.fill_rect(Rect2i(1, 3, 6, 2), g2)
+		img.fill_rect(Rect2i(2, 2, 4, 2), g1)
+		img.set_pixel(3, 1, g1)
+		img.set_pixel(4, 1, Color(1.0, 0.95, 0.65))
+	elif kind == "sludge":
+		# Giftschlamm-Pfütze
+		img = _img(10, 5)
+		var s1 := Color(0.30, 0.55, 0.20, 0.85)
+		var s2 := Color(0.45, 0.75, 0.25, 0.85)
+		img.fill_rect(Rect2i(1, 1, 8, 3), s1)
+		img.set_pixel(0, 2, s1)
+		img.set_pixel(9, 2, s1)
+		img.set_pixel(3, 1, s2)
+		img.set_pixel(6, 2, s2)
+		img.set_pixel(4, 3, s2)
+	elif PROP_ART.has(kind):
 		var art: Dictionary = PROP_ART[kind]
 		var rows: Array = art["rows"]
 		img = _img(rows[0].length(), rows.size())

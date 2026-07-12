@@ -6,8 +6,9 @@ var main: Node = null
 var gold := 120
 var inventory := {}  # name -> anzahl
 var party := []      # Array aus Dictionaries (siehe reset_party)
-var boss_defeated := false   # Knochenkönig (Finsterhöhle)
-var boss2_defeated := false  # Frostkoloss (Frostgrotte) — beendet das Spiel
+var boss_defeated := false   # Schlotbaron (Schlotwerk) — öffnet den Konzernturm
+var boss2_defeated := false  # Monopolfürst (Konzernturm) — öffnet die Hassfestung
+var boss3_defeated := false  # Der Spalter (Hassfestung) — beendet das Spiel
 
 const ITEMS := {
 	"Trank": {"price": 20, "desc": "Heilt 30 LP.", "hp": 30, "mp": 0},
@@ -16,37 +17,80 @@ const ITEMS := {
 }
 
 # Bosse tragen "boss": true plus Inszenierungs-Daten (Thema, Musik, Texte).
+# "proj" gibt Fernkämpfern ihre Spezialattacke (sludge/smog/coin/page/hate),
+# "tint" färbt das Sprite im Kampf, "attack_line" ersetzt den Standard-Angriffstext.
 const ENEMIES := {
-	"slime": {"name": "Schleim", "hp": 26, "atk": 7, "def": 2, "gold": 8, "xp": 7, "sprite": "slime"},
-	"bat": {"name": "Höhlenfledermaus", "hp": 20, "atk": 9, "def": 1, "gold": 10, "xp": 8, "sprite": "bat"},
-	"skeleton": {"name": "Skelett", "hp": 40, "atk": 11, "def": 4, "gold": 18, "xp": 15, "sprite": "skeleton"},
-	"frostwolf": {"name": "Frostwolf", "hp": 55, "atk": 17, "def": 5, "gold": 25, "xp": 22, "sprite": "frostwolf"},
-	"eisgeist": {"name": "Eisgeist", "hp": 45, "atk": 19, "def": 3, "gold": 28, "xp": 24, "sprite": "eisgeist"},
-	"boss": {"name": "Knochenkönig", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130, "sprite": "boss",
-		"boss": true, "theme": "bone", "song": "boss",
-		"entrance_line": "Der Herrscher der Finsterhöhle erhebt sich!",
-		"aoe_name": "Knochensturm", "ultimate_name": "Armee der Verdammten"},
-	"boss2": {"name": "Frostkoloss", "hp": 520, "atk": 26, "def": 8, "gold": 800, "xp": 180, "sprite": "boss2",
-		"boss": true, "theme": "frost", "song": "boss2",
-		"entrance_line": "Das ewige Eis erwacht — der Wächter der Frostgrotte!",
-		"aoe_name": "Eissturm", "ultimate_name": "Ewiger Winter"},
+	# --- Schlotwerk: die Umweltverschmutzer ---
+	"schlammschleim": {"name": "Schlammschleim", "hp": 26, "atk": 7, "def": 2,
+		"gold": 8, "xp": 7, "sprite": "schlammschleim", "proj": "sludge",
+		"attack_line": "%s spuckt Giftschlamm auf %s!"},
+	"qualmgeist": {"name": "Qualmgeist", "hp": 20, "atk": 9, "def": 1,
+		"gold": 10, "xp": 8, "sprite": "qualmgeist", "proj": "smog",
+		"attack_line": "%s hüllt %s in beißenden Qualm!"},
+	"muellgnom": {"name": "Müllgnom", "hp": 40, "atk": 11, "def": 4,
+		"gold": 18, "xp": 15, "sprite": "muellgnom",
+		"attack_line": "%s wirft sich mit rostigem Schrott auf %s!"},
+	"boss": {"name": "Schlotbaron", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130,
+		"sprite": "boss", "boss": true, "theme": "toxic", "song": "boss",
+		"entrance_line": "Die Schlote speien Gift — der Baron persönlich watet aus dem Schlamm!",
+		"aoe_name": "Giftflut", "ultimate_name": "Schwarzer Himmel"},
+	# --- Konzernturm: die Kapitalisten ---
+	"gierschlund": {"name": "Gierschlund", "hp": 55, "atk": 18, "def": 5,
+		"gold": 30, "xp": 22, "sprite": "gierschlund", "proj": "coin",
+		"tint": Color(1.2, 1.05, 0.6),
+		"attack_line": "%s schleudert glühende Münzen auf %s!"},
+	"paragraphengeist": {"name": "Paragraphengeist", "hp": 48, "atk": 20, "def": 3,
+		"gold": 34, "xp": 24, "sprite": "paragraphengeist", "proj": "page",
+		"attack_line": "%s wirft %s eine Abmahnung an den Kopf!"},
+	"zinshund": {"name": "Zinshund", "hp": 58, "atk": 17, "def": 6,
+		"gold": 36, "xp": 23, "sprite": "zinshund", "tint": Color(1.15, 1.0, 0.65),
+		"attack_line": "%s treibt bei %s Schulden ein!"},
+	"boss2": {"name": "Monopolfürst", "hp": 560, "atk": 26, "def": 8, "gold": 1200, "xp": 190,
+		"sprite": "boss2", "boss": true, "theme": "gold", "song": "boss2",
+		"entrance_line": "Zeit ist Geld — und eure Zeit ist hiermit gekündigt!",
+		"aoe_name": "Münzhagel", "ultimate_name": "Feindliche Übernahme"},
+	# --- Hassfestung: die Rassisten und Nationalisten ---
+	"hetzer": {"name": "Hetzer", "hp": 72, "atk": 25, "def": 6,
+		"gold": 30, "xp": 34, "sprite": "hetzer", "proj": "hate",
+		"attack_line": "%s bewirft %s mit giftigen Parolen!"},
+	"wutgeist": {"name": "Wutgeist", "hp": 60, "atk": 28, "def": 4,
+		"gold": 28, "xp": 36, "sprite": "wutgeist", "tint": Color(1.35, 0.62, 0.62),
+		"attack_line": "%s stürzt sich blind vor Wut auf %s!"},
+	"schlaeger": {"name": "Schläger", "hp": 88, "atk": 26, "def": 9,
+		"gold": 34, "xp": 40, "sprite": "schlaeger",
+		"attack_line": "%s holt zum brutalen Schlag gegen %s aus!"},
+	"hassprediger": {"name": "Hassprediger", "hp": 66, "atk": 30, "def": 5,
+		"gold": 36, "xp": 42, "sprite": "hassprediger", "proj": "hate",
+		"tint": Color(1.15, 0.8, 0.8),
+		"attack_line": "%s schleudert %s einen Fluch aus Hass entgegen!"},
+	"boss3": {"name": "Der Spalter", "hp": 680, "atk": 33, "def": 10, "gold": 900, "xp": 280,
+		"sprite": "boss3", "boss": true, "theme": "hate", "song": "boss3",
+		"entrance_line": "Ihr da! Ihr gehört hier nicht her — die Festung kennt nur Hass!",
+		"aoe_name": "Hasstirade", "ultimate_name": "Mauer des Hasses"},
 }
 
 # Zufalls-Begegnungen pro Dungeon (Gruppen von Gegner-IDs).
 const ENCOUNTERS := {
 	"dungeon": [
-		["slime", "slime"],
-		["bat", "bat", "slime"],
-		["skeleton"],
-		["skeleton", "bat"],
-		["slime", "bat"],
+		["schlammschleim", "schlammschleim"],
+		["qualmgeist", "qualmgeist", "schlammschleim"],
+		["muellgnom"],
+		["muellgnom", "qualmgeist"],
+		["schlammschleim", "qualmgeist"],
 	],
 	"dungeon2": [
-		["frostwolf"],
-		["frostwolf", "eisgeist"],
-		["eisgeist", "eisgeist"],
-		["frostwolf", "frostwolf"],
-		["eisgeist", "frostwolf", "eisgeist"],
+		["gierschlund"],
+		["gierschlund", "paragraphengeist"],
+		["zinshund", "zinshund"],
+		["paragraphengeist", "zinshund"],
+		["gierschlund", "zinshund", "paragraphengeist"],
+	],
+	"dungeon3": [
+		["hetzer"],
+		["hetzer", "wutgeist"],
+		["schlaeger", "wutgeist"],
+		["hassprediger", "hetzer"],
+		["schlaeger", "hassprediger", "wutgeist"],
 	],
 }
 
@@ -58,6 +102,7 @@ func reset_all() -> void:
 	gold = 120
 	boss_defeated = false
 	boss2_defeated = false
+	boss3_defeated = false
 	reset_party()
 
 func reset_party() -> void:
@@ -75,6 +120,9 @@ func reset_party() -> void:
 				{"name": "Fokusstoß", "cost": 3, "target": "one",
 					"power": 16, "kind": "pierce",
 					"desc": "Durchbohrt die Verteidigung."},
+				{"name": "Klingentanz", "cost": 8, "target": "one",
+					"power": 6, "kind": "dance",
+					"desc": "Fünf Blitzschnitte im Stern, dann der Fallstreich."},
 			],
 			"ultimate": {"name": "Sternenklinge",
 				"desc": "Lichtklingen zerreißen alle Feinde. (1x pro Kampf)"},
@@ -123,12 +171,14 @@ func reset_party() -> void:
 				"desc": "Ein Strahl aus dem Orbit vernichtet alle Feinde. (1x pro Kampf)"},
 		},
 	]
-	# Nach dem Sieg über den Knochenkönig bleibt seine Segnung erhalten,
-	# auch wenn die Gruppe später fällt — sonst wäre die Frostgrotte unschaffbar.
+	# Besiegte Bosse hinterlassen dauerhafte Segnungen — sie überstehen auch
+	# Niederlagen, sonst wären die späteren Dungeons unschaffbar.
 	if boss_defeated:
 		apply_blessing()
+	if boss2_defeated:
+		apply_blessing2()
 
-## Segnung des Knochenkönigs: dauerhafter Machtschub für die Frostgrotte.
+## Segnung des reinen Flusses (nach dem Schlotbaron): Machtschub für den Konzernturm.
 func apply_blessing() -> void:
 	for member in party:
 		member["max_hp"] += 35
@@ -137,6 +187,18 @@ func apply_blessing() -> void:
 		member["mp"] = member["max_mp"]
 		member["atk"] += 6
 		member["mag"] += 8
+		member["def"] += 3
+
+## Segnung des freien Marktes... nein: des geteilten Wohlstands (nach dem
+## Monopolfürsten) — Rückenwind für die Hassfestung.
+func apply_blessing2() -> void:
+	for member in party:
+		member["max_hp"] += 30
+		member["hp"] = member["max_hp"]
+		member["max_mp"] += 10
+		member["mp"] = member["max_mp"]
+		member["atk"] += 5
+		member["mag"] += 6
 		member["def"] += 3
 
 ## ---------- Stufenaufstieg (Level-System) ----------

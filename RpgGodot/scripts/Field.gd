@@ -12,9 +12,11 @@ const CHAR_OFFSET := Vector2(-2, -12)
 # Feld-Bosse: welcher Boss in welchem Dungeon thront (bis sein Flag gesetzt ist).
 const FIELD_BOSSES := {
 	"dungeon": {"id": "boss", "tile": Vector2i(18, 10), "flag": "boss_defeated",
-		"glow": Color(1.0, 0.15, 0.05, 0.35)},
+		"glow": Color(0.45, 1.0, 0.20, 0.35)},
 	"dungeon2": {"id": "boss2", "tile": Vector2i(18, 10), "flag": "boss2_defeated",
-		"glow": Color(0.20, 0.80, 1.0, 0.35)},
+		"glow": Color(1.0, 0.80, 0.20, 0.35)},
+	"dungeon3": {"id": "boss3", "tile": Vector2i(18, 10), "flag": "boss3_defeated",
+		"glow": Color(1.0, 0.15, 0.05, 0.35)},
 }
 
 var map_id := "town"
@@ -54,14 +56,19 @@ var hud: Label
 
 # Dunkle Karten: Grundlicht + Laternenfarbe + Wandschmuck (Fackel/Kristall).
 const LIGHTING := {
-	"dungeon": {"ambient": Color(0.36, 0.32, 0.52), "lantern": Color(1.0, 0.78, 0.48),
-		"wall_prop": "torch"},
-	"dungeon2": {"ambient": Color(0.32, 0.42, 0.66), "lantern": Color(0.80, 0.92, 1.0),
-		"wall_prop": "crystal"},
+	# Schlotwerk: giftgrüner Dunst, Schleim trieft von den Wänden.
+	"dungeon": {"ambient": Color(0.32, 0.42, 0.32), "lantern": Color(0.85, 1.0, 0.60),
+		"wall_prop": "goo", "light": Color(0.55, 0.95, 0.35)},
+	# Konzernturm: kaltes Marmorlicht mit goldenen Kronleuchter-Kristallen.
+	"dungeon2": {"ambient": Color(0.44, 0.42, 0.36), "lantern": Color(1.0, 0.92, 0.65),
+		"wall_prop": "crystal", "light": Color(1.0, 0.85, 0.45)},
+	# Hassfestung: rote Banner, glutrote Fackelschächte.
+	"dungeon3": {"ambient": Color(0.42, 0.28, 0.28), "lantern": Color(1.0, 0.72, 0.45),
+		"wall_prop": "banner_red", "light": Color(1.0, 0.42, 0.22)},
 }
 
 # Kacheln, die einen Kontaktschatten auf den Boden darunter werfen.
-const SOLID_ABOVE := ["t", "m", "R", "W", "D", "#", "I"]
+const SOLID_ABOVE := ["t", "m", "R", "W", "D", "#", "I", "Y"]
 
 func _ready() -> void:
 	add_child(Fx.glow_environment())
@@ -98,7 +105,7 @@ func _add_lighting() -> void:
 		var row: String = rows[y]
 		for x in row.length():
 			var ch := row[x]
-			if (ch == "#" or ch == "I") and MapData.WALKABLE.has((rows[y + 1] as String)[x]):
+			if (ch == "#" or ch == "I" or ch == "Y") and MapData.WALKABLE.has((rows[y + 1] as String)[x]):
 				candidates.append(Vector2i(x, y))
 	var step := maxi(2, candidates.size() / 9)
 	var placed := 0
@@ -112,26 +119,43 @@ func _add_lighting() -> void:
 		s.centered = false
 		s.z_index = 2
 		add_child(s)
-		if cfg["wall_prop"] == "torch":
-			s.position = Vector2(c.x * TILE + 5, c.y * TILE + 3)
-			var l := Fx.point_light(Color(1.0, 0.70, 0.35), 55.0, 1.1)
-			l.position = Vector2(c.x * TILE + 8, c.y * TILE + 6)
-			add_child(l)
-			Fx.flicker(l, 1.1)
-			# Glutschein direkt an der Flamme
-			var halo := Sprite2D.new()
-			halo.texture = SpriteFactory.circle(6, Color(1.0, 0.65, 0.25, 0.45))
-			halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			halo.material = _additive()
-			halo.position = Vector2(c.x * TILE + 8, c.y * TILE + 5)
-			halo.z_index = 3
-			add_child(halo)
-		else:
-			s.position = Vector2(c.x * TILE + 3, c.y * TILE + 4)
-			var l := Fx.point_light(Color(0.55, 0.85, 1.0), 48.0, 0.9)
-			l.position = Vector2(c.x * TILE + 8, c.y * TILE + 10)
-			add_child(l)
-			Fx.pulse(l, 0.9, 1.4 + randf() * 0.8)
+		var lcol: Color = cfg.get("light", Color(1.0, 0.70, 0.35))
+		match cfg["wall_prop"]:
+			"torch":
+				s.position = Vector2(c.x * TILE + 5, c.y * TILE + 3)
+				var l := Fx.point_light(lcol, 55.0, 1.1)
+				l.position = Vector2(c.x * TILE + 8, c.y * TILE + 6)
+				add_child(l)
+				Fx.flicker(l, 1.1)
+				# Glutschein direkt an der Flamme
+				var halo := Sprite2D.new()
+				halo.texture = SpriteFactory.circle(6, Color(lcol.r, lcol.g, lcol.b, 0.45))
+				halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+				halo.material = _additive()
+				halo.position = Vector2(c.x * TILE + 8, c.y * TILE + 5)
+				halo.z_index = 3
+				add_child(halo)
+			"goo":
+				# Triefender Giftschleim: Overlay direkt auf der Wandkachel,
+				# darunter ein waberndes grünes Glimmen.
+				s.position = Vector2(c.x * TILE, c.y * TILE)
+				var l := Fx.point_light(lcol, 50.0, 0.9)
+				l.position = Vector2(c.x * TILE + 8, c.y * TILE + 16)
+				add_child(l)
+				Fx.pulse(l, 0.9, 1.6 + randf() * 0.9)
+			"banner_red":
+				# Banner hängt an der Wand, davor flackert eine Fackelschale.
+				s.position = Vector2(c.x * TILE, c.y * TILE)
+				var l := Fx.point_light(lcol, 58.0, 1.0)
+				l.position = Vector2(c.x * TILE + 8, c.y * TILE + 18)
+				add_child(l)
+				Fx.flicker(l, 1.0)
+			_:
+				s.position = Vector2(c.x * TILE + 3, c.y * TILE + 4)
+				var l := Fx.point_light(lcol, 48.0, 0.9)
+				l.position = Vector2(c.x * TILE + 8, c.y * TILE + 10)
+				add_child(l)
+				Fx.pulse(l, 0.9, 1.4 + randf() * 0.8)
 
 static func _additive() -> CanvasItemMaterial:
 	var m := CanvasItemMaterial.new()
@@ -144,8 +168,15 @@ func _add_barrier_shimmer() -> void:
 		if not portal.has("locked_until") or GameState.get(portal["locked_until"]):
 			continue
 		var p: Vector2i = portal["pos"]
+		# Barrierenfarbe passend zum Ziel: goldene Konzern-Versiegelung,
+		# roter Hass-Wall, sonst eisblau.
+		var bcol := Color(0.45, 0.85, 1.0, 0.5)
+		if portal["to"] == "dungeon2":
+			bcol = Color(1.0, 0.85, 0.30, 0.5)
+		elif portal["to"] == "dungeon3":
+			bcol = Color(1.0, 0.35, 0.25, 0.5)
 		var shimmer := Sprite2D.new()
-		shimmer.texture = SpriteFactory.circle(10, Color(0.45, 0.85, 1.0, 0.5))
+		shimmer.texture = SpriteFactory.circle(10, bcol)
 		shimmer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		shimmer.position = Vector2(p.x * TILE + 8, p.y * TILE + 8)
 		shimmer.z_index = 6
@@ -175,21 +206,33 @@ func _add_ambience() -> void:
 			p.color = Color(0.55, 0.75, 0.35, 0.8)
 			p.texture = SpriteFactory.circle(2, Color.WHITE)
 		"dungeon":
+			# Giftgrüne Smogbläschen steigen träge auf
 			p.emission_rect_extents = Vector2(190, 120)
 			p.position = Vector2(6, 8)
 			p.direction = Vector2(0, -1)
-			p.gravity = Vector2.ZERO
-			p.initial_velocity_min = 2.0
-			p.initial_velocity_max = 7.0
-			p.color = Color(0.75, 0.70, 0.85, 0.35)
-			p.texture = SpriteFactory.circle(1, Color.WHITE)
+			p.gravity = Vector2(0, -3)
+			p.initial_velocity_min = 3.0
+			p.initial_velocity_max = 9.0
+			p.color = Color(0.55, 0.90, 0.35, 0.35)
+			p.texture = SpriteFactory.circle(2, Color.WHITE)
 		"dungeon2":
-			p.amount = 40
-			p.direction = Vector2(0.15, 1)
-			p.gravity = Vector2(0, 6)
-			p.initial_velocity_min = 22.0
-			p.initial_velocity_max = 44.0
-			p.color = Color(0.95, 0.98, 1.0, 0.8)
+			# Goldener Geldstaub rieselt von den Kronleuchtern
+			p.amount = 34
+			p.direction = Vector2(0.1, 1)
+			p.gravity = Vector2(0, 5)
+			p.initial_velocity_min = 10.0
+			p.initial_velocity_max = 22.0
+			p.color = Color(1.0, 0.88, 0.45, 0.7)
+			p.texture = SpriteFactory.circle(1, Color.WHITE)
+		"dungeon3":
+			# Glutasche treibt durch die Festung
+			p.emission_rect_extents = Vector2(190, 120)
+			p.position = Vector2(6, 8)
+			p.direction = Vector2(-0.2, -1)
+			p.gravity = Vector2(-3, -5)
+			p.initial_velocity_min = 4.0
+			p.initial_velocity_max = 11.0
+			p.color = Color(1.0, 0.45, 0.20, 0.45)
 			p.texture = SpriteFactory.circle(1, Color.WHITE)
 		"world":
 			p.amount = 16
@@ -270,17 +313,31 @@ func _add_tile_details() -> void:
 					elif n < 0.18:
 						_place_prop("tuft", x, y, n)
 				"f":
+					# Schlotwerk: Risse, Giftfässer, Schlammpfützen, Mutantenpilze
 					if n < 0.05:
 						_place_prop("pebble", x, y, n)
 					elif n < 0.09:
 						_place_prop("crack", x, y, n)
 					elif n < 0.115:
-						_place_prop("bones", x, y, n)
+						_place_prop("barrel", x, y, n)
+					elif n < 0.14:
+						_place_prop("sludge", x, y, n)
 					elif n > 0.975:
 						_place_mushroom(x, y)
 				"i":
-					if n < 0.08:
-						_place_prop("icecrack", x, y, n)
+					# Konzernturm: Münzhaufen und Frachtkisten
+					if n < 0.05:
+						_place_prop("coins", x, y, n)
+					elif n < 0.08:
+						_place_prop("crate", x, y, n)
+				"y":
+					# Hassfestung: Risse, Schutt, Knochen
+					if n < 0.05:
+						_place_prop("crack", x, y, n)
+					elif n < 0.08:
+						_place_prop("pebble", x, y, n)
+					elif n < 0.105:
+						_place_prop("bones", x, y, n)
 
 func _tile_noise(x: int, y: int) -> float:
 	return fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
@@ -574,8 +631,9 @@ func _advance_dialogue() -> void:
 const GRADES := {
 	"town": [Color(1.0, 0.85, 0.55, 0.08), Color(0.15, 0.10, 0.35, 0.12)],
 	"world": [Color(1.0, 0.90, 0.65, 0.06), Color(0.10, 0.12, 0.35, 0.10)],
-	"dungeon": [Color(0.55, 0.35, 0.75, 0.07), Color(0.05, 0.03, 0.15, 0.20)],
-	"dungeon2": [Color(0.60, 0.85, 1.0, 0.09), Color(0.02, 0.08, 0.30, 0.18)],
+	"dungeon": [Color(0.60, 0.95, 0.35, 0.08), Color(0.04, 0.12, 0.03, 0.20)],
+	"dungeon2": [Color(1.0, 0.88, 0.50, 0.09), Color(0.12, 0.08, 0.02, 0.16)],
+	"dungeon3": [Color(1.0, 0.45, 0.30, 0.08), Color(0.10, 0.02, 0.02, 0.20)],
 }
 
 func _build_ui() -> void:

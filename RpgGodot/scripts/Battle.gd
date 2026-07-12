@@ -28,7 +28,30 @@ const BATTLE_FORMATION := {
 }
 
 var enemy_ids: Array = []
-var arena_theme := "cave"  # "cave" | "frost" — von Main anhand der Karte gesetzt
+var arena_theme := "toxic"  # "toxic" | "gold" | "hate" — von Main anhand der Karte gesetzt
+
+# Inszenierungs-Farben je Boss-Thema (Banner, Blitze, Wut-Phase, Auren).
+const THEME_STYLE := {
+	"toxic": {"flash": Color(0.45, 1.0, 0.25, 0.40), "banner": Color(0.60, 1.0, 0.35),
+		"banner_outline": Color(0.05, 0.18, 0.03), "bar": Color(0.45, 0.95, 0.25),
+		"bar_border": Color(0.20, 0.45, 0.10), "rage": Color(0.6, 1.5, 0.45),
+		"aura": Color(0.45, 1.0, 0.15, 0.30), "ember": Color(0.55, 1.0, 0.20, 0.8),
+		"burst": Color(0.55, 1.0, 0.30)},
+	"gold": {"flash": Color(1.0, 0.85, 0.25, 0.40), "banner": Color(1.0, 0.87, 0.35),
+		"banner_outline": Color(0.25, 0.15, 0.02), "bar": Color(1.0, 0.80, 0.20),
+		"bar_border": Color(0.50, 0.35, 0.08), "rage": Color(1.6, 1.2, 0.5),
+		"aura": Color(1.0, 0.75, 0.15, 0.30), "ember": Color(1.0, 0.85, 0.25, 0.8),
+		"burst": Color(1.0, 0.85, 0.35)},
+	"hate": {"flash": Color(1.0, 0.15, 0.10, 0.40), "banner": Color(1.0, 0.45, 0.35),
+		"banner_outline": Color(0.28, 0.03, 0.03), "bar": Color(0.95, 0.20, 0.15),
+		"bar_border": Color(0.55, 0.10, 0.08), "rage": Color(1.7, 0.45, 0.35),
+		"aura": Color(1.0, 0.15, 0.05, 0.30), "ember": Color(1.0, 0.25, 0.08, 0.8),
+		"burst": Color(1.0, 0.40, 0.30)},
+}
+
+## Stil des aktuellen Boss-Themas (Fallback: Arena-Thema).
+func _style() -> Dictionary:
+	return THEME_STYLE.get(boss_def.get("theme", arena_theme), THEME_STYLE["toxic"])
 var boss_def := {}         # ENEMIES-Definition des Bosses in diesem Kampf (falls vorhanden)
 var heroes := []   # {data, sprite, home, hp_label, hp_fill, mp_fill}
 var enemies := []  # {name, hp, max_hp, atk, def, gold, sprite, home, alive, ...}
@@ -60,8 +83,36 @@ func _ready() -> void:
 	_build_ui()
 	if OS.get_environment("SPELLSHOT") != "":
 		_spell_showcase()
+	elif OS.get_environment("BOSSSHOT") != "":
+		_boss_showcase()
 	else:
 		_run_battle()
+
+## Debug: spielt AoE + Ultimate des aktuellen Bosses ab und macht Screenshots
+## (env BOSSSHOT=Zielordner). Nur zum visuellen Prüfen, kein Spielinhalt.
+func _boss_showcase() -> void:
+	var dir := OS.get_environment("BOSSSHOT")
+	var suffix: String = boss_def.get("theme", "x")
+	for u in heroes + enemies:
+		(u["sprite"] as Sprite2D).position = u["home"]
+	for i in heroes.size():
+		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0)
+	_start_idle_animations()
+	for h in heroes:
+		h["data"]["hp"] = 999
+		h["data"]["max_hp"] = 999
+	var e: Dictionary = enemies[0]
+	await get_tree().create_timer(0.8).timeout
+	_snap(dir, "boss_idle_" + suffix)
+	await _boss_aoe(e, heroes)
+	_snap(dir, "boss_aoe_" + suffix)
+	await get_tree().create_timer(0.5).timeout
+	e["hp"] = int(e["max_hp"] * 0.3)
+	await _boss_enrage(e)
+	await _boss_ultimate(e, heroes)
+	_snap(dir, "boss_ult_" + suffix)
+	await get_tree().create_timer(1.0).timeout
+	get_tree().quit()
 
 ## Debug: löst jeden Zauber-/Spezialeffekt aus und macht Screenshots am Höhepunkt
 ## (env SPELLSHOT=Zielordner). Nur zum visuellen Prüfen, kein Spielinhalt.
@@ -97,6 +148,13 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_snap(dir, "show_pierce_2")
 	await get_tree().create_timer(1.3).timeout
+	# Serena Klingentanz (Sternschritte + Fallstreich)
+	_blade_dance(heroes[0], heroes[0]["data"]["abilities"][2], enemies[1])
+	await get_tree().create_timer(1.6).timeout
+	_snap(dir, "show_dance_1")
+	await get_tree().create_timer(1.15).timeout
+	_snap(dir, "show_dance_2")
+	await get_tree().create_timer(1.0).timeout
 	# Milo Feuerball (Explosion einfangen)
 	_fireball(heroes[1], heroes[1]["data"]["abilities"][0], enemies[0])
 	await get_tree().create_timer(1.85).timeout
@@ -164,33 +222,50 @@ func _snap(dir: String, shot_name: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(dir + "/" + shot_name + ".png")
 
-## Farbstimmung des Schauplatzes (dunkle Höhle vs. Frostgrotte).
+## Farbstimmung des Schauplatzes (Schlotwerk giftgrün, Konzernturm golden,
+## Hassfestung blutrot).
 func _palette() -> Dictionary:
-	if arena_theme == "frost":
-		return {
-			"bg_top": Color(0.08, 0.15, 0.26), "bg_bottom": Color(0.02, 0.05, 0.11),
-			"floor_top": Color(0.20, 0.28, 0.40), "floor_bottom": Color(0.08, 0.12, 0.20),
-			"stone": Color(0.34, 0.44, 0.58), "stal": Color(0.14, 0.22, 0.36, 0.9),
-			"flame": Color(0.35, 0.80, 1.0), "glow": Color(0.25, 0.70, 1.0, 0.35),
-			"fog": Color(0.70, 0.85, 1.0, 0.09), "hit": Color(0.55, 0.85, 1.0),
-			"ray": Color(0.60, 0.85, 1.0, 0.05), "dust": Color(0.75, 0.92, 1.0, 0.55),
-			"grade_top": Color(0.65, 0.85, 1.0, 0.08), "grade_bottom": Color(0.03, 0.10, 0.35, 0.20),
-			"pool_hero": Color(0.65, 0.90, 1.0, 0.11), "pool_enemy": Color(0.45, 0.80, 1.0, 0.11),
-			"fg": Color(0.02, 0.04, 0.09), "ambient": Color(0.55, 0.64, 0.80),
-		}
 	var boss_fight := not boss_def.is_empty()
-	return {
-		"bg_top": Color(0.16, 0.07, 0.12) if boss_fight else Color(0.13, 0.11, 0.22),
-		"bg_bottom": Color(0.05, 0.03, 0.07),
-		"floor_top": Color(0.22, 0.18, 0.27), "floor_bottom": Color(0.10, 0.08, 0.14),
-		"stone": Color(0.28, 0.24, 0.34), "stal": Color(0.09, 0.06, 0.13, 0.85),
-		"flame": Color(1.0, 0.60, 0.15), "glow": Color(1.0, 0.55, 0.15, 0.35),
-		"fog": Color(0.55, 0.50, 0.75, 0.07), "hit": Color(1.0, 0.4, 0.3),
-		"ray": Color(1.0, 0.80, 0.50, 0.05), "dust": Color(1.0, 0.85, 0.55, 0.50),
-		"grade_top": Color(0.95, 0.65, 0.35, 0.07), "grade_bottom": Color(0.08, 0.10, 0.35, 0.17),
-		"pool_hero": Color(1.0, 0.85, 0.55, 0.12), "pool_enemy": Color(0.70, 0.50, 1.0, 0.10),
-		"fg": Color(0.03, 0.02, 0.06), "ambient": Color(0.62, 0.58, 0.72),
-	}
+	match arena_theme:
+		"gold":
+			return {
+				"bg_top": Color(0.18, 0.14, 0.08) if boss_fight else Color(0.15, 0.12, 0.09),
+				"bg_bottom": Color(0.05, 0.04, 0.03),
+				"floor_top": Color(0.30, 0.27, 0.24), "floor_bottom": Color(0.13, 0.11, 0.09),
+				"stone": Color(0.42, 0.38, 0.30), "stal": Color(0.12, 0.09, 0.05, 0.85),
+				"flame": Color(1.0, 0.80, 0.30), "glow": Color(1.0, 0.75, 0.25, 0.35),
+				"fog": Color(0.85, 0.75, 0.50, 0.07), "hit": Color(1.0, 0.80, 0.30),
+				"ray": Color(1.0, 0.85, 0.45, 0.06), "dust": Color(1.0, 0.88, 0.50, 0.55),
+				"grade_top": Color(1.0, 0.85, 0.40, 0.08), "grade_bottom": Color(0.10, 0.06, 0.20, 0.16),
+				"pool_hero": Color(1.0, 0.90, 0.60, 0.12), "pool_enemy": Color(1.0, 0.80, 0.35, 0.11),
+				"fg": Color(0.04, 0.03, 0.02), "ambient": Color(0.68, 0.62, 0.52),
+			}
+		"hate":
+			return {
+				"bg_top": Color(0.19, 0.05, 0.06) if boss_fight else Color(0.14, 0.06, 0.08),
+				"bg_bottom": Color(0.05, 0.02, 0.03),
+				"floor_top": Color(0.24, 0.15, 0.16), "floor_bottom": Color(0.10, 0.06, 0.07),
+				"stone": Color(0.32, 0.22, 0.22), "stal": Color(0.10, 0.04, 0.05, 0.85),
+				"flame": Color(1.0, 0.45, 0.15), "glow": Color(1.0, 0.35, 0.12, 0.35),
+				"fog": Color(0.70, 0.35, 0.35, 0.07), "hit": Color(1.0, 0.35, 0.25),
+				"ray": Color(1.0, 0.45, 0.30, 0.05), "dust": Color(1.0, 0.55, 0.35, 0.50),
+				"grade_top": Color(1.0, 0.45, 0.30, 0.08), "grade_bottom": Color(0.10, 0.02, 0.04, 0.20),
+				"pool_hero": Color(1.0, 0.75, 0.55, 0.12), "pool_enemy": Color(1.0, 0.35, 0.25, 0.11),
+				"fg": Color(0.04, 0.01, 0.02), "ambient": Color(0.66, 0.52, 0.52),
+			}
+		_:  # toxic
+			return {
+				"bg_top": Color(0.09, 0.15, 0.08) if boss_fight else Color(0.10, 0.13, 0.10),
+				"bg_bottom": Color(0.03, 0.05, 0.03),
+				"floor_top": Color(0.20, 0.25, 0.18), "floor_bottom": Color(0.09, 0.12, 0.08),
+				"stone": Color(0.30, 0.34, 0.26), "stal": Color(0.07, 0.10, 0.06, 0.85),
+				"flame": Color(0.55, 1.0, 0.30), "glow": Color(0.50, 1.0, 0.25, 0.35),
+				"fog": Color(0.55, 0.80, 0.40, 0.08), "hit": Color(0.70, 1.0, 0.35),
+				"ray": Color(0.65, 1.0, 0.45, 0.05), "dust": Color(0.75, 1.0, 0.55, 0.50),
+				"grade_top": Color(0.60, 1.0, 0.40, 0.07), "grade_bottom": Color(0.03, 0.10, 0.20, 0.17),
+				"pool_hero": Color(0.90, 1.0, 0.65, 0.12), "pool_enemy": Color(0.55, 1.0, 0.40, 0.10),
+				"fg": Color(0.02, 0.04, 0.02), "ambient": Color(0.60, 0.68, 0.58),
+			}
 
 ## ---------- Aufbau ----------
 
@@ -283,9 +358,12 @@ func _build_scene() -> void:
 		stone.position = Vector2(40 + i * 39.0, 350 + fmod(i * 61.3, 160.0))
 		stone.z_index = -11
 		add_child(stone)
-	# Verstreute Requisiten machen den Boden glaubwürdig (Knochen/Risse/Eis).
-	var prop_kinds: Array = ["icecrack", "pebble", "crack"] if arena_theme == "frost" \
-		else ["bones", "crack", "pebble"]
+	# Verstreute Requisiten machen den Boden glaubwürdig (je Schauplatz).
+	var prop_kinds: Array
+	match arena_theme:
+		"gold": prop_kinds = ["coins", "crate", "pebble"]
+		"hate": prop_kinds = ["bones", "crack", "pebble"]
+		_: prop_kinds = ["barrel", "sludge", "crack"]
 	for i in 6:
 		var pr := Sprite2D.new()
 		pr.texture = SpriteFactory.prop(prop_kinds[i % prop_kinds.size()])
@@ -312,8 +390,7 @@ func _build_scene() -> void:
 	_add_fog(pal)
 	_add_dust_motes(pal)
 	_add_foreground_blur(pal)
-	if arena_theme == "frost":
-		_add_snow()
+	_add_theme_weather()
 
 	# Alle Kämpfer starten außerhalb des Bildes und marschieren in _run_battle ein.
 	for i in GameState.party.size():
@@ -355,22 +432,30 @@ func _build_scene() -> void:
 			_attach_shadow(s, 13, 3, foot)
 			_attach_glow_pool(s, foot, pal["pool_enemy"])
 			refl = _attach_reflection(s, foot, 0.10)
-			_attach_boss_aura(s, def.get("theme", "bone"))
+			_attach_boss_aura(s, def.get("theme", "toxic"))
 		else:
 			var foot_e: float = s.texture.get_height() * 0.5 - 1.0
 			_attach_shadow(s, 9, 3, foot_e)
 			_attach_glow_pool(s, foot_e, pal["pool_enemy"])
 			refl = _attach_reflection(s, foot_e)
+		# Themen-Tönung (z. B. goldene Gierschlünde, rote Wutgeister);
+		# die Spiegelung erbt sie als Kind automatisch.
+		var tint: Color = def.get("tint", Color.WHITE)
+		s.modulate = tint
+		s.set_meta("tint", tint)
 		add_child(s)
 		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"], "xp": def.get("xp", 0),
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
-			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl})
+			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl,
+			"tint": tint, "proj": def.get("proj", ""),
+			"attack_line": def.get("attack_line", "")})
 
 ## Lebendiger Himmel über der Arena: pulsierende Glut in der Höhle,
 ## wogende Aurora-Bänder in der Frostgrotte.
 func _add_sky(pal: Dictionary) -> void:
-	if arena_theme == "frost":
+	if arena_theme == "toxic":
+		# Wabernde Smogschwaden ziehen als Bänder unter der Hallendecke entlang
 		for i in 3:
 			var band := Polygon2D.new()
 			var pts := PackedVector2Array()
@@ -380,25 +465,28 @@ func _add_sky(pal: Dictionary) -> void:
 			for k in range(12, -1, -1):
 				pts.append(Vector2(k * 80.0, y0 + 24.0 + sin(k * 0.9 + i * 1.7) * 16.0))
 			band.polygon = pts
-			band.color = Color(0.4, 0.9, 0.8, 0.05 + 0.02 * i)
+			band.color = Color(0.45, 0.85, 0.30, 0.05 + 0.02 * i)
 			band.z_index = -18
 			var mat := CanvasItemMaterial.new()
 			mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 			band.material = mat
 			add_child(band)
 			var tw := band.create_tween().set_loops()
-			tw.tween_property(band, "modulate", Color(0.7, 1.25, 1.1, 1.0), 3.2 + i * 0.8) \
+			tw.tween_property(band, "modulate", Color(0.8, 1.25, 0.7, 1.0), 3.2 + i * 0.8) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 			tw.parallel().tween_property(band, "position:x", -22.0, 3.2 + i * 0.8) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-			tw.tween_property(band, "modulate", Color(1.15, 0.9, 1.3, 0.7), 3.6 + i * 0.7) \
+			tw.tween_property(band, "modulate", Color(1.1, 1.0, 0.6, 0.7), 3.6 + i * 0.7) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 			tw.parallel().tween_property(band, "position:x", 22.0, 3.6 + i * 0.7) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		return
+	# Pulsierende Glutblasen: golden im Konzernturm, blutrot in der Hassfestung
+	var blob_col := Color(1.0, 0.80, 0.30, 0.10) if arena_theme == "gold" \
+		else Color(1.0, 0.30, 0.12, 0.10)
 	for i in 4:
 		var blob := Sprite2D.new()
-		blob.texture = SpriteFactory.circle(26, Color(1.0, 0.45, 0.15, 0.10))
+		blob.texture = SpriteFactory.circle(26, blob_col)
 		blob.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		blob.position = Vector2(120 + i * 240.0, 70 + fmod(i * 53.0, 60.0))
 		blob.scale = Vector2(2.5 + (i % 2), 1.6)
@@ -476,10 +564,11 @@ func _attach_reflection(s: Sprite2D, foot_y: float, alpha := 0.15) -> Sprite2D:
 	s.add_child(r)
 	return r
 
-## Pulsierende Aura + aufsteigende Glut hinter dem Boss (rot bzw. eisblau).
+## Pulsierende Aura + aufsteigende Glut hinter dem Boss (Farbe je Thema).
 func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
-	var aura_col := Color(0.20, 0.75, 1.0, 0.30) if theme == "frost" else Color(1.0, 0.15, 0.05, 0.30)
-	var ember_col := Color(0.45, 0.85, 1.0, 0.8) if theme == "frost" else Color(1.0, 0.25, 0.08, 0.8)
+	var st: Dictionary = THEME_STYLE.get(theme, THEME_STYLE["toxic"])
+	var aura_col: Color = st["aura"]
+	var ember_col: Color = st["ember"]
 	var glow := Sprite2D.new()
 	glow.texture = SpriteFactory.circle(40, aura_col)
 	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -652,25 +741,55 @@ func _add_fog(pal: Dictionary) -> void:
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Sanft rieselnder Schnee in der Frostgrotte.
-func _add_snow() -> void:
-	var snow := CPUParticles2D.new()
-	snow.position = Vector2(480, -20)
-	snow.amount = 70
-	snow.lifetime = 6.0
-	snow.preprocess = 6.0
-	snow.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	snow.emission_rect_extents = Vector2(520, 10)
-	snow.direction = Vector2(0, 1)
-	snow.spread = 12.0
-	snow.gravity = Vector2(0, 12)
-	snow.initial_velocity_min = 55.0
-	snow.initial_velocity_max = 95.0
-	snow.scale_amount_min = 0.5
-	snow.scale_amount_max = 1.2
-	snow.color = Color(0.95, 0.98, 1.0, 0.75)
-	snow.texture = SpriteFactory.circle(2, Color.WHITE)
-	snow.z_index = 20
-	add_child(snow)
+## Schauplatz-Wetter: giftige Bläschen, goldener Glitzerregen oder Glutasche.
+func _add_theme_weather() -> void:
+	var p := CPUParticles2D.new()
+	p.lifetime = 6.0
+	p.preprocess = 6.0
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.texture = SpriteFactory.circle(2, Color.WHITE)
+	p.z_index = 20
+	match arena_theme:
+		"gold":
+			# Goldstaub rieselt wie feiner Konfettiregen
+			p.position = Vector2(480, -20)
+			p.amount = 50
+			p.emission_rect_extents = Vector2(520, 10)
+			p.direction = Vector2(0.08, 1)
+			p.spread = 10.0
+			p.gravity = Vector2(0, 10)
+			p.initial_velocity_min = 35.0
+			p.initial_velocity_max = 65.0
+			p.scale_amount_min = 0.4
+			p.scale_amount_max = 1.0
+			p.color = Color(1.0, 0.87, 0.40, 0.75)
+		"hate":
+			# Glutasche wirbelt nach oben
+			p.position = Vector2(480, 560)
+			p.amount = 46
+			p.emission_rect_extents = Vector2(520, 10)
+			p.direction = Vector2(-0.15, -1)
+			p.spread = 16.0
+			p.gravity = Vector2(-6, -22)
+			p.initial_velocity_min = 30.0
+			p.initial_velocity_max = 60.0
+			p.scale_amount_min = 0.5
+			p.scale_amount_max = 1.1
+			p.color = Color(1.0, 0.42, 0.15, 0.7)
+		_:
+			# Giftblasen steigen träge aus dem Boden
+			p.position = Vector2(480, 560)
+			p.amount = 36
+			p.emission_rect_extents = Vector2(520, 10)
+			p.direction = Vector2(0, -1)
+			p.spread = 8.0
+			p.gravity = Vector2(0, -10)
+			p.initial_velocity_min = 18.0
+			p.initial_velocity_max = 40.0
+			p.scale_amount_min = 0.6
+			p.scale_amount_max = 1.4
+			p.color = Color(0.55, 1.0, 0.30, 0.45)
+	add_child(p)
 
 ## Lebendige Idles: Held*innen und Monster durchlaufen ihre 4-Frame-Animation.
 func _start_idle_animations() -> void:
@@ -860,17 +979,15 @@ func _build_boss_bar() -> void:
 	boss_bar_holder.position = Vector2(270, 52)
 	boss_bar_holder.modulate.a = 0.0
 	ui_layer.add_child(boss_bar_holder)
-	var frost: bool = boss_def.get("theme", "bone") == "frost"
+	var st := _style()
 	var name_l := Label.new()
 	name_l.text = "☠  %s  ☠" % boss_def["name"].to_upper()
 	name_l.position = Vector2(0, -30)
 	name_l.custom_minimum_size = Vector2(420, 0)
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_l.add_theme_font_size_override("font_size", 20)
-	name_l.add_theme_color_override("font_color",
-		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.85, 0.3))
-	name_l.add_theme_color_override("font_outline_color",
-		Color(0.03, 0.10, 0.25) if frost else Color(0.25, 0.03, 0.03))
+	name_l.add_theme_color_override("font_color", st["banner"])
+	name_l.add_theme_color_override("font_outline_color", st["banner_outline"])
 	name_l.add_theme_constant_override("outline_size", 6)
 	boss_bar_holder.add_child(name_l)
 	var bg := ColorRect.new()
@@ -880,13 +997,13 @@ func _build_boss_bar() -> void:
 	var border := ColorRect.new()
 	border.size = Vector2(424, 20)
 	border.position = Vector2(-2, -2)
-	border.color = Color(0.15, 0.35, 0.6) if frost else Color(0.6, 0.15, 0.1)
+	border.color = st["bar_border"]
 	border.show_behind_parent = true
 	bg.add_child(border)
 	boss_bar_fill = ColorRect.new()
 	boss_bar_fill.position = Vector2(1, 1)
 	boss_bar_fill.size = Vector2(418, 14)
-	boss_bar_fill.color = Color(0.25, 0.75, 1.0) if frost else Color(0.9, 0.2, 0.15)
+	boss_bar_fill.color = st["bar"]
 	bg.add_child(boss_bar_fill)
 
 func _refresh_party() -> void:
@@ -1083,6 +1200,7 @@ func _ability_menu(h: Dictionary) -> bool:
 			match ab["kind"]:
 				"magic": await _fireball(h, ab, enemies[t])
 				"beam": await _laser(h, ab, enemies[t])
+				"dance": await _blade_dance(h, ab, enemies[t])
 				_: await _pierce(h, ab, enemies[t])
 		"ally":
 			var a: int = await _menu(_ally_entries(), h)
@@ -1632,6 +1750,102 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 		_crit_fx(es.position)
 	await _damage_enemy(e, maxi(dmg, 1))
 	await _sprint(h, h["home"], 0.22)
+
+## Serenas Klingentanz: fünf Blitzschritte im Pentagramm um das Ziel,
+## dann steigt sie auf und fährt mit dem Fallstreich nieder.
+func _blade_dance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	_say("%s tanzt den %s!" % [d["name"], ab["name"]])
+	var s: Sprite2D = h["sprite"]
+	var es: Sprite2D = e["sprite"]
+	var wp: Sprite2D = h["weapon"]
+	await _stance(h, Color(0.75, 0.60, 1.0))
+	var center: Vector2 = es.position
+	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
+	# Fünf Schnitte: Startpunkte in Pentagramm-Reihenfolge um das Ziel,
+	# jeder Schritt schneidet durchs Zentrum.
+	for i in 5:
+		if not e["alive"]:
+			break
+		var ang := -PI / 2.0 + i * (TAU * 2.0 / 5.0)
+		var from := center + Vector2(cos(ang), sin(ang) * 0.7) * 120.0
+		var to := center - (from - center) * 0.9
+		var dir_right: bool = to.x > from.x
+		s.position = from
+		s.flip_h = not dir_right
+		if wp != null:
+			wp.position.x = -grip_x if dir_right else grip_x
+			wp.rotation = 1.35 if dir_right else -1.35
+		_burst(from, Color(0.80, 0.65, 1.0, 0.7), 5, 60)
+		var dash := create_tween()
+		dash.tween_property(s, "position", to, 0.10) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_ghost_trail(s, 0.10)
+		if wp != null:
+			_weapon_trail(wp, 0.10)
+		AudioManager.play_sfx("slash")
+		_slash_arc(center + Vector2(randf_range(-10, 10), randf_range(-10, 10)))
+		_star_sparks(center)
+		await dash.finished
+		var pass_dmg := maxi(int((ab["power"] + d["atk"] * 0.35) * randf_range(0.9, 1.1)), 1)
+		await _damage_enemy(e, pass_dmg)
+	# Waffe in Ruheposition, Blick wieder nach links
+	s.flip_h = true
+	if wp != null:
+		wp.position.x = grip_x
+		wp.rotation = wp.get_meta("rest", WEAPON_REST)
+	if not e["alive"]:
+		# Das Ziel fiel schon im Tanz — elegant zurückgleiten.
+		await _sprint(h, h["home"], 0.22)
+		return
+	# Finisher: hoch über das Ziel steigen, ein Atemzug ...
+	AudioManager.play_sfx("whirl")
+	var leap := create_tween()
+	leap.tween_property(s, "position", center + Vector2(10, -240), 0.28) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_ghost_trail(s, 0.28)
+	await leap.finished
+	await get_tree().create_timer(0.18).timeout
+	# ... dann der Fallstreich
+	if wp != null:
+		wp.rotation = 2.4
+		_weapon_trail(wp, 0.14)
+	var slam := create_tween()
+	slam.tween_property(s, "position", center + Vector2(6, -6), 0.13) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_ghost_trail(s, 0.13)
+	await slam.finished
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(0.85, 0.75, 1.0, 0.35))
+	_impact_ring(es.position, Color(0.80, 0.65, 1.0, 0.8))
+	_cross_slash(center)
+	_shake_camera(2.0)
+	var crit := randf() < 0.18
+	await _hitstop(0.14 if crit else 0.09)
+	if crit:
+		_crit_fx(es.position)
+	var dmg: int = int((ab["power"] * 2.5 + d["atk"]) * randf_range(0.95, 1.15) * (1.6 if crit else 1.0))
+	await _damage_enemy(e, maxi(dmg, 1))
+	await _sprint(h, h["home"], 0.24)
+
+## Violette Sternenfunken, die beim Klingentanz aufblitzen.
+func _star_sparks(pos: Vector2) -> void:
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var p := Sprite2D.new()
+	p.texture = SpriteFactory.particle("star_07")
+	p.position = pos + Vector2(randf_range(-20, 20), randf_range(-24, 8))
+	p.scale = Vector2(0.10, 0.10)
+	p.modulate = Color(0.85, 0.70, 1.0, 0.9)
+	p.material = mat
+	p.z_index = 6
+	add_child(p)
+	var tw := create_tween()
+	tw.tween_property(p, "scale", Vector2(0.3, 0.3), 0.28) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(p, "rotation", 1.5, 0.28)
+	tw.parallel().tween_property(p, "modulate:a", 0.0, 0.28)
+	tw.tween_callback(p.queue_free)
 
 ## ---------- Roboter-Held Rax: Laser, Raketen, Orbital-Ultimate ----------
 
@@ -2774,7 +2988,16 @@ func _enemy_turn(e: Dictionary) -> void:
 		await _boss_aoe(e, alive_heroes)
 		return
 	var target: Dictionary = alive_heroes[randi() % alive_heroes.size()]
-	_say("%s greift %s an!" % [e["name"], target["data"]["name"]])
+	var line: String = e.get("attack_line", "")
+	if line != "":
+		_say(line % [e["name"], target["data"]["name"]])
+	else:
+		_say("%s greift %s an!" % [e["name"], target["data"]["name"]])
+	# Fernkämpfer werfen ihr Fraktions-Geschoss statt zu stürmen.
+	if e.get("proj", "") != "":
+		await _enemy_ranged(e, target)
+		await get_tree().create_timer(0.25).timeout
+		return
 	var tw := create_tween()
 	tw.tween_property(es, "position", target["sprite"].position + Vector2(-60, 0), 0.22) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -2790,10 +3013,176 @@ func _enemy_turn(e: Dictionary) -> void:
 	await back.finished
 	await get_tree().create_timer(0.25).timeout
 
-## Boss-Spezial: Knochen- bzw. Eissturm prasselt auf die ganze Gruppe.
+## Bézier-Bogenflug für Wurfgeschosse (tween_method-Helfer).
+func _arc_step(t: float, node: Node2D, from: Vector2, mid: Vector2, to: Vector2) -> void:
+	if not is_instance_valid(node):
+		return
+	var p1 := from.lerp(mid, t)
+	var p2 := mid.lerp(to, t)
+	node.position = p1.lerp(p2, t)
+
+static var _paper_tex: Texture2D
+## Kleines Schriftstück mit Textzeilen und rotem Stempel (Paragraphengeist).
+func _paper_texture() -> Texture2D:
+	if _paper_tex == null:
+		var img := Image.create(7, 9, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0.95, 0.95, 0.90))
+		for yy: int in [2, 4, 6]:
+			for xx in range(1, 6):
+				img.set_pixel(xx, yy, Color(0.35, 0.35, 0.45))
+		img.set_pixel(5, 7, Color(0.85, 0.20, 0.20))
+		_paper_tex = ImageTexture.create_from_image(img)
+	return _paper_tex
+
+## Fernangriffe der Monster — jede Fraktion wirft ihr eigenes Geschoss.
+func _enemy_ranged(e: Dictionary, target: Dictionary) -> void:
+	var es: Sprite2D = e["sprite"]
+	var from: Vector2 = es.position + Vector2(34, -8)
+	var to: Vector2 = target["sprite"].position
+	var dmg := maxi(int(e["atk"] * randf_range(0.85, 1.15)) - target["data"]["def"], 1)
+	match e["proj"]:
+		"sludge":
+			# Giftschlamm-Klumpen im hohen Bogen; zerplatzt zu Spritzern + Pfütze
+			AudioManager.play_sfx("splat")
+			var glob := Sprite2D.new()
+			glob.texture = SpriteFactory.circle(7, Color(0.45, 0.85, 0.20))
+			glob.position = from
+			add_child(glob)
+			var wob := glob.create_tween().set_loops()
+			wob.tween_property(glob, "scale", Vector2(1.25, 0.8), 0.09)
+			wob.tween_property(glob, "scale", Vector2(0.85, 1.2), 0.09)
+			var mid := (from + to) * 0.5 + Vector2(0, -95)
+			var fly := create_tween()
+			fly.tween_method(_arc_step.bind(glob, from, mid, to), 0.0, 1.0, 0.5)
+			await fly.finished
+			glob.queue_free()
+			AudioManager.play_sfx("hit")
+			_burst(to, Color(0.55, 1.0, 0.30), 14, 130)
+			var pool := Sprite2D.new()
+			pool.texture = SpriteFactory.prop("sludge")
+			pool.position = to + Vector2(-16, 38)
+			pool.scale = Vector2(3.5, 3.0)
+			pool.z_index = -9
+			add_child(pool)
+			var pf := create_tween()
+			pf.tween_interval(1.0)
+			pf.tween_property(pool, "modulate:a", 0.0, 0.8)
+			pf.tween_callback(pool.queue_free)
+		"smog":
+			# Qualmwolke wabert heran und hüllt das Ziel ein
+			AudioManager.play_sfx("wave")
+			var cloud := Sprite2D.new()
+			cloud.texture = SpriteFactory.particle("smoke_04")
+			cloud.position = from
+			cloud.scale = Vector2(0.25, 0.25)
+			cloud.modulate = Color(0.55, 0.70, 0.45, 0.0)
+			cloud.z_index = 5
+			add_child(cloud)
+			var cfly := create_tween()
+			cfly.tween_property(cloud, "modulate:a", 0.85, 0.15)
+			cfly.parallel().tween_property(cloud, "position", to, 0.55) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			cfly.parallel().tween_property(cloud, "scale", Vector2(0.6, 0.55), 0.55)
+			cfly.parallel().tween_property(cloud, "rotation", 1.2, 0.55)
+			await cfly.finished
+			AudioManager.play_sfx("hit")
+			_burst(to, Color(0.60, 0.75, 0.50), 10, 90)
+			var fade := create_tween()
+			fade.tween_property(cloud, "modulate:a", 0.0, 0.45)
+			fade.parallel().tween_property(cloud, "scale", Vector2(0.85, 0.8), 0.45)
+			fade.tween_callback(cloud.queue_free)
+		"coin":
+			# Drei Münzen im flachen Bogen — Geld regiert, Geld verletzt
+			for k in 3:
+				AudioManager.play_sfx("coin")
+				var coin := Sprite2D.new()
+				coin.texture = SpriteFactory.dtii("coin_anim_f0")
+				coin.scale = Vector2(2.6, 2.6)
+				coin.position = from
+				add_child(coin)
+				var cmid := (from + to) * 0.5 + Vector2(0, -40.0 - k * 14.0)
+				var cf := create_tween()
+				cf.tween_method(_arc_step.bind(coin, from, cmid,
+					to + Vector2(randf_range(-14, 14), randf_range(-10, 10))), 0.0, 1.0, 0.3)
+				cf.parallel().tween_property(coin, "rotation", TAU * 1.5, 0.3)
+				cf.tween_callback(coin.queue_free)
+				await get_tree().create_timer(0.14).timeout
+			await get_tree().create_timer(0.2).timeout
+			AudioManager.play_sfx("hit")
+			_burst(to, Color(1.0, 0.85, 0.35), 14, 130)
+		"page":
+			# Flatterndes Schriftstück — Bürokratie als Wurfwaffe
+			AudioManager.play_sfx("wave")
+			var page := Sprite2D.new()
+			page.texture = _paper_texture()
+			page.scale = Vector2(3, 3)
+			page.position = from
+			add_child(page)
+			var flut := page.create_tween().set_loops()
+			flut.tween_property(page, "rotation", 0.5, 0.16).set_trans(Tween.TRANS_SINE)
+			flut.tween_property(page, "rotation", -0.5, 0.16).set_trans(Tween.TRANS_SINE)
+			var pmid := (from + to) * 0.5 + Vector2(0, -60)
+			var pfly := create_tween()
+			pfly.tween_method(_arc_step.bind(page, from, pmid, to), 0.0, 1.0, 0.6)
+			await pfly.finished
+			page.queue_free()
+			AudioManager.play_sfx("slash")
+			_burst(to, Color(0.95, 0.95, 0.90), 12, 120)
+		"hate":
+			# Gezackter Hassblitz schießt schnurgerade aufs Ziel
+			AudioManager.play_sfx("screech")
+			var bmat := CanvasItemMaterial.new()
+			bmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			var bolt := Sprite2D.new()
+			bolt.texture = SpriteFactory.particle("spark_04")
+			bolt.modulate = Color(1.0, 0.30, 0.20)
+			bolt.material = bmat
+			bolt.scale = Vector2(0.5, 0.28)
+			bolt.position = from
+			bolt.rotation = (to - from).angle()
+			bolt.z_index = 5
+			add_child(bolt)
+			var bfly := create_tween()
+			bfly.tween_property(bolt, "position", to, 0.22) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			await bfly.finished
+			bolt.queue_free()
+			_flash_screen(Color(1.0, 0.20, 0.15, 0.16))
+			AudioManager.play_sfx("hit")
+			_burst(to, Color(1.0, 0.40, 0.30), 14, 140)
+	_damage_hero(target, dmg)
+
+## Aufblitzender Schallring (Hasstirade).
+func _shockring(pos: Vector2, delay: float) -> void:
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var ring := Sprite2D.new()
+	ring.texture = SpriteFactory.particle("circle_05")
+	ring.position = pos
+	ring.scale = Vector2(0.1, 0.07)
+	ring.modulate = Color(1.0, 0.35, 0.25, 0.0)
+	ring.material = mat
+	ring.z_index = 6
+	add_child(ring)
+	var tw := create_tween()
+	tw.tween_interval(delay)
+	tw.tween_property(ring, "modulate:a", 0.9, 0.05)
+	tw.tween_property(ring, "scale", Vector2(2.4, 1.6), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(ring, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(ring.queue_free)
+
+## Münze schlägt auf: Klimpern + goldene Funken.
+func _coin_impact(c: Sprite2D) -> void:
+	AudioManager.play_sfx("coin")
+	_burst(c.position, Color(1.0, 0.85, 0.35), 5, 80)
+	c.queue_free()
+
+## Boss-Spezial: Giftflut, Münzhagel oder Hasstirade über der ganzen Gruppe.
 func _boss_aoe(e: Dictionary, targets: Array) -> void:
-	var frost: bool = boss_def.get("theme", "bone") == "frost"
-	_say("%s beschwört den %s!" % [e["name"], boss_def["aoe_name"]])
+	var st := _style()
+	var theme: String = boss_def.get("theme", "toxic")
+	_say("%s holt aus — %s!" % [e["name"], boss_def["aoe_name"]])
 	AudioManager.play_sfx("roar")
 	var es: Sprite2D = e["sprite"]
 	var ebase: Vector2 = es.get_meta("base_scale", es.scale)
@@ -2801,38 +3190,98 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 	pump.tween_property(es, "scale", ebase * 1.25, 0.35).set_trans(Tween.TRANS_QUAD)
 	pump.tween_property(es, "scale", ebase, 0.15)
 	await pump.finished
-	_flash_screen(Color(0.3, 0.7, 1.0, 0.40) if frost else Color(1.0, 0.15, 0.1, 0.40))
+	_flash_screen(st["flash"])
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.0)
-	# Projektilhagel über den Helden (Knochen bzw. Eissplitter)
-	var impact_col := Color(0.6, 0.9, 1.0) if frost else Color(0.9, 0.88, 0.8)
-	for i in 12:
-		var b := Sprite2D.new()
-		b.texture = SpriteFactory.shard() if frost else SpriteFactory.bone()
-		b.scale = Vector2(3, 3)
-		b.rotation = randf() * TAU if not frost else randf_range(-0.3, 0.3)
-		b.position = Vector2(randf_range(600, 860), -30)
-		add_child(b)
-		var fall := create_tween()
-		fall.tween_interval(randf_range(0.0, 0.35))
-		fall.tween_property(b, "position:y", randf_range(240, 360), randf_range(0.30, 0.5)) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		if not frost:
-			fall.parallel().tween_property(b, "rotation", b.rotation + randf_range(-6.0, 6.0), 0.5)
-		fall.tween_callback(func():
-			_burst(b.position, impact_col, 5, 80)
-			b.queue_free())
+	match theme:
+		"gold":
+			# Münzhagel: Goldstücke prasseln klimpernd aufs Heldenfeld
+			for i in 16:
+				var c := Sprite2D.new()
+				c.texture = SpriteFactory.dtii("coin_anim_f%d" % (i % 4))
+				c.scale = Vector2(2.8, 2.8)
+				c.position = Vector2(randf_range(600, 880), -30)
+				add_child(c)
+				var fall := create_tween()
+				fall.tween_interval(randf_range(0.0, 0.4))
+				fall.tween_property(c, "position:y", randf_range(250, 380), randf_range(0.28, 0.45)) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				fall.parallel().tween_property(c, "rotation", randf_range(3.0, 9.0), 0.5)
+				fall.tween_callback(_coin_impact.bind(c))
+		"hate":
+			# Hasstirade: Schallringe aus der Fratze + Blitzsalve
+			AudioManager.play_sfx("screech")
+			for i in 3:
+				_shockring(es.position + Vector2(50, -40), 0.14 * i)
+			for i in 6:
+				var bmat := CanvasItemMaterial.new()
+				bmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+				var bolt := Sprite2D.new()
+				bolt.texture = SpriteFactory.particle("spark_04")
+				bolt.modulate = Color(1.0, 0.30, 0.20)
+				bolt.material = bmat
+				bolt.scale = Vector2(0.55, 0.30)
+				bolt.position = es.position + Vector2(50, -40)
+				var btarget: Vector2 = (targets[i % targets.size()]["sprite"] as Sprite2D).position \
+					+ Vector2(randf_range(-30, 30), randf_range(-30, 30))
+				bolt.rotation = (btarget - bolt.position).angle()
+				bolt.z_index = 6
+				add_child(bolt)
+				var bfly := create_tween()
+				bfly.tween_interval(i * 0.09)
+				bfly.tween_property(bolt, "position", btarget, 0.20) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				bfly.tween_callback(_bolt_impact.bind(bolt))
+		_:
+			# Giftflut: Schlammwoge schwappt übers Feld, dazu Säurespritzer
+			AudioManager.play_sfx("wave")
+			var wave := Sprite2D.new()
+			wave.texture = SpriteFactory.circle(60, Color(0.40, 0.75, 0.20, 0.75))
+			wave.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			wave.position = Vector2(300, 400)
+			wave.scale = Vector2(2.0, 1.2)
+			wave.z_index = 5
+			add_child(wave)
+			var surge := create_tween()
+			surge.tween_property(wave, "position", Vector2(780, 340), 0.55) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			surge.parallel().tween_property(wave, "scale", Vector2(4.5, 2.0), 0.55)
+			surge.tween_property(wave, "modulate:a", 0.0, 0.4)
+			surge.tween_callback(wave.queue_free)
+			for i in 12:
+				var drop := Sprite2D.new()
+				drop.texture = SpriteFactory.circle(4, Color(0.50, 0.95, 0.25))
+				drop.position = Vector2(randf_range(600, 880), -20)
+				drop.scale = Vector2(0.8, 1.6)
+				add_child(drop)
+				var fall := create_tween()
+				fall.tween_interval(randf_range(0.0, 0.35))
+				fall.tween_property(drop, "position:y", randf_range(250, 380), randf_range(0.3, 0.5)) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				fall.tween_callback(_acid_impact.bind(drop))
 	await get_tree().create_timer(0.55).timeout
 	for t in targets:
 		var dmg := maxi(int(e["atk"] * randf_range(0.7, 0.9)) - t["data"]["def"], 1)
-		_burst(t["sprite"].position, Color(0.5, 0.8, 1.0) if frost else Color(0.9, 0.4, 0.9), 8, 110)
+		_burst(t["sprite"].position, st["burst"], 8, 110)
 		_damage_hero(t, dmg)
 	await get_tree().create_timer(0.7).timeout
 
-## Boss-Ultimative: „Armee der Verdammten“ (Geisterschädel-Welle) bzw.
-## „Ewiger Winter“ (Eisspeere brechen unter den Helden hervor).
+## Hassblitz schlägt ein.
+func _bolt_impact(bolt: Sprite2D) -> void:
+	_burst(bolt.position, Color(1.0, 0.40, 0.30), 8, 110)
+	bolt.queue_free()
+
+## Säuretropfen zerplatzt.
+func _acid_impact(drop: Sprite2D) -> void:
+	_burst(drop.position, Color(0.60, 1.0, 0.30), 6, 90)
+	drop.queue_free()
+
+## Boss-Ultimative: „Schwarzer Himmel“ (Smogdecke + Säureregen),
+## „Feindliche Übernahme“ (Münzstrudel + Riesenmünze) oder
+## „Mauer des Hasses“ (Backsteinmauer wächst und kippt auf die Helden).
 func _boss_ultimate(e: Dictionary, targets: Array) -> void:
-	var frost: bool = boss_def.get("theme", "bone") == "frost"
+	var st := _style()
+	var theme: String = boss_def.get("theme", "toxic")
 	var ult_name: String = boss_def["ultimate_name"]
 	_say("%s entfesselt: %s!" % [e["name"], ult_name])
 	var dim := _dim_world(0.55)
@@ -2844,57 +3293,12 @@ func _boss_ultimate(e: Dictionary, targets: Array) -> void:
 	await pump.finished
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.0)
-	_ult_banner("☠ %s ☠" % ult_name.to_upper(),
-		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.45, 0.35))
+	_ult_banner("☠ %s ☠" % ult_name.to_upper(), st["banner"])
 	await get_tree().create_timer(0.6).timeout
-	if frost:
-		# Eisspeere brechen unter jedem Helden aus dem Boden
-		AudioManager.play_sfx("bigboom")
-		_flash_screen(Color(0.5, 0.8, 1.0, 0.5))
-		_shake_camera(2.2)
-		for t in targets:
-			var pos: Vector2 = t["sprite"].position
-			for k in 3:
-				var spike := Sprite2D.new()
-				spike.texture = SpriteFactory.shard()
-				spike.scale = Vector2(4.5, 6.5)
-				spike.position = pos + Vector2((k - 1) * 26.0, 110)
-				spike.rotation = (k - 1) * 0.18
-				add_child(spike)
-				var rise := create_tween()
-				rise.tween_interval(k * 0.06)
-				rise.tween_property(spike, "position:y", pos.y + 4 + k * 7.0, 0.15) \
-					.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-				rise.tween_interval(0.55)
-				rise.tween_property(spike, "modulate:a", 0.0, 0.3)
-				rise.tween_callback(spike.queue_free)
-			_burst(pos, Color(0.6, 0.9, 1.0), 14, 150)
-		await get_tree().create_timer(0.5).timeout
-	else:
-		# Eine Welle geisterhafter Schädel fegt über das Schlachtfeld
-		AudioManager.play_sfx("bigboom")
-		_flash_screen(Color(1.0, 0.2, 0.15, 0.45))
-		for i in 9:
-			var sk := Sprite2D.new()
-			sk.texture = SpriteFactory.skull()
-			sk.scale = Vector2(4, 4)
-			sk.modulate = Color(0.95, 0.8, 1.0, 0.85)
-			var mat := CanvasItemMaterial.new()
-			mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-			sk.material = mat
-			sk.position = Vector2(-60, 90 + (i % 5) * 55.0 + randf_range(-18, 18))
-			add_child(sk)
-			var fly := create_tween()
-			fly.tween_interval(i * 0.07)
-			fly.tween_property(sk, "position:x", 1040.0, randf_range(0.5, 0.75)) \
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			fly.parallel().tween_property(sk, "position:y", sk.position.y + randf_range(-50, 50), 0.7)
-			fly.tween_callback(sk.queue_free)
-		await get_tree().create_timer(0.55).timeout
-		for t in targets:
-			_burst(t["sprite"].position, Color(0.85, 0.5, 1.0), 12, 140)
-		_shake_camera(2.0)
-		await get_tree().create_timer(0.35).timeout
+	match theme:
+		"gold": await _ult_uebernahme()
+		"hate": await _ult_mauer(targets)
+		_: await _ult_schwarzer_himmel()
 	for t in targets:
 		var dmg := maxi(int(e["atk"] * randf_range(0.95, 1.15)) - t["data"]["def"], 1)
 		_damage_hero(t, dmg)
@@ -2902,6 +3306,179 @@ func _boss_ultimate(e: Dictionary, targets: Array) -> void:
 	shrink.tween_property(es, "scale", base, 0.3).set_trans(Tween.TRANS_QUAD)
 	_undim(dim)
 	await get_tree().create_timer(0.9).timeout
+
+## Schlotbaron: Schwarze Smogwolken rollen über den Himmel, dann Säureregen.
+func _ult_schwarzer_himmel() -> void:
+	AudioManager.play_sfx("wave")
+	var clouds: Array = []
+	for i in 5:
+		var cl := Sprite2D.new()
+		cl.texture = SpriteFactory.particle("smoke_04")
+		cl.position = Vector2(-140.0 - i * 60.0, 60.0 + (i % 3) * 30.0)
+		cl.scale = Vector2(1.3, 0.9)
+		cl.modulate = Color(0.14, 0.17, 0.11, 0.92)
+		cl.z_index = 6
+		add_child(cl)
+		clouds.append(cl)
+		var roll := create_tween()
+		roll.tween_property(cl, "position:x", 120.0 + i * 190.0, 0.9 + i * 0.12) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		roll.parallel().tween_property(cl, "rotation", 0.6, 1.0)
+	await get_tree().create_timer(1.15).timeout
+	_flash_screen(Color(0.5, 1.0, 0.3, 0.30))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.2)
+	# Ätzender Regen hämmert auf die Heldenseite
+	for i in 20:
+		var drop := Sprite2D.new()
+		drop.texture = SpriteFactory.circle(3, Color(0.55, 1.0, 0.25))
+		drop.scale = Vector2(0.6, 3.4)
+		drop.position = Vector2(randf_range(590, 900), randf_range(-60, 40))
+		drop.z_index = 6
+		add_child(drop)
+		var fall := create_tween()
+		fall.tween_interval(randf_range(0.0, 0.4))
+		fall.tween_property(drop, "position:y", randf_range(250, 390), randf_range(0.18, 0.3)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fall.tween_callback(_acid_impact.bind(drop))
+	await get_tree().create_timer(0.9).timeout
+	for cl: Sprite2D in clouds:
+		var fade := create_tween()
+		fade.tween_property(cl, "modulate:a", 0.0, 0.8)
+		fade.tween_callback(cl.queue_free)
+
+## Kreisender Münzstrudel (tween_method-Helfer): zieht sich spiralig zusammen.
+func _orbit_step(t: float, node: Node2D, center: Vector2, r0: float, ang0: float) -> void:
+	if not is_instance_valid(node):
+		return
+	var ang := ang0 + t * 9.0
+	var r := lerpf(r0, 10.0, t)
+	node.position = center + Vector2(cos(ang) * r, sin(ang) * r * 0.55)
+
+## Monopolfürst: Münzstrudel saugt sich zusammen, dann zerschmettert
+## eine Riesenmünze das Heldenfeld.
+func _ult_uebernahme() -> void:
+	var center := Vector2(760, 250)
+	AudioManager.play_sfx("charge")
+	var coins: Array = []
+	for i in 22:
+		var c := Sprite2D.new()
+		c.texture = SpriteFactory.dtii("coin_anim_f%d" % (i % 4))
+		c.scale = Vector2(2.4, 2.4)
+		c.z_index = 6
+		add_child(c)
+		coins.append(c)
+		var ang0 := randf() * TAU
+		var r0 := randf_range(200, 320)
+		_orbit_step(0.0, c, center, r0, ang0)
+		var sp := create_tween()
+		sp.tween_method(_orbit_step.bind(c, center, r0, ang0), 0.0, 1.0, 1.15) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		sp.parallel().tween_property(c, "rotation", TAU * 3.0, 1.15)
+	await get_tree().create_timer(1.2).timeout
+	for c: Sprite2D in coins:
+		c.queue_free()
+	_flash_screen(Color(1.0, 0.9, 0.4, 0.4))
+	# Riesenmünze stürzt herab
+	var giant := Sprite2D.new()
+	giant.texture = SpriteFactory.dtii("coin_anim_f0")
+	giant.scale = Vector2(14, 14)
+	giant.position = Vector2(center.x, -120)
+	giant.z_index = 7
+	add_child(giant)
+	AudioManager.play_sfx("whistle")
+	var gdrop := create_tween()
+	gdrop.tween_property(giant, "position:y", 300.0, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	gdrop.parallel().tween_property(giant, "rotation", TAU, 0.4)
+	await gdrop.finished
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1, 1, 1, 0.6))
+	_shake_camera(2.6)
+	_burst(Vector2(center.x, 320), Color(1.0, 0.85, 0.3), 26, 220)
+	_burst(Vector2(center.x, 320), Color(1.0, 0.97, 0.8), 18, 170)
+	var out := create_tween()
+	out.tween_property(giant, "modulate:a", 0.0, 0.5)
+	out.parallel().tween_property(giant, "position:y", 340.0, 0.5)
+	out.tween_callback(giant.queue_free)
+	await get_tree().create_timer(0.4).timeout
+
+## Der Spalter: Eine Backsteinmauer wächst vor den Helden empor —
+## und kippt dann krachend auf sie.
+func _ult_mauer(targets: Array) -> void:
+	AudioManager.play_sfx("stomp")
+	_shake_camera(1.6)
+	var wall := Node2D.new()
+	wall.position = Vector2(590, 400)  # Fußpunkt vor der Heldenreihe
+	wall.z_index = 7
+	add_child(wall)
+	# Versetzte Backsteinreihen wachsen aus dem Boden
+	for row in 9:
+		for col in 2:
+			var b := ColorRect.new()
+			b.size = Vector2(34, 22)
+			var off := 17.0 if row % 2 == 1 else 0.0
+			b.position = Vector2(-42.0 + col * 35.0 + off, -24.0 - row * 23.0)
+			b.color = [Color(0.42, 0.16, 0.14), Color(0.36, 0.13, 0.12),
+				Color(0.30, 0.11, 0.11)][(row + col) % 3]
+			wall.add_child(b)
+	wall.scale = Vector2(1, 0.02)
+	AudioManager.play_sfx("eruption")
+	_shake_camera(2.0)
+	# Staubfahne am Fuß der wachsenden Mauer
+	var dust := CPUParticles2D.new()
+	dust.position = wall.position
+	dust.one_shot = true
+	dust.explosiveness = 0.8
+	dust.amount = 18
+	dust.lifetime = 0.9
+	dust.direction = Vector2(0, -1)
+	dust.spread = 70.0
+	dust.gravity = Vector2(0, 120)
+	dust.initial_velocity_min = 60.0
+	dust.initial_velocity_max = 140.0
+	dust.scale_amount_min = 0.06
+	dust.scale_amount_max = 0.14
+	dust.color = Color(0.55, 0.40, 0.35, 0.7)
+	dust.texture = SpriteFactory.particle("dirt_02")
+	dust.emitting = true
+	add_child(dust)
+	var rise := create_tween()
+	rise.tween_property(wall, "scale:y", 1.0, 0.6) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await rise.finished
+	await get_tree().create_timer(0.5).timeout
+	# Die Mauer kippt nach rechts auf die Heldenreihe
+	AudioManager.play_sfx("roar")
+	var tip := create_tween()
+	tip.tween_property(wall, "rotation", PI / 2.0, 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tip.finished
+	_flash_screen(Color(1, 1, 1, 0.55))
+	AudioManager.play_sfx("bigboom")
+	_shake_camera(2.8)
+	for t in targets:
+		_burst((t["sprite"] as Sprite2D).position, Color(0.85, 0.45, 0.35), 12, 150)
+	# Die Mauer zerbirst in umherfliegende Ziegel
+	for i in 12:
+		var frag := ColorRect.new()
+		frag.size = Vector2(16, 10)
+		frag.color = [Color(0.42, 0.16, 0.14), Color(0.32, 0.12, 0.11)][i % 2]
+		frag.position = Vector2(randf_range(600, 820), randf_range(370, 410))
+		frag.rotation = randf() * TAU
+		add_child(frag)
+		var ft := create_tween()
+		ft.tween_property(frag, "position",
+			frag.position + Vector2(randf_range(-90, 90), randf_range(-130, -30)), 0.35) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ft.parallel().tween_property(frag, "rotation", frag.rotation + randf_range(-5, 5), 0.6)
+		ft.tween_property(frag, "position:y", 420.0, 0.35) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		ft.parallel().tween_property(frag, "modulate:a", 0.0, 0.35)
+		ft.tween_callback(frag.queue_free)
+	wall.queue_free()
+	dust.queue_free()
+	await get_tree().create_timer(0.5).timeout
 
 func _damage_hero(target: Dictionary, dmg: int) -> void:
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)
@@ -2950,21 +3527,23 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 
 ## Wut-Phase des Bosses: Aufschrei, Färbung, mehr Angriff (Farbe je Thema).
 func _boss_enrage(e: Dictionary) -> void:
-	var frost: bool = boss_def.get("theme", "bone") == "frost"
 	e["enraged"] = true
 	e["atk"] = int(e["atk"] * 1.35)
 	AudioManager.play_sfx("charge")
 	_say("%s tobt vor Wut!" % e["name"])
 	var es: Sprite2D = e["sprite"]
-	_flash_screen(Color(0.3, 0.7, 1.0, 0.35) if frost else Color(1.0, 0.1, 0.05, 0.35))
+	var st := _style()
+	_flash_screen(st["flash"])
 	_shake_camera(2.2)
-	var rage_col := Color(0.5, 1.1, 1.7) if frost else Color(1.6, 0.5, 0.4)
-	var tint := Color(0.85, 1.0, 1.2) if frost else Color(1.15, 0.85, 0.85)
+	var rage_col: Color = st["rage"]
+	# Bleibende Wut-Tönung: abgeschwächte Wutfarbe Richtung Weiß.
+	var tint: Color = rage_col.lerp(Color.WHITE, 0.6)
 	e["tint"] = tint
+	es.set_meta("tint", tint)
 	var tw := create_tween()
 	tw.tween_property(es, "modulate", rage_col, 0.3)
 	tw.tween_property(es, "modulate", tint, 0.4)
-	_burst(es.position, Color(0.3, 0.85, 1.0) if frost else Color(1.0, 0.2, 0.1), 22, 190)
+	_burst(es.position, st["burst"], 22, 190)
 	AudioManager.play_sfx("roar")
 	await get_tree().create_timer(1.0).timeout
 
@@ -3005,7 +3584,8 @@ func _shake(s: Sprite2D) -> void:
 	tw.tween_property(s, "position:x", orig.x, 0.04)
 	var flash := create_tween()
 	flash.tween_property(s, "modulate", Fx.hot(Color(1.0, 0.45, 0.4), 1.6), 0.08)
-	flash.tween_property(s, "modulate", Color.WHITE, 0.15)
+	# Zurück zur Grundtönung (Themen-Tint bzw. Wutfärbung), nicht stur zu Weiß.
+	flash.tween_property(s, "modulate", s.get_meta("tint", Color.WHITE), 0.15)
 	# Quetsch-Impuls + Rotations-Wobble verkaufen die Wucht des Treffers.
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var squash := create_tween()
@@ -3301,18 +3881,16 @@ func _boss_entrance() -> void:
 		AudioManager.play_sfx("stomp")
 		_shake_camera(1.8)
 		await get_tree().create_timer(0.42).timeout
-	var frost: bool = boss_def.get("theme", "bone") == "frost"
+	var st := _style()
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.4)
 	_punch_zoom(0.14, Vector2(230, 240))
-	_flash_screen(Color(0.2, 0.6, 1.0, 0.35) if frost else Color(0.8, 0.1, 0.1, 0.35))
+	_flash_screen(st["flash"])
 	var banner := Label.new()
 	banner.text = "☠  %s  ☠" % boss_def["name"].to_upper()
 	banner.add_theme_font_size_override("font_size", 48)
-	banner.add_theme_color_override("font_color",
-		Color(0.55, 0.9, 1.0) if frost else Color(1.0, 0.85, 0.3))
-	banner.add_theme_color_override("font_outline_color",
-		Color(0.03, 0.10, 0.28) if frost else Color(0.3, 0.05, 0.05))
+	banner.add_theme_color_override("font_color", st["banner"])
+	banner.add_theme_color_override("font_outline_color", st["banner_outline"])
 	banner.add_theme_constant_override("outline_size", 12)
 	banner.custom_minimum_size = Vector2(960, 0)
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3408,19 +3986,31 @@ func _victory() -> void:
 				_say("%s kann nun %s beschwören!" % [up["name"], up["unlock"]])
 				await get_tree().create_timer(1.8).timeout
 	# Boss-Siege schalten den Fortschritt frei.
-	if enemy_ids.has("boss2"):
+	if enemy_ids.has("boss3"):
+		GameState.boss3_defeated = true
+	elif enemy_ids.has("boss2"):
 		GameState.boss2_defeated = true
+		GameState.apply_blessing2()
+		_refresh_party()
+		AudioManager.play_sfx("heal")
+		for h in heroes:
+			_sparkle(h["sprite"].position, Color(1.0, 0.9, 0.4))
+			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
+		_say("Der Hort des Fürsten fließt zurück ins Land — sein Dank stärkt euch!")
+		await get_tree().create_timer(2.4).timeout
+		_say("Im Südwesten bröckelt der Wall aus Misstrauen um die Hassfestung ...")
+		await get_tree().create_timer(2.2).timeout
 	elif enemy_ids.has("boss"):
 		GameState.boss_defeated = true
 		GameState.apply_blessing()
 		_refresh_party()
 		AudioManager.play_sfx("heal")
 		for h in heroes:
-			_sparkle(h["sprite"].position, Color(1.0, 0.9, 0.4))
-			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
-		_say("Die Segnung des Königs durchströmt euch — ihr fühlt euch stärker!")
+			_sparkle(h["sprite"].position, Color(0.7, 1.0, 0.5))
+			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(0.7, 1.0, 0.5))
+		_say("Der Fluss atmet auf — die Segnung des klaren Wassers durchströmt euch!")
 		await get_tree().create_timer(2.4).timeout
-		_say("Im Nordosten birst krachend eine Barriere aus Eis ...")
+		_say("Im Nordosten springen die goldenen Tore des Konzernturms auf ...")
 		await get_tree().create_timer(2.2).timeout
 	finished.emit(true)
 
