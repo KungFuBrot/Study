@@ -376,10 +376,12 @@ func _build_scene() -> void:
 	_add_torch(Vector2(890, 160), pal)
 	# Weiches Fülllicht über der Gegnerseite: die Torches stehen am Rand,
 	# ohne Aufheller stünden die Monster fast im Schwarzen.
-	var fill := Fx.point_light(Color(1.0, 0.97, 0.9), 430.0, 1.05)
+	# Kühleres, etwas schwächeres Licht über der Monsterseite — unheimlicher,
+	# aber hell genug, dass die dunkleren Kreaturen lesbar bleiben.
+	var fill := Fx.point_light(Color(0.86, 0.90, 1.0), 430.0, 0.95)
 	fill.position = Vector2(280, 235)
 	add_child(fill)
-	Fx.pulse(fill, 1.05, 2.6)
+	Fx.pulse(fill, 0.95, 2.6)
 	# ... und über der Heldenseite, warm getönt — sonst säuft vor allem
 	# Rax' graues Metall im dunklen Ambiente ab.
 	var fill_h := Fx.point_light(Color(1.0, 0.88, 0.72), 380.0, 0.9)
@@ -427,6 +429,7 @@ func _build_scene() -> void:
 		var home := Vector2(215, 232) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
 		var refl: Sprite2D
+		var mist: CPUParticles2D = null
 		if is_boss:
 			var foot: float = s.texture.get_height() * 0.5 + 0.5
 			_attach_shadow(s, 13, 3, foot)
@@ -438,9 +441,12 @@ func _build_scene() -> void:
 			_attach_shadow(s, 9, 3, foot_e)
 			_attach_glow_pool(s, foot_e, pal["pool_enemy"])
 			refl = _attach_reflection(s, foot_e)
-		# Themen-Tönung (z. B. goldene Gierschlünde, rote Wutgeister);
-		# die Spiegelung erbt sie als Kind automatisch.
-		var tint: Color = def.get("tint", Color.WHITE)
+			mist = _attach_menace(s, home, foot_e)
+		# Themen-Tönung, zusätzlich abgedunkelt und leicht ins Violette
+		# entsättigt — die Monster lauern im Halbdunkel. Die Spiegelung
+		# erbt die Färbung als Kind automatisch.
+		var dark := Color(0.90, 0.88, 0.94) if is_boss else Color(0.78, 0.75, 0.86)
+		var tint: Color = def.get("tint", Color.WHITE) * dark
 		s.modulate = tint
 		s.set_meta("tint", tint)
 		add_child(s)
@@ -448,7 +454,7 @@ func _build_scene() -> void:
 			"atk": def["atk"], "def": def["def"], "gold": def["gold"], "xp": def.get("xp", 0),
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl,
-			"tint": tint, "proj": def.get("proj", ""),
+			"tint": tint, "proj": def.get("proj", ""), "mist": mist,
 			"attack_line": def.get("attack_line", "")})
 
 ## Lebendiger Himmel über der Arena: pulsierende Glut in der Höhle,
@@ -596,6 +602,41 @@ func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
 	ember.color = ember_col
 	ember.texture = SpriteFactory.circle(3, Color.WHITE)
 	s.add_child(ember)
+
+## Grusel-Aufsatz für normale Monster: schwarzer Bodennebel wabert um die
+## Füße, und in unregelmäßigen Abständen zuckt die Kreatur unruhig.
+func _attach_menace(s: Sprite2D, home: Vector2, foot_local: float) -> CPUParticles2D:
+	var mist := CPUParticles2D.new()
+	mist.position = home + Vector2(0, foot_local * 6.5 - 2.0)
+	mist.amount = 7
+	mist.lifetime = 2.6
+	mist.preprocess = 2.6
+	mist.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	mist.emission_rect_extents = Vector2(34, 5)
+	mist.direction = Vector2(0, -1)
+	mist.spread = 24.0
+	mist.gravity = Vector2(0, -6)
+	mist.initial_velocity_min = 3.0
+	mist.initial_velocity_max = 9.0
+	mist.scale_amount_min = 0.14
+	mist.scale_amount_max = 0.30
+	mist.color = Color(0.03, 0.02, 0.06, 0.4)
+	mist.texture = SpriteFactory.particle("smoke_07")
+	mist.z_index = 1
+	add_child(mist)
+	var twitch := Timer.new()
+	twitch.wait_time = randf_range(2.2, 4.6)
+	twitch.autostart = true
+	twitch.timeout.connect(func():
+		twitch.wait_time = randf_range(2.2, 4.6)
+		if not is_instance_valid(s) or not s.visible:
+			return
+		var tw := create_tween()
+		tw.tween_property(s, "rotation", 0.05, 0.05)
+		tw.tween_property(s, "rotation", -0.04, 0.06)
+		tw.tween_property(s, "rotation", 0.0, 0.07))
+	add_child(twitch)
+	return mist
 
 ## Fackel: flackerndes Licht + aufsteigende Glut (Flammenfarbe je Schauplatz).
 func _add_torch(pos: Vector2, pal: Dictionary) -> void:
@@ -3517,6 +3558,9 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 			if c is CanvasItem:
 				var ct := create_tween()
 				ct.tween_property(c, "modulate:a", 0.0, 0.35)
+		# Der schwarze Bodennebel verweht mit dem Monster.
+		if e.get("mist") != null and is_instance_valid(e["mist"]):
+			(e["mist"] as CPUParticles2D).emitting = false
 		await tw.finished
 		(e["sprite"] as Sprite2D).visible = false
 	else:

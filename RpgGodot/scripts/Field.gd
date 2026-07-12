@@ -582,7 +582,7 @@ func _after_step() -> void:
 			# Versiegelte Portale (z. B. Frostgrotte) erst nach Freischaltung.
 			if portal.has("locked_until") and not GameState.get(portal["locked_until"]):
 				AudioManager.play_sfx("error")
-				dialog_name.text = "Eisbarriere"
+				dialog_name.text = portal.get("locked_name", "Barriere")
 				dialog_lines = [portal["locked_msg"]]
 				dialog_after_shop = false
 				state = "dialogue"
