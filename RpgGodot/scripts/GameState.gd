@@ -109,8 +109,27 @@ const ENCOUNTERS := {
 	],
 }
 
+## Nutzer-Einstellungen (überleben Neustarts via user://settings.cfg).
+var touch_pad := true  # Bildschirm-Tasten (D-Pad) anzeigen — Standard: an
+
 func _ready() -> void:
+	_load_settings()
 	reset_party()
+
+func _load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://settings.cfg") == OK:
+		touch_pad = cfg.get_value("input", "touch_pad", true)
+
+func set_touch_pad(value: bool) -> void:
+	touch_pad = value
+	var cfg := ConfigFile.new()
+	cfg.set_value("input", "touch_pad", value)
+	cfg.save("user://settings.cfg")
+	if main != null:
+		var t: Variant = main.get("touch")
+		if t != null and is_instance_valid(t):
+			t.apply_setting()
 
 ## Kompletter Neustart (nach dem Abspann): alles zurück auf Anfang.
 func reset_all() -> void:

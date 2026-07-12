@@ -248,12 +248,21 @@ func play_music(id: String) -> void:
 	music_player.stream = _music_cache[id]
 	music_player.play()
 
+## Echte Soundeffekte (CC0, Kenney — siehe assets/sfx/LICENSE.txt) haben
+## Vorrang; wo keine Datei liegt, rendert weiterhin der Synth (z. B. die
+## eigens gebauten Explosionen boom/bigboom/nuke).
+const SFX_DIR := "res://assets/sfx/"
+
 func play_sfx(id: String) -> void:
 	if not _sfx_cache.has(id):
-		var buf := _render_sfx(id)
-		if buf == null:
-			return
-		_sfx_cache[id] = buf
+		var path := SFX_DIR + id + ".ogg"
+		if ResourceLoader.exists(path):
+			_sfx_cache[id] = load(path)
+		else:
+			var buf := _render_sfx(id)
+			if buf == null:
+				return
+			_sfx_cache[id] = buf
 	var p: AudioStreamPlayer = sfx_players[sfx_next]
 	sfx_next = (sfx_next + 1) % sfx_players.size()
 	p.stream = _sfx_cache[id]

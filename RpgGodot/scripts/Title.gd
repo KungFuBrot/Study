@@ -11,12 +11,16 @@ const HEROES := [
 	{"id": "rax", "pos": Vector2(630, 434), "flip": true},
 ]
 
+const MENU_ITEMS := ["Neues Spiel", "Steuerung", "Einstellungen"]
+
 var menu_index := 0
 var menu_labels: Array = []
 var anim_frame := 0
 var hero_sprites: Array = []
 var flame: Sprite2D
 var help_panel: PanelContainer
+var settings_panel: PanelContainer
+var pad_label: Label
 var ui: CanvasLayer
 var _locked := false
 
@@ -274,8 +278,8 @@ func _build_ui() -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_label("Ein Mini-JRPG-Abenteuer", 19, Color(0.82, 0.82, 0.95), 176)
 	# Startmenü
-	for i in 2:
-		var l := _label(["Neues Spiel", "Steuerung"][i], 24, Color.WHITE, 262 + i * 40)
+	for i in MENU_ITEMS.size():
+		var l := _label(MENU_ITEMS[i], 24, Color.WHITE, 252 + i * 38)
 		menu_labels.append(l)
 	_redraw_menu()
 	# Hilfe-Overlay (Steuerung), anfangs verborgen
@@ -302,6 +306,43 @@ func _build_ui() -> void:
 		vb.add_child(l)
 	help_panel.visible = false
 	ui.add_child(help_panel)
+	# Einstellungs-Overlay (Bildschirm-Tasten an/aus), anfangs verborgen
+	settings_panel = PanelContainer.new()
+	settings_panel.position = Vector2(300, 220)
+	settings_panel.custom_minimum_size = Vector2(360, 0)
+	var svb := VBoxContainer.new()
+	svb.add_theme_constant_override("separation", 10)
+	settings_panel.add_child(svb)
+	var stitle := Label.new()
+	stitle.text = "— Einstellungen —"
+	stitle.add_theme_font_size_override("font_size", 20)
+	stitle.add_theme_color_override("font_color", Color(1.0, 0.85, 0.32))
+	stitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(stitle)
+	pad_label = Label.new()
+	pad_label.add_theme_font_size_override("font_size", 18)
+	pad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(pad_label)
+	var shint := Label.new()
+	shint.text = "Z: Umschalten   ·   X: Zurück"
+	shint.add_theme_font_size_override("font_size", 15)
+	shint.add_theme_color_override("font_color", Color(0.75, 0.75, 0.9))
+	shint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(shint)
+	var shint2 := Label.new()
+	shint2.text = "Tipp: 5-mal schnell tippen blendet das Pad wieder ein"
+	shint2.add_theme_font_size_override("font_size", 13)
+	shint2.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
+	shint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(shint2)
+	_refresh_pad_label()
+	settings_panel.visible = false
+	ui.add_child(settings_panel)
+
+func _refresh_pad_label() -> void:
+	pad_label.text = "Bildschirm-Tasten (Pad):  %s" % ("AN" if GameState.touch_pad else "AUS")
+	pad_label.add_theme_color_override("font_color",
+		Color(0.55, 1.0, 0.6) if GameState.touch_pad else Color(1.0, 0.55, 0.5))
 
 func _label(text: String, size: int, color: Color, y: float) -> Label:
 	var l := Label.new()
@@ -320,7 +361,7 @@ func _redraw_menu() -> void:
 	for i in menu_labels.size():
 		var l: Label = menu_labels[i]
 		var selected := i == menu_index
-		l.text = ("> " if selected else "") + ["Neues Spiel", "Steuerung"][i]
+		l.text = ("> " if selected else "") + MENU_ITEMS[i]
 		l.add_theme_color_override("font_color",
 			Color(1.0, 0.85, 0.32) if selected else Color(0.8, 0.8, 0.88))
 
@@ -332,15 +373,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			AudioManager.play_sfx("menu")
 			help_panel.visible = false
 		return
-	if event.is_action_pressed("move_up") or event.is_action_pressed("move_down"):
+	if settings_panel.visible:
+		if event.is_action_pressed("confirm"):
+			# Bildschirm-Tasten umschalten (wird sofort angewendet + gespeichert)
+			AudioManager.play_sfx("buy")
+			GameState.set_touch_pad(not GameState.touch_pad)
+			_refresh_pad_label()
+		elif event.is_action_pressed("cancel"):
+			AudioManager.play_sfx("menu")
+			settings_panel.visible = false
+		return
+	if event.is_action_pressed("move_up"):
 		AudioManager.play_sfx("menu")
-		menu_index = (menu_index + 1) % 2
+		menu_index = (menu_index - 1 + MENU_ITEMS.size()) % MENU_ITEMS.size()
+		_redraw_menu()
+	elif event.is_action_pressed("move_down"):
+		AudioManager.play_sfx("menu")
+		menu_index = (menu_index + 1) % MENU_ITEMS.size()
 		_redraw_menu()
 	elif event.is_action_pressed("confirm"):
-		if menu_index == 0:
-			_locked = true
-			AudioManager.play_sfx("buy")
-			start_game.emit()
-		else:
-			AudioManager.play_sfx("menu")
-			help_panel.visible = true
+		match menu_index:
+			0:
+				_locked = true
+				AudioManager.play_sfx("buy")
+				start_game.emit()
+			1:
+				AudioManager.play_sfx("menu")
+				help_panel.visible = true
+			2:
+				AudioManager.play_sfx("menu")
+				_refresh_pad_label()
+				settings_panel.visible = true

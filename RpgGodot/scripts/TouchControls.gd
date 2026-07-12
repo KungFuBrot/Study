@@ -29,6 +29,28 @@ func _ready() -> void:
 	# Auch während Pausen/Übergängen bedienbar bleiben.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build()
+	apply_setting()
+
+## Wendet die Titel-Einstellung an: ist das Pad deaktiviert, verschwindet
+## ALLES — auch der „Pad aus"-Umschaltknopf oben rechts.
+func apply_setting() -> void:
+	visible = GameState.touch_pad
+
+var _tap_times: Array = []
+
+## Notausgang: Ist das Pad per Einstellung versteckt, holen fünf schnelle
+## Bildschirm-Tipps es zurück — sonst wäre ein reines Touch-Gerät dauerhaft
+## ausgesperrt (die Einstellung überlebt ja Neustarts).
+func _input(event: InputEvent) -> void:
+	if visible or not (event is InputEventScreenTouch) or not event.pressed:
+		return
+	var now := Time.get_ticks_msec()
+	_tap_times.append(now)
+	while _tap_times.size() > 0 and now - _tap_times[0] > 2000:
+		_tap_times.pop_front()
+	if _tap_times.size() >= 5:
+		_tap_times.clear()
+		GameState.set_touch_pad(true)
 
 func _build() -> void:
 	_root = Control.new()

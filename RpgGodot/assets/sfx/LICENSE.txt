@@ -1,0 +1,30 @@
+Soundeffekte aus den Kenney-Audio-Packs (https://kenney.nl)
+Lizenz: CC0 1.0 (Public Domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Quellen:
+- https://kenney.nl/assets/rpg-audio
+- https://kenney.nl/assets/interface-sounds
+- https://kenney.nl/assets/impact-sounds
+- https://kenney.nl/assets/sci-fi-sounds
+- https://kenney.nl/assets/digital-audio
+
+Zuordnung (Originaldatei):
+- menu.ogg       = interface-sounds/click_001
+- buy.ogg        = rpg-audio/handleCoins
+- error.ogg      = interface-sounds/error_004
+- slash.ogg      = rpg-audio/knifeSlice
+- hit.ogg        = impact-sounds/impactPunch_heavy_001
+- heal.ogg       = digital-audio/powerUp5
+- coin.ogg       = rpg-audio/handleCoins2
+- step.ogg       = rpg-audio/footstep00
+- encounter.ogg  = digital-audio/zapThreeToneUp
+- flee.ogg       = digital-audio/phaserDown1
+- laser.ogg      = sci-fi-sounds/laserLarge_000
+- charge.ogg     = digital-audio/phaserUp2
+- ult_charge.ogg = sci-fi-sounds/forceField_000
+- die.ogg        = sci-fi-sounds/slime_000
+- rocket.ogg     = sci-fi-sounds/thrusterFire_000
+- stomp.ogg      = impact-sounds/impactPlate_heavy_000
+
+Alle übrigen Effekte (Explosionen, Brüllen, Beschwörungen usw.) rendert
+weiterhin der eingebaute Synthesizer. Danke an Kenney für die Assets!

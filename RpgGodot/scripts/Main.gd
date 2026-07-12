@@ -4,6 +4,7 @@ extends Node
 
 var current_screen: Node = null
 var fade_rect: ColorRect
+var touch: TouchControls
 
 # Merker, um nach einem Kampf an dieselbe Stelle zurückzukehren.
 var field_return := {"map": "town", "spawn": "start", "pos": Vector2i(-1, -1)}
@@ -22,7 +23,8 @@ func _ready() -> void:
 	layer.add_child(fade_rect)
 	# Bildschirm-Steuerung für Geräte ohne Tastatur (Web/Touch); bleibt über
 	# allen Szenen bestehen und speist die Input-Actions ein.
-	add_child(TouchControls.new())
+	touch = TouchControls.new()
+	add_child(touch)
 	if OS.get_environment("SPELLSHOT") != "":
 		goto_map("town", "start")
 		await get_tree().create_timer(0.5).timeout
