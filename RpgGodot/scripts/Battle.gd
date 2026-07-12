@@ -19,11 +19,12 @@ const WEAPON_GRIP := {
 
 # Kampf-Aufstellung (Zickzack in der Tiefe): Serena vordere Reihe oben,
 # Milo hintere Reihe Mitte (weiter rechts + kleiner → Tiefe), Rax vordere
-# Reihe unten. pos = Mittelpunkt.
+# Reihe unten. pos = Mittelpunkt. Milo weit genug rechts und Rax weit genug
+# links, dass Milos Vortreten (_stance, -56 px) niemanden überlappt.
 const BATTLE_FORMATION := {
 	"serena": {"pos": Vector2(692, 178), "scale": 4.9},
-	"milo": {"pos": Vector2(808, 242), "scale": 4.1},
-	"rax": {"pos": Vector2(702, 300), "scale": 4.6},
+	"milo": {"pos": Vector2(838, 242), "scale": 4.1},
+	"rax": {"pos": Vector2(662, 306), "scale": 4.6},
 }
 
 var enemy_ids: Array = []
@@ -1904,16 +1905,21 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	await fall.finished
 	blink.kill()
 	b.queue_free()
-	# Detonation: langer Weißblitz, alles bebt.
+	# Detonation: langer Weißblitz, alles bebt — und zwar richtig.
 	AudioManager.play_sfx("nuke")
 	_flash_screen(Color(1, 1, 1, 0.95))
 	_shockwave(center)
-	_shake_camera(3.0)
-	_punch_zoom(0.16, center)
-	_explosion(center, 2.4)
+	_shake_camera(3.6)
+	_punch_zoom(0.2, center)
+	_explosion(center, 3.4)
 	for e in alive:
-		_explosion((e["sprite"] as Sprite2D).position, 1.2)
-	_mushroom_cloud(center)
+		_explosion((e["sprite"] as Sprite2D).position, 1.6)
+	_mushroom_cloud(center, 1.6)
+	# Nachschlag: zweite Druckwelle + zweite Explosion, wenn der Blitz abklingt.
+	get_tree().create_timer(0.55).timeout.connect(func():
+		_shockwave(center + Vector2(30, -20))
+		_explosion(center + Vector2(randf_range(-50, 50), randf_range(-30, 10)), 2.0)
+		_shake_camera(2.2))
 	# Hitzeflimmern über dem Schlachtfeld, solange der Pilz steht.
 	var haze := ColorRect.new()
 	haze.position = Vector2(20, 90)
@@ -1934,7 +1940,8 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 
 ## Atompilz: heißer Stamm wächst hoch, glühende Kappe wölbt sich auf,
 ## Glutpartikel steigen — alles additiv und selbstaufräumend.
-func _mushroom_cloud(pos: Vector2) -> void:
+## `size` skaliert Höhe, Breite und Partikelmenge.
+func _mushroom_cloud(pos: Vector2, size := 1.0) -> void:
 	var addm := CanvasItemMaterial.new()
 	addm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	var stem := Sprite2D.new()
@@ -1942,67 +1949,67 @@ func _mushroom_cloud(pos: Vector2) -> void:
 	stem.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	stem.material = addm
 	stem.position = pos
-	stem.scale = Vector2(1.2, 0.4)
+	stem.scale = Vector2(1.2 * size, 0.4)
 	add_child(stem)
 	var st := create_tween()
-	st.tween_property(stem, "scale", Vector2(1.5, 4.8), 0.8) \
+	st.tween_property(stem, "scale", Vector2(1.5, 4.8) * size, 0.8) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	st.parallel().tween_property(stem, "position:y", pos.y - 80.0, 0.8)
+	st.parallel().tween_property(stem, "position:y", pos.y - 80.0 * size, 0.8)
 	st.tween_property(stem, "modulate:a", 0.0, 0.9)
 	st.tween_callback(stem.queue_free)
 	# Glühende Pilzkappe aus echten Rauch-Puffs (additiv = Feuerschein) ...
-	for i in 5:
+	for i in 6:
 		var puff := Sprite2D.new()
 		puff.texture = SpriteFactory.particle("smoke_04")
 		puff.material = addm
-		puff.modulate = Color(1.0, lerpf(0.75, 0.45, i / 4.0), 0.2, 0.85)
+		puff.modulate = Color(1.0, lerpf(0.75, 0.45, i / 5.0), 0.2, 0.85)
 		puff.position = pos + Vector2(randf_range(-8, 8), -10)
 		puff.rotation = randf_range(0.0, TAU)
 		puff.scale = Vector2(0.12, 0.12)
 		add_child(puff)
-		var side := randf_range(-52, 52) * (0.4 + i * 0.15)
+		var side := randf_range(-52, 52) * (0.4 + i * 0.15) * size
 		var pt := create_tween()
 		pt.tween_interval(0.12 + i * 0.05)
-		pt.tween_property(puff, "position", pos + Vector2(side, -152.0 - i * 14.0), 1.1) \
+		pt.tween_property(puff, "position", pos + Vector2(side, (-152.0 - i * 14.0) * size), 1.1) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		pt.parallel().tween_property(puff, "scale", Vector2.ONE * (0.5 + i * 0.09), 1.1)
+		pt.parallel().tween_property(puff, "scale", Vector2.ONE * (0.5 + i * 0.09) * size, 1.1)
 		pt.parallel().tween_property(puff, "rotation", puff.rotation + randf_range(-0.8, 0.8), 1.1)
 		pt.parallel().tween_property(puff, "modulate:a", 0.0, 1.3)
 		pt.tween_callback(puff.queue_free)
 	# ... darüber dunkler Nachrauch, der träge weiterzieht
-	for i in 3:
+	for i in 4:
 		var gray := Sprite2D.new()
 		gray.texture = SpriteFactory.particle("smoke_04")
 		gray.modulate = Color(0.35, 0.33, 0.33, 0.0)
-		gray.position = pos + Vector2(randf_range(-20, 20), -60 - i * 20.0)
+		gray.position = pos + Vector2(randf_range(-24, 24), (-60.0 - i * 22.0) * size)
 		gray.rotation = randf_range(0.0, TAU)
-		gray.scale = Vector2(0.25, 0.25)
+		gray.scale = Vector2(0.25, 0.25) * size
 		add_child(gray)
 		var gt := create_tween()
 		gt.tween_interval(0.5 + i * 0.2)
 		gt.tween_property(gray, "modulate:a", 0.5, 0.4)
-		gt.parallel().tween_property(gray, "position:y", gray.position.y - 90.0, 2.0) \
+		gt.parallel().tween_property(gray, "position:y", gray.position.y - 95.0 * size, 2.0) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		gt.parallel().tween_property(gray, "scale", Vector2(0.7, 0.7), 2.0)
+		gt.parallel().tween_property(gray, "scale", Vector2(0.7, 0.7) * size, 2.0)
 		gt.tween_property(gray, "modulate:a", 0.0, 0.8)
 		gt.tween_callback(gray.queue_free)
 	var emb := CPUParticles2D.new()
 	emb.position = pos
-	emb.amount = 40
+	emb.amount = int(40 * size)
 	emb.lifetime = 1.2
 	emb.one_shot = true
 	emb.explosiveness = 0.9
 	emb.direction = Vector2(0, -1)
 	emb.spread = 55.0
 	emb.gravity = Vector2(0, -60)
-	emb.initial_velocity_min = 60.0
-	emb.initial_velocity_max = 190.0
+	emb.initial_velocity_min = 60.0 * size
+	emb.initial_velocity_max = 190.0 * size
 	emb.color = Color(1.0, 0.55, 0.15, 0.9)
 	emb.texture = SpriteFactory.circle(2, Color.WHITE)
 	emb.emitting = true
 	add_child(emb)
 	get_tree().create_timer(2.4).timeout.connect(emb.queue_free)
-	_spell_light(pos, Color(1.0, 0.6, 0.2), 420.0, 1.4, 2.0)
+	_spell_light(pos, Color(1.0, 0.6, 0.2), 420.0 * size, 1.4, 2.0)
 
 ## Zielmarker, der über einem Gegner zusammenzieht (Orbital-Anvisierung).
 func _target_reticle(pos: Vector2) -> void:
