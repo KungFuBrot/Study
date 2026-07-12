@@ -85,9 +85,9 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.2).timeout
 	# Milo Feuerball (Explosion einfangen)
 	_fireball(heroes[1], heroes[1]["data"]["abilities"][0], enemies[0])
-	await get_tree().create_timer(1.05).timeout
+	await get_tree().create_timer(1.85).timeout
 	_snap(dir, "show_fireball")
-	await get_tree().create_timer(1.4).timeout
+	await get_tree().create_timer(1.2).timeout
 	# Rax Laser
 	_laser(heroes[2], heroes[2]["data"]["abilities"][0], enemies[1])
 	await get_tree().create_timer(0.55).timeout
@@ -95,9 +95,9 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.2).timeout
 	# Rax Raketensalve
 	_rocket_all(heroes[2], heroes[2]["data"]["abilities"][1])
-	await get_tree().create_timer(0.95).timeout
+	await get_tree().create_timer(1.55).timeout
 	_snap(dir, "show_rockets")
-	await get_tree().create_timer(1.6).timeout
+	await get_tree().create_timer(2.0).timeout
 	# Rax Ultimate
 	_ultimate_rax(heroes[2])
 	await get_tree().create_timer(1.95).timeout
@@ -1331,10 +1331,54 @@ func _strike_offset(e: Dictionary) -> float:
 	var es: Sprite2D = e["sprite"]
 	return es.texture.get_width() * es.scale.x * 0.5 + 30.0
 
+## Vorbereitungspose vor einer Fähigkeit (wie beim Roboterlaser): der Held
+## tritt vor und sammelt sichtbar Kraft — Zauberkreis, aufglühende Aura,
+## einlaufende Funken, Wirk-Pose, Sammelton. Erst danach folgt die Wirkung.
+func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
+	var s: Sprite2D = h["sprite"]
+	await _sprint(h, h["home"] + Vector2(-56, 4), 0.18)
+	_cast_circle(s.position + Vector2(0, 40), color)
+	_anim_cast(s)
+	AudioManager.play_sfx(sfx)
+	_spell_light(s.position, color, 150.0, 0.8, 1.0)
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Aura glüht hinter der Figur auf und verlischt wieder
+	var aura := Sprite2D.new()
+	aura.texture = SpriteFactory.particle("light_01")
+	aura.material = mat
+	aura.modulate = Color(color, 0.0)
+	aura.position = s.position
+	aura.scale = Vector2(0.4, 0.4)
+	add_child(aura)
+	var at := create_tween()
+	at.tween_property(aura, "modulate:a", 0.75, 0.28)
+	at.parallel().tween_property(aura, "scale", Vector2(1.0, 1.0), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	at.tween_property(aura, "modulate:a", 0.0, 0.25)
+	at.tween_callback(aura.queue_free)
+	# Funken laufen von außen in die Figur
+	for i in 6:
+		var spark := Sprite2D.new()
+		spark.texture = SpriteFactory.circle(3, Color(1, 1, 1))
+		spark.material = mat
+		spark.modulate = color.lightened(0.4)
+		spark.position = s.position + Vector2(randf_range(-52, 52), randf_range(-46, 46))
+		add_child(spark)
+		var st := spark.create_tween()
+		st.tween_interval(i * 0.04)
+		st.tween_property(spark, "position", s.position, 0.24) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		st.parallel().tween_property(spark, "scale", Vector2(0.3, 0.3), 0.24)
+		st.tween_callback(spark.queue_free)
+	await get_tree().create_timer(0.55).timeout
+
 func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s entfesselt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
+	# Konzentration: vortreten, Kraft sammeln, dann erst der Wirbel.
+	await _stance(h, Color(1.0, 0.95, 0.5))
 	var tw := create_tween()
 	tw.tween_property(s, "position", Vector2(430, 260), 0.25).set_trans(Tween.TRANS_QUAD)
 	_ghost_trail(s, 0.25)
@@ -1361,9 +1405,9 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s wirkt %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
-	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
+	# Beschwörungspose: vortreten und Kraft sammeln, dann aufsteigen.
+	await _stance(h, Color(1.0, 0.6, 0.2), "summon")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.82, 0.35))
-	_anim_cast(s)
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
 	await raise.finished
@@ -1431,6 +1475,8 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	_say("%s setzt %s ein!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
+	# Konzentration vor dem Sturmangriff.
+	await _stance(h, Color(1.0, 0.95, 0.5))
 	var tw := create_tween()
 	tw.tween_property(s, "position", es.position + Vector2(_strike_offset(e), 0), 0.14) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -1578,21 +1624,23 @@ func _launch_rocket(from: Vector2, to: Vector2) -> void:
 	exm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	exhaust.material = exm
 	r.add_child(exhaust)
-	# Rauchspur aus echten Rauch-Puffs, die hängen bleiben und aufquellen.
+	# Rauchfaden: eigenständiger Emitter (KEIN Kind der Rakete), der ihr am
+	# Heck folgt und träge, lang lebende Puffs ablegt — die Flugbahn bleibt
+	# als hängender Faden in der Luft stehen und verweht nach dem Einschlag.
 	var smoke := CPUParticles2D.new()
-	smoke.amount = 26
-	smoke.lifetime = 0.7
-	smoke.direction = Vector2(-1, 0)
-	smoke.spread = 18.0
-	smoke.gravity = Vector2(0, -20)
-	smoke.initial_velocity_min = 10.0
-	smoke.initial_velocity_max = 30.0
+	smoke.amount = 90
+	smoke.lifetime = 1.9
+	smoke.direction = Vector2(0, -1)
+	smoke.spread = 180.0
+	smoke.gravity = Vector2(0, -12)
+	smoke.initial_velocity_min = 2.0
+	smoke.initial_velocity_max = 8.0
 	smoke.scale_amount_min = 0.05
-	smoke.scale_amount_max = 0.14
-	smoke.color = Color(0.78, 0.77, 0.75, 0.4)
+	smoke.scale_amount_max = 0.11
+	smoke.color = Color(0.85, 0.84, 0.82, 0.6)
 	smoke.texture = SpriteFactory.particle("smoke_07")
-	smoke.position = Vector2(-14, 0)  # am Heck, in lokalen Koordinaten
-	r.add_child(smoke)
+	smoke.position = from
+	add_child(smoke)
 	add_child(r)
 	# Mündungsblitz am Startrohr
 	var muzzle := Sprite2D.new()
@@ -1615,9 +1663,9 @@ func _launch_rocket(from: Vector2, to: Vector2) -> void:
 	# Quadratische Bézier-Bahn: Kontrollpunkt hoch über dem Startrohr →
 	# steiler Aufstieg, dann Sturz ins Ziel.
 	var ctrl := from + Vector2(randf_range(-40, 10), -randf_range(110, 170))
-	var dur := randf_range(0.36, 0.46)
+	var dur := randf_range(0.62, 0.78)
 	var tw := create_tween()
-	tw.tween_method(_rocket_step.bind(r, from, ctrl, to), 0.0, 1.0, dur) \
+	tw.tween_method(_rocket_step.bind(r, smoke, from, ctrl, to), 0.0, 1.0, dur) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func():
 		flick.kill()
@@ -1625,25 +1673,36 @@ func _launch_rocket(from: Vector2, to: Vector2) -> void:
 		_explosion(to, 1.15)
 		_spell_light(to, Color(1.0, 0.6, 0.25), 160.0, 0.4)
 		AudioManager.play_sfx("boom")
-		_shake_camera(1.2))
+		_shake_camera(1.2)
+		# Der Rauchfaden bleibt stehen und verweht von selbst.
+		smoke.emitting = false
+		get_tree().create_timer(2.0).timeout.connect(smoke.queue_free))
 
-## Ein Schritt auf der Bézier-Bahn einer Rakete: Position + Blickrichtung.
-func _rocket_step(t: float, r: Sprite2D, from: Vector2, ctrl: Vector2, to: Vector2) -> void:
+## Ein Schritt auf der Bézier-Bahn einer Rakete: Position + Blickrichtung;
+## der Rauch-Emitter hängt am Heck (gegen die Flugrichtung versetzt).
+func _rocket_step(t: float, r: Sprite2D, smoke: CPUParticles2D,
+		from: Vector2, ctrl: Vector2, to: Vector2) -> void:
 	if not is_instance_valid(r):
 		return
 	var u := 1.0 - t
 	r.position = u * u * from + 2.0 * u * t * ctrl + t * t * to
 	var deriv: Vector2 = 2.0 * u * (ctrl - from) + 2.0 * t * (to - ctrl)
 	r.rotation = deriv.angle()
+	if is_instance_valid(smoke):
+		smoke.position = r.position - deriv.normalized() * 20.0
 
 ## Raketensalve: zwei Wellen kleiner Raketen auf alle Gegner.
 func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	_say("%s startet %s!" % [d["name"], ab["name"]])
+	# In Feuerposition schweben und den Schützenstand einnehmen.
+	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.6, 0.2))
 	h["anim"] = "aim"
 	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	AudioManager.play_sfx("charge")
+	await get_tree().create_timer(0.4).timeout
 	var alive := []
 	for e in enemies:
 		if e["alive"]:
@@ -1657,13 +1716,15 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 			AudioManager.play_sfx("rocket")
 			await get_tree().create_timer(0.09).timeout
 		await get_tree().create_timer(0.18).timeout
-	await get_tree().create_timer(0.35).timeout
+	# Warten, bis auch die langsamen Raketen eingeschlagen sind.
+	await get_tree().create_timer(0.8).timeout
 	h["anim"] = "idle"
 	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
 	for e in alive:
 		if e["alive"]:
 			var dmg: int = int((ab["power"] + d["mag"] * 0.7) * randf_range(0.9, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
+	await _sprint(h, h["home"], 0.2)
 
 ## Atombombe: Rax markiert alle Ziele, ein Sprengkopf fällt pfeifend vom
 ## Himmel — Weißblitz, Schockwelle, Atompilz, massiver Flächenschaden.
@@ -1671,6 +1732,8 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	_say("%s fordert %s an!" % [d["name"], ab["name"]])
+	# Vortreten und den Uplink aufbauen (Schützenstand, Antenne dauerrot).
+	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	h["anim"] = "aim"
 	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
 	var alive := []
@@ -1734,6 +1797,7 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 			await _damage_enemy(e, maxi(dmg, 1))
 	h["anim"] = "idle"
 	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	await _sprint(h, h["home"], 0.2)
 
 ## Atompilz: heißer Stamm wächst hoch, glühende Kappe wölbt sich auf,
 ## Glutpartikel steigen — alles additiv und selbstaufräumend.
@@ -2476,7 +2540,8 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var td: Dictionary = target["data"]
 	_say("%s wirkt %s auf %s!" % [d["name"], ab["name"], td["name"]])
 	var s: Sprite2D = h["sprite"]
-	_cast_circle(s.position + Vector2(0, 40), Color(0.45, 1.0, 0.55))
+	# Beschwörungspose vor dem Heilzauber.
+	await _stance(h, Color(0.45, 1.0, 0.55), "summon")
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 12.0, 0.2)
 	await raise.finished
@@ -2514,14 +2579,34 @@ func _enemy_turn(e: Dictionary) -> void:
 		e["ult_used"] = true
 		await _boss_ultimate(e, alive_heroes)
 		return
-	# Kurzes Aufladen (Anspannen + rote Färbung) vor jeder Gegner-Aktion.
+	# In Stellung gehen: zurückweichen, ducken, bedrohlich aufglühen —
+	# erst dann folgt der Sturmangriff (Anticipation wie bei den Helden).
 	var es: Sprite2D = e["sprite"]
 	var base_scale: Vector2 = es.scale
+	var ehome: Vector2 = e["home"]
+	var amat := CanvasItemMaterial.new()
+	amat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var aura := Sprite2D.new()
+	aura.texture = SpriteFactory.particle("light_01")
+	aura.material = amat
+	aura.modulate = Color(1.0, 0.25, 0.15, 0.0)
+	aura.position = es.position
+	aura.scale = Vector2(0.5, 0.5) * (2.0 if e["is_boss"] else 1.0)
+	aura.show_behind_parent = true
+	add_child(aura)
+	var at := create_tween()
+	at.tween_property(aura, "modulate:a", 0.6, 0.3)
+	at.tween_property(aura, "modulate:a", 0.0, 0.2)
+	at.tween_callback(aura.queue_free)
 	var windup := create_tween()
-	windup.tween_property(es, "scale", base_scale * 1.15, 0.16)
-	windup.parallel().tween_property(es, "modulate", Color(1.3, 0.8, 0.8), 0.16)
-	windup.tween_property(es, "scale", base_scale, 0.12)
-	windup.parallel().tween_property(es, "modulate", e.get("tint", Color.WHITE), 0.12)
+	windup.tween_property(es, "position:x", ehome.x - 26.0, 0.22) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	windup.parallel().tween_property(es, "scale", base_scale * Vector2(1.10, 0.90), 0.22)
+	windup.parallel().tween_property(es, "modulate", Color(1.35, 0.75, 0.75), 0.22)
+	windup.tween_interval(0.14)
+	windup.tween_property(es, "scale", base_scale * Vector2(0.94, 1.08), 0.09)
+	windup.parallel().tween_property(es, "modulate", e.get("tint", Color.WHITE), 0.09)
+	windup.tween_property(es, "scale", base_scale, 0.07)
 	await windup.finished
 	if e["is_boss"] and e["acts"] % 3 == 0:
 		await _boss_aoe(e, alive_heroes)
