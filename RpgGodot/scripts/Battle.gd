@@ -437,6 +437,12 @@ func _build_scene() -> void:
 			refl = _attach_reflection(s, foot, 0.10)
 			_attach_boss_aura(s, def.get("theme", "toxic"))
 			_attach_boss_life(s, def.get("theme", "toxic"), def["sprite"])
+			# Träges Gewichts-Schwanken — der Koloss steht nie ganz still.
+			var sway := create_tween().set_loops()
+			sway.tween_property(s, "rotation", 0.015, 2.2) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			sway.tween_property(s, "rotation", -0.015, 2.2) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		else:
 			var foot_e: float = s.texture.get_height() * 0.5 - 1.0
 			_attach_shadow(s, 9, 3, foot_e)
@@ -904,23 +910,22 @@ func _add_theme_weather() -> void:
 
 ## Lebendige Idles: Held*innen und Monster durchlaufen ihre 4-Frame-Animation.
 func _start_idle_animations() -> void:
-	var frame_timer := Timer.new()
-	frame_timer.wait_time = 0.16
-	frame_timer.autostart = true
-	frame_timer.timeout.connect(func():
-		for e in enemies:
+	# Jede Figur taktet ihre Frames eigenständig und leicht unterschiedlich
+	# schnell — im globalen Gleichtakt wirkte die Szene wie ein starres GIF.
+	for e in enemies:
+		_unit_ticker(randf_range(0.13, 0.19), func():
 			if e["alive"] and SpriteFactory.enemy_has_anim(e["id"]):
 				e["frame"] = (e["frame"] + 1) % SpriteFactory.ENEMY_FRAMES
 				var tex := SpriteFactory.enemy_frame(e["id"], e["frame"])
 				(e["sprite"] as Sprite2D).texture = tex
 				if is_instance_valid(e["refl"]):
-					(e["refl"] as Sprite2D).texture = tex
-		for h in heroes:
+					(e["refl"] as Sprite2D).texture = tex)
+	for h in heroes:
+		_unit_ticker(randf_range(0.13, 0.19), func():
 			if h["data"]["hp"] > 0:
 				h["frame"] = (h["frame"] + 1) % 4
-				var tex := SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"])
-				(h["sprite"] as Sprite2D).texture = tex)
-	add_child(frame_timer)
+				(h["sprite"] as Sprite2D).texture = \
+					SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"]))
 	var glint_timer := Timer.new()
 	glint_timer.wait_time = 2.6
 	glint_timer.autostart = true
@@ -943,6 +948,37 @@ func _start_idle_animations() -> void:
 		tw.tween_property(glint, "modulate:a", 0.0, 0.22)
 		tw.tween_callback(glint.queue_free))
 	add_child(glint_timer)
+
+## Eigener Frame-Ticker pro Figur (leicht versetzte Perioden = organisches Bild).
+func _unit_ticker(period: float, cb: Callable) -> void:
+	var t := Timer.new()
+	t.wait_time = period
+	t.autostart = true
+	t.timeout.connect(cb)
+	add_child(t)
+
+## Kleiner Staubstoß an den Füßen — verkauft Abstoß und Landung.
+func _step_dust(pos: Vector2) -> void:
+	var p := CPUParticles2D.new()
+	p.position = pos
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = 6
+	p.lifetime = 0.4
+	p.direction = Vector2(0, -1)
+	p.spread = 60.0
+	p.gravity = Vector2(0, 60)
+	p.initial_velocity_min = 20.0
+	p.initial_velocity_max = 55.0
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.0
+	p.color = Color(0.75, 0.72, 0.68, 0.5)
+	p.texture = SpriteFactory.circle(2, Color.WHITE)
+	p.emitting = true
+	add_child(p)
+	var tw := create_tween()
+	tw.tween_interval(0.9)
+	tw.tween_callback(p.queue_free)
 
 ## Idle-Wippen zentral anhalten/neustarten — verhindert, dass ein laufender
 ## Bob-Loop in Dash-/Teleport-Animationen hineinpfuscht oder doppelt stapelt.
@@ -1516,17 +1552,30 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	var s: Sprite2D = h["sprite"]
 	s.z_index = 2
 	h["anim"] = "run"
+	var foot_y := s.texture.get_height() * s.scale.y * 0.5 - 4.0
+	_step_dust(s.position + Vector2(0, foot_y))
 	var frames := create_tween().set_loops()
 	frames.tween_interval(0.06)
 	frames.tween_callback(func():
 		h["frame"] = (h["frame"] + 1) % 4
 		s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "run"))
 	_ghost_trail(s, dur)
+	# In Laufrichtung lehnen, am Ziel aufrichten und abfedern.
+	var lean := create_tween()
+	lean.tween_property(s, "rotation", -0.09 if to.x < s.position.x else 0.09,
+		minf(0.12, dur * 0.5)).set_trans(Tween.TRANS_SINE)
 	var tw := create_tween()
 	tw.tween_property(s, "position", to, dur) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	await tw.finished
 	frames.kill()
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var settle := create_tween()
+	settle.tween_property(s, "rotation", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
+	settle.parallel().tween_property(s, "scale", base * Vector2(1.05, 0.94), 0.07)
+	settle.tween_property(s, "scale", base, 0.12) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_step_dust(to + Vector2(0, foot_y))
 	h["anim"] = "idle"
 	s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle")
 	if to.is_equal_approx(h["home"]):
@@ -3155,11 +3204,15 @@ func _enemy_turn(e: Dictionary) -> void:
 		_resume_bob(e, bob_period)
 		await get_tree().create_timer(0.25).timeout
 		return
+	# Abstoß-Staub, Anlauf-Lehnen und Geistertrail machen den Sturm wuchtig.
+	var efoot := es.texture.get_height() * es.scale.y * 0.5 - 4.0
+	_step_dust(ehome + Vector2(0, efoot))
+	var charge_lean := create_tween()
+	charge_lean.tween_property(es, "rotation", 0.12, 0.12).set_trans(Tween.TRANS_SINE)
 	var tw := create_tween()
 	tw.tween_property(es, "position", target["sprite"].position + Vector2(-60, 0), 0.22) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	if e["is_boss"]:
-		_ghost_trail(es, 0.22)
+	_ghost_trail(es, 0.22)
 	await tw.finished
 	AudioManager.play_sfx("hit")
 	_burst(target["sprite"].position, _palette()["hit"], 8, 110)
@@ -3167,7 +3220,14 @@ func _enemy_turn(e: Dictionary) -> void:
 	_damage_hero(target, dmg)
 	var back := create_tween()
 	back.tween_property(es, "position", e["home"], 0.25).set_trans(Tween.TRANS_QUAD)
+	back.parallel().tween_property(es, "rotation", 0.0, 0.20).set_trans(Tween.TRANS_SINE)
 	await back.finished
+	# Landung abfedern + Staub
+	var settle := create_tween()
+	settle.tween_property(es, "scale", base_scale * Vector2(1.06, 0.94), 0.07)
+	settle.tween_property(es, "scale", base_scale, 0.12) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_step_dust(e["home"] + Vector2(0, efoot))
 	_resume_bob(e, bob_period)
 	await get_tree().create_timer(0.25).timeout
 
@@ -3198,6 +3258,12 @@ func _enemy_ranged(e: Dictionary, target: Dictionary) -> void:
 	var from: Vector2 = es.position + Vector2(34, -8)
 	var to: Vector2 = target["sprite"].position
 	var dmg := maxi(int(e["atk"] * randf_range(0.85, 1.15)) - target["data"]["def"], 1)
+	# Abwurf-Impuls: kurz nach vorn schnellen und zurückfedern.
+	var kick := create_tween()
+	kick.tween_property(es, "position:x", es.position.x + 14.0, 0.10) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	kick.tween_property(es, "position:x", es.position.x, 0.22) \
+		.set_trans(Tween.TRANS_SINE)
 	match e["proj"]:
 		"sludge":
 			# Giftschlamm-Klumpen im hohen Bogen; zerplatzt zu Spritzern + Pfütze
