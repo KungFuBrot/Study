@@ -219,6 +219,14 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.0).timeout
 	_snap(dir, "show_leviathan_3")
 	await get_tree().create_timer(2.5).timeout
+	# Milo Bahamut (Drachenkönig + Megaflare)
+	heroes[1]["data"]["mp"] = 99
+	_summon_bahamut(heroes[1], summons[2])
+	await get_tree().create_timer(3.4).timeout
+	_snap(dir, "show_bahamut_1")
+	await get_tree().create_timer(1.2).timeout
+	_snap(dir, "show_bahamut_2")
+	await get_tree().create_timer(2.5).timeout
 	# Milo Meteorregen (Gesteinsbrocken über dem ganzen Feld)
 	_ultimate_milo(heroes[1])
 	await get_tree().create_timer(2.1).timeout
@@ -458,12 +466,27 @@ func _build_scene() -> void:
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false,
 			"frame": 0, "weapon": wp, "anim": "idle"})
 
+	# Gegner-Skalierung: normale Monster werden mit jedem bereits erledigten
+	# Dungeon (= gefallener Boss) stärker, damit die Herausforderung unabhängig
+	# von der gewählten Reihenfolge mitwächst. Bosse behalten ihre festen Werte.
+	var scale_n := GameState.bosses_defeated_count()
+	var hp_mul := 1.0 + 0.42 * scale_n
+	var atk_mul := 1.0 + 0.30 * scale_n
+	var def_mul := 1.0 + 0.22 * scale_n
+	var loot_mul := 1.0 + 0.5 * scale_n
 	for i in enemy_ids.size():
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
 		var is_boss: bool = def.get("boss", false)
+		var e_hp: int = def["hp"] if is_boss else int(round(def["hp"] * hp_mul))
+		var e_atk: int = def["atk"] if is_boss else int(round(def["atk"] * atk_mul))
+		var e_def: int = def["def"] if is_boss else int(round(def["def"] * def_mul))
+		var e_gold: int = def["gold"] if is_boss else int(round(def["gold"] * loot_mul))
+		var e_xp: int = def.get("xp", 0) if is_boss else int(round(def.get("xp", 0) * loot_mul))
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		s.scale = Vector2(7.2, 7.2) if is_boss else Vector2(6.5, 6.5)
+		# Der finale Boss „Die Stille" thront deutlich größer als die übrigen.
+		var boss_sc := 9.6 if def["sprite"] == "boss4" else 7.2
+		s.scale = Vector2(boss_sc, boss_sc) if is_boss else Vector2(6.5, 6.5)
 		s.set_meta("base_scale", s.scale)
 		var home := Vector2(222, 222) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
@@ -496,8 +519,8 @@ func _build_scene() -> void:
 		s.modulate = tint
 		s.set_meta("tint", tint)
 		add_child(s)
-		enemies.append({"name": def["name"], "hp": def["hp"], "max_hp": def["hp"],
-			"atk": def["atk"], "def": def["def"], "gold": def["gold"], "xp": def.get("xp", 0),
+		enemies.append({"name": def["name"], "hp": e_hp, "max_hp": e_hp,
+			"atk": e_atk, "def": e_def, "gold": e_gold, "xp": e_xp,
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl,
 			"tint": tint, "proj": def.get("proj", ""), "mist": mist,
@@ -1556,6 +1579,7 @@ func _ability_menu(h: Dictionary) -> bool:
 		match sm["id"]:
 			"ifrit": await _summon_ifrit(h, sm)
 			"leviathan": await _summon_leviathan(h, sm)
+			"bahamut": await _summon_bahamut(h, sm)
 		return true
 	if pick == abilities.size() + summons.size():
 		if h["ult_used"]:
@@ -3651,6 +3675,194 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	await back.finished
 	h["bob"] = _idle_bob(s, 2.0)
 
+## Draconische Silhouette für Bahamut: dunkler Körper mit Schwingen, glühender
+## Kern und Augen (alles additiv). Gibt den Wurzelknoten zurück.
+func _bahamut_body(sc: float) -> Node2D:
+	var root := Node2D.new()
+	var dark := Color(0.10, 0.08, 0.14)
+	var rim := Color(0.55, 0.30, 0.12)
+	# Schwingen (zwei große, gezackte Flügel)
+	for side: int in [-1, 1]:
+		var wing := Polygon2D.new()
+		wing.polygon = PackedVector2Array([Vector2(0, -6), Vector2(side * 60, -34),
+			Vector2(side * 78, -6), Vector2(side * 66, 6), Vector2(side * 44, 2),
+			Vector2(side * 30, 18), Vector2(side * 20, 4)])
+		wing.color = dark
+		root.add_child(wing)
+		var edge := Line2D.new()
+		edge.points = wing.polygon
+		edge.width = 1.6
+		edge.default_color = rim
+		edge.closed = true
+		root.add_child(edge)
+	# Körper (Rumpf + Hals + Kopf)
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-12, 8), Vector2(-6, -10),
+		Vector2(6, -14), Vector2(12, -26), Vector2(20, -30), Vector2(16, -18),
+		Vector2(10, -8), Vector2(12, 10), Vector2(0, 22)])
+	body.color = dark
+	root.add_child(body)
+	var bedge := Line2D.new()
+	bedge.points = body.polygon
+	bedge.width = 1.6
+	bedge.default_color = rim
+	bedge.closed = true
+	root.add_child(bedge)
+	# Glühender Brustkern (additiv, pulsiert)
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var core := Sprite2D.new()
+	core.texture = SpriteFactory.particle("light_01")
+	core.material = mat
+	core.scale = Vector2(0.5, 0.5)
+	core.modulate = Color(1.0, 0.65, 0.25)
+	core.position = Vector2(2, -2)
+	root.add_child(core)
+	var pc := core.create_tween().set_loops()
+	pc.tween_property(core, "scale", Vector2(0.7, 0.7), 0.5).set_trans(Tween.TRANS_SINE)
+	pc.tween_property(core, "scale", Vector2(0.5, 0.5), 0.5).set_trans(Tween.TRANS_SINE)
+	# Glühende Augen
+	for ex: float in [16.0, 21.0]:
+		var eye := Sprite2D.new()
+		eye.texture = SpriteFactory.circle(2, Color(1.0, 0.85, 0.4))
+		eye.material = mat
+		eye.position = Vector2(ex, -24)
+		root.add_child(eye)
+	root.scale = Vector2(sc, sc)
+	return root
+
+## Bahamut (Milos 3. Beschwörung, nach dem 3. Bosssieg): Der Drachenkönig fährt
+## über dem Gegnerfeld herab, lädt am Maul die „Megaflare" und entlädt einen
+## gewaltigen Strahl über die gesamte Reihe. Milos stärkste Beschwörung.
+func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var gold := Color(1.0, 0.72, 0.3)
+	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	if h.get("bob") != null:
+		(h["bob"] as Tween).kill()
+	var dim := _dim_world(0.66)
+	AudioManager.play_sfx("ult_charge")
+	_cast_circle(s.position + Vector2(0, 40), gold)
+	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.9, 0.6))
+	_anim_cast(s)
+	_chant(s, 1.8)
+	s.modulate = Color(1.5, 1.25, 0.9)
+	var rise := create_tween()
+	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.8).timeout
+	_ult_banner("◈ BAHAMUT ◈", gold)
+	_punch_zoom(0.08, Vector2(360, 300))
+	# Drache fährt aus einem Portal hoch über dem Gegnerfeld herein.
+	var origin := Vector2(250, -40)
+	_summon_portal(Vector2(250, 90), gold)
+	var drag := _bahamut_body(3.4)
+	drag.position = origin
+	drag.z_index = 6
+	add_child(drag)
+	AudioManager.play_sfx("roar")
+	var descend := drag.create_tween()
+	descend.tween_property(drag, "position:y", 120.0, 0.7) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await descend.finished
+	_shake_camera(1.2)
+	# Flügelschlag-Wippen, während sich die Megaflare am Maul auflädt.
+	var hover := drag.create_tween().set_loops()
+	hover.tween_property(drag, "position:y", 108.0, 0.6).set_trans(Tween.TRANS_SINE)
+	hover.tween_property(drag, "position:y", 120.0, 0.6).set_trans(Tween.TRANS_SINE)
+	var maw := Vector2(250, 120) + Vector2(20, -24) * 3.4
+	var cmat := CanvasItemMaterial.new()
+	cmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var orb := Sprite2D.new()
+	orb.texture = SpriteFactory.particle("flare_01")
+	orb.material = cmat
+	orb.position = maw
+	orb.scale = Vector2(0.05, 0.05)
+	orb.modulate = Color(1.0, 0.8, 0.4)
+	orb.z_index = 7
+	add_child(orb)
+	AudioManager.play_sfx("charge")
+	var charge := orb.create_tween()
+	charge.tween_property(orb, "scale", Vector2(0.9, 0.9), 0.9) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	charge.parallel().tween_property(orb, "modulate", Color(1.0, 0.95, 0.8), 0.9)
+	# Funken saugen in den Ladepunkt.
+	for i in 14:
+		var sp := Sprite2D.new()
+		sp.texture = SpriteFactory.particle("spark_04")
+		sp.material = cmat
+		sp.modulate = gold
+		sp.scale = Vector2(0.3, 0.3)
+		sp.position = maw + Vector2(randf_range(-90, 90), randf_range(-70, 70))
+		sp.z_index = 7
+		add_child(sp)
+		var suck := sp.create_tween()
+		suck.tween_interval(randf_range(0.0, 0.5))
+		suck.tween_property(sp, "position", maw, 0.4).set_trans(Tween.TRANS_QUAD)
+		suck.parallel().tween_property(sp, "scale", Vector2(0.05, 0.05), 0.4)
+		suck.tween_callback(sp.queue_free)
+	await charge.finished
+	hover.kill()
+	# Entladung: ein breiter Megaflare-Strahl bricht über das Gegnerfeld.
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	var beam := Polygon2D.new()
+	beam.polygon = PackedVector2Array([Vector2(-18, 0), Vector2(18, 0),
+		Vector2(150, 520), Vector2(-150, 520)])
+	beam.color = Color(1.0, 0.9, 0.6, 0.0)
+	beam.position = maw
+	beam.material = cmat
+	beam.z_index = 7
+	add_child(beam)
+	var core_beam := Polygon2D.new()
+	core_beam.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0),
+		Vector2(70, 520), Vector2(-70, 520)])
+	core_beam.color = Color(1, 1, 1, 0.0)
+	core_beam.position = maw
+	core_beam.material = cmat
+	core_beam.z_index = 7
+	add_child(core_beam)
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1.0, 0.92, 0.7, 0.6))
+	_shake_camera(2.4)
+	_punch_zoom(0.14, Vector2(300, 320))
+	var bt := create_tween()
+	bt.tween_property(beam, "color:a", 0.85, 0.12)
+	bt.parallel().tween_property(core_beam, "color:a", 0.95, 0.12)
+	var orb_fade := orb.create_tween()
+	orb_fade.tween_property(orb, "scale", Vector2(1.6, 1.6), 0.12)
+	orb_fade.parallel().tween_property(orb, "modulate:a", 0.0, 0.5)
+	orb_fade.tween_callback(orb.queue_free)
+	_shockwave(Vector2(300, 300))
+	await _hitstop(0.18)
+	for e in alive:
+		if e["alive"]:
+			_burst(e["sprite"].position, Color(1.0, 0.9, 0.6), 18, 200)
+			var dmg: int = int((d["mag"] * 2.1 + sm["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
+			await _damage_enemy(e, maxi(dmg, 1))
+	var bfade := beam.create_tween()
+	bfade.tween_interval(0.15)
+	bfade.tween_property(beam, "color:a", 0.0, 0.4)
+	bfade.parallel().tween_property(core_beam, "color:a", 0.0, 0.4)
+	bfade.tween_callback(beam.queue_free)
+	bfade.tween_callback(core_beam.queue_free)
+	# Der Drache steigt zurück in den Himmel und verblasst.
+	var leave := drag.create_tween()
+	leave.tween_property(drag, "position:y", -80.0, 0.6) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	leave.parallel().tween_property(drag, "modulate:a", 0.0, 0.6)
+	leave.tween_callback(drag.queue_free)
+	s.modulate = Color.WHITE
+	_undim(dim)
+	var back := create_tween()
+	back.tween_property(s, "position", h["home"], 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await back.finished
+	h["bob"] = _idle_bob(s, 2.0)
+
 ## Heillicht: grüner Lichtring + Funken, heilt einen Verbündeten.
 func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var d: Dictionary = h["data"]
@@ -3738,6 +3950,12 @@ func _enemy_turn(e: Dictionary) -> void:
 		_say(line % [e["name"], target["data"]["name"]])
 	else:
 		_say("%s greift %s an!" % [e["name"], target["data"]["name"]])
+	# „Die Stille" stürmt nicht — sie lässt die Leere unter dem Ziel aufreißen.
+	if e["is_boss"] and boss_def.get("theme", "") == "void":
+		await _void_grasp(e, target)
+		_resume_bob(e, bob_period)
+		await get_tree().create_timer(0.25).timeout
+		return
 	# Fernkämpfer werfen ihr Fraktions-Geschoss statt zu stürmen.
 	if e.get("proj", "") != "":
 		await _enemy_ranged(e, target)
@@ -3996,6 +4214,35 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 				bfly.tween_property(bolt, "position", btarget, 0.20) \
 					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 				bfly.tween_callback(_bolt_impact.bind(bolt))
+		"void":
+			# Grauschleier: eine fahle Woge der Gleichgültigkeit legt sich übers
+			# Feld und entfärbt alles, dazu regnen kalte graue Splitter herab.
+			AudioManager.play_sfx("wave")
+			var veil := Sprite2D.new()
+			veil.texture = SpriteFactory.circle(60, Color(0.62, 0.66, 0.74, 0.6))
+			veil.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			veil.position = Vector2(300, 360)
+			veil.scale = Vector2(2.2, 1.4)
+			veil.z_index = 5
+			add_child(veil)
+			var surge := create_tween()
+			surge.tween_property(veil, "position", Vector2(800, 340), 0.6) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			surge.parallel().tween_property(veil, "scale", Vector2(5.0, 2.4), 0.6)
+			surge.tween_property(veil, "modulate:a", 0.0, 0.4)
+			surge.tween_callback(veil.queue_free)
+			for i in 12:
+				var shard := Sprite2D.new()
+				shard.texture = SpriteFactory.circle(4, Color(0.70, 0.74, 0.82))
+				shard.position = Vector2(randf_range(600, 880), -20)
+				shard.scale = Vector2(0.7, 1.5)
+				shard.rotation = randf_range(-0.3, 0.3)
+				add_child(shard)
+				var fall := create_tween()
+				fall.tween_interval(randf_range(0.0, 0.35))
+				fall.tween_property(shard, "position:y", randf_range(250, 380), randf_range(0.3, 0.5)) \
+					.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				fall.tween_callback(_grey_impact.bind(shard))
 		_:
 			# Giftflut: Schlammwoge schwappt übers Feld, dazu Säurespritzer
 			AudioManager.play_sfx("wave")
@@ -4040,6 +4287,11 @@ func _acid_impact(drop: Sprite2D) -> void:
 	_burst(drop.position, Color(0.60, 1.0, 0.30), 6, 90)
 	drop.queue_free()
 
+## Grauer Splitter des Grauschleiers zerstäubt.
+func _grey_impact(shard: Sprite2D) -> void:
+	_burst(shard.position, Color(0.72, 0.76, 0.84), 6, 90)
+	shard.queue_free()
+
 ## Boss-Ultimative: „Schwarzer Himmel“ (Smogdecke + Säureregen),
 ## „Feindliche Übernahme“ (Münzstrudel + Riesenmünze) oder
 ## „Mauer des Hasses“ (Backsteinmauer wächst und kippt auf die Helden).
@@ -4062,6 +4314,7 @@ func _boss_ultimate(e: Dictionary, targets: Array) -> void:
 	match theme:
 		"gold": await _ult_uebernahme()
 		"hate": await _ult_mauer(targets)
+		"void": await _ult_vergessen(es.position)
 		_: await _ult_schwarzer_himmel()
 	for t in targets:
 		var dmg := maxi(int(e["atk"] * randf_range(0.95, 1.15)) - t["data"]["def"], 1)
@@ -4110,6 +4363,78 @@ func _ult_schwarzer_himmel() -> void:
 		var fade := create_tween()
 		fade.tween_property(cl, "modulate:a", 0.0, 0.8)
 		fade.tween_callback(cl.queue_free)
+
+## „Die Stille": Das große Vergessen — alles Licht der Welt wird zur Gestalt
+## gesogen, verdichtet sich zu einer wachsenden Leere-Kugel und kollabiert dann
+## in einer entfärbenden Druckwelle, die das ganze Schlachtfeld erfasst.
+func _ult_vergessen(center: Vector2) -> void:
+	AudioManager.play_sfx("ult_charge")
+	var vmat := CanvasItemMaterial.new()
+	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Phase 1: das Licht wird eingesogen — Streifen konvergieren aufs Zentrum.
+	for i in 40:
+		var streak := Sprite2D.new()
+		streak.texture = SpriteFactory.particle("light_01")
+		streak.material = vmat
+		streak.modulate = Color(0.72, 0.78, 0.9)
+		streak.scale = Vector2(0.35, 0.35)
+		var ang := randf() * TAU
+		streak.position = center + Vector2(cos(ang), sin(ang)) * randf_range(260.0, 620.0)
+		streak.z_index = 6
+		add_child(streak)
+		var pull := streak.create_tween()
+		pull.tween_interval(randf_range(0.0, 0.5))
+		pull.tween_property(streak, "position", center, 0.7) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		pull.parallel().tween_property(streak, "scale", Vector2(0.02, 0.02), 0.7)
+		pull.tween_callback(streak.queue_free)
+	# Wachsende Leere-Kugel (dunkel, verschluckt das Licht) mit fahlem Saum.
+	var halo := Sprite2D.new()
+	halo.texture = SpriteFactory.circle(48, Color(0.55, 0.60, 0.72, 0.5))
+	halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	halo.material = vmat
+	halo.position = center
+	halo.scale = Vector2(0.2, 0.2)
+	halo.z_index = 6
+	add_child(halo)
+	var orb := Sprite2D.new()
+	orb.texture = SpriteFactory.circle(48, Color(0.04, 0.04, 0.07))
+	orb.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	orb.position = center
+	orb.scale = Vector2(0.1, 0.1)
+	orb.z_index = 6
+	add_child(orb)
+	var grow := create_tween()
+	grow.tween_property(orb, "scale", Vector2(3.4, 3.4), 1.1).set_trans(Tween.TRANS_QUAD)
+	grow.parallel().tween_property(halo, "scale", Vector2(3.8, 3.8), 1.1).set_trans(Tween.TRANS_QUAD)
+	await grow.finished
+	# Phase 2: Kollaps und entfärbende Druckwelle über das ganze Feld.
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(0.86, 0.89, 0.96, 0.7))
+	_shake_camera(2.8)
+	_shockwave(center)
+	var collapse := create_tween()
+	collapse.tween_property(orb, "scale", Vector2(0.05, 0.05), 0.14) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	collapse.parallel().tween_property(halo, "scale", Vector2(0.05, 0.05), 0.14)
+	collapse.tween_callback(orb.queue_free)
+	collapse.tween_callback(halo.queue_free)
+	# Expandierender grauer Ring als Schockfront.
+	var ring := Sprite2D.new()
+	ring.texture = SpriteFactory.circle(48, Color(0.78, 0.82, 0.9, 0.9))
+	ring.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	ring.material = vmat
+	ring.position = center
+	ring.scale = Vector2(0.1, 0.1)
+	ring.z_index = 7
+	add_child(ring)
+	var expand := ring.create_tween()
+	expand.tween_interval(0.14)
+	expand.tween_property(ring, "scale", Vector2(26.0, 26.0), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	expand.parallel().tween_property(ring, "modulate:a", 0.0, 0.5)
+	expand.tween_callback(ring.queue_free)
+	await get_tree().create_timer(0.5).timeout
 
 ## Kreisender Münzstrudel (tween_method-Helfer): zieht sich spiralig zusammen.
 func _orbit_step(t: float, node: Node2D, center: Vector2, r0: float, ang0: float) -> void:
@@ -4300,10 +4625,101 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 			await _boss_enrage(e)
 		await get_tree().create_timer(0.35).timeout
 
+## „Die Stille"-Nahangriff: Unter dem Ziel reißt ein dunkler Riss auf, aus dem
+## kalte graue Klauen nach oben greifen — kein Sturm, nur lautloses Zupacken.
+func _void_grasp(e: Dictionary, target: Dictionary) -> void:
+	var ts: Sprite2D = target["sprite"]
+	var foot: float = ts.texture.get_height() * ts.scale.y * 0.5 - 6.0
+	var base: Vector2 = ts.position + Vector2(0, foot)
+	AudioManager.play_sfx("sizzle")
+	var rift := Sprite2D.new()
+	rift.texture = SpriteFactory.circle(28, Color(0.06, 0.06, 0.10, 0.9))
+	rift.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	rift.position = base
+	rift.scale = Vector2(0.2, 0.05)
+	rift.z_index = 3
+	add_child(rift)
+	var open := create_tween()
+	open.tween_property(rift, "scale", Vector2(2.2, 0.5), 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await open.finished
+	var vmat := CanvasItemMaterial.new()
+	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for i in 7:
+		var claw := Sprite2D.new()
+		claw.texture = SpriteFactory.particle("spark_04")
+		claw.material = vmat
+		claw.modulate = Color(0.70, 0.74, 0.86)
+		claw.scale = Vector2(0.3, 0.85)
+		claw.position = base + Vector2(randf_range(-32, 32), 0)
+		claw.rotation = randf_range(-0.3, 0.3)
+		claw.z_index = 4
+		add_child(claw)
+		var grab := claw.create_tween()
+		grab.tween_interval(i * 0.03)
+		grab.tween_property(claw, "position:y", base.y - randf_range(60, 115), 0.22) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		grab.parallel().tween_property(claw, "scale", Vector2(0.5, 1.35), 0.22)
+		grab.tween_property(claw, "modulate:a", 0.0, 0.25)
+		grab.tween_callback(claw.queue_free)
+	await get_tree().create_timer(0.24).timeout
+	AudioManager.play_sfx("hit")
+	_burst(ts.position, Color(0.78, 0.82, 0.92), 12, 130)
+	var dmg := maxi(int(e["atk"] * randf_range(0.9, 1.15)) - target["data"]["def"], 1)
+	_damage_hero(target, dmg)
+	var close := rift.create_tween()
+	close.tween_property(rift, "scale", Vector2(0.1, 0.03), 0.3)
+	close.parallel().tween_property(rift, "modulate:a", 0.0, 0.25)
+	close.tween_callback(rift.queue_free)
+
+## Phasenwechsel von „Die Stille" (statt Wut): die Leere verdichtet sich, das
+## Licht wird fahler, die Augen erlöschen zu kaltem Weiß. Der Angriff steigt.
+func _boss4_phase(e: Dictionary) -> void:
+	AudioManager.play_sfx("ult_charge")
+	_say("%s hört auf, überhaupt etwas zu sein — die Leere um sie frisst das Licht." % e["name"])
+	var es: Sprite2D = e["sprite"]
+	_flash_screen(Color(0.85, 0.88, 0.96, 0.4))
+	_shake_camera(1.8)
+	var tint := Color(0.55, 0.60, 0.72)
+	e["tint"] = tint
+	es.set_meta("tint", tint)
+	var tw := create_tween()
+	tw.tween_property(es, "modulate", Color(1.7, 1.8, 2.0), 0.25)
+	tw.tween_property(es, "modulate", tint, 0.55)
+	if es.has_meta("eyes") and is_instance_valid(es.get_meta("eyes")):
+		var ey: Sprite2D = es.get_meta("eyes")
+		var et := create_tween()
+		et.tween_property(ey, "modulate", Color(1.6, 1.7, 2.0, 1.0), 0.3)
+		et.parallel().tween_property(ey, "scale", Vector2(2.0, 1.0), 0.3)
+	# Splitter saugen einwärts — die Leere zieht sich enger um die Gestalt.
+	var vmat := CanvasItemMaterial.new()
+	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for i in 18:
+		var sh := Sprite2D.new()
+		sh.texture = SpriteFactory.particle("spark_04")
+		sh.material = vmat
+		sh.modulate = Color(0.68, 0.73, 0.85)
+		sh.scale = Vector2(0.4, 0.4)
+		var ang := randf() * TAU
+		sh.position = es.position + Vector2(cos(ang), sin(ang)) * randf_range(120.0, 240.0)
+		sh.z_index = 6
+		add_child(sh)
+		var cv := sh.create_tween()
+		cv.tween_interval(randf_range(0.0, 0.3))
+		cv.tween_property(sh, "position", es.position + Vector2(0, -40), 0.5) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		cv.parallel().tween_property(sh, "scale", Vector2(0.05, 0.05), 0.5)
+		cv.tween_callback(sh.queue_free)
+	await get_tree().create_timer(1.1).timeout
+
 ## Wut-Phase des Bosses: Aufschrei, Färbung, mehr Angriff (Farbe je Thema).
 func _boss_enrage(e: Dictionary) -> void:
 	e["enraged"] = true
 	e["atk"] = int(e["atk"] * 1.35)
+	# „Die Stille" wird nicht wütend — die Leere um sie herum vertieft sich nur.
+	if boss_def.get("theme", "") == "void":
+		await _boss4_phase(e)
+		return
 	AudioManager.play_sfx("charge")
 	_say("%s tobt vor Wut!" % e["name"])
 	var es: Sprite2D = e["sprite"]
@@ -4792,6 +5208,39 @@ func _boss_reveal(e: Dictionary, theme: String) -> void:
 			var cf := create_tween()
 			cf.tween_interval(1.2)
 			cf.tween_callback(col.queue_free)
+		"void":
+			# Aus dem Nichts: kein Getöse. Kalte Splitter fallen von überall nach
+			# INNEN und verdichten sich zur Gestalt, die weißkalt aufscheint und
+			# dann ins fahle Grau verebbt — als würde die Welt selbst erlöschen.
+			s.position = home
+			s.modulate = Color(1.8, 1.9, 2.1, 0.0)
+			AudioManager.play_sfx("ult_charge")
+			var vmat := CanvasItemMaterial.new()
+			vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			for i in 24:
+				var sh := Sprite2D.new()
+				sh.texture = SpriteFactory.particle("spark_04")
+				sh.material = vmat
+				sh.modulate = Color(0.70, 0.75, 0.86)
+				sh.scale = Vector2(0.45, 0.45)
+				var ang := randf() * TAU
+				sh.position = home + Vector2(cos(ang), sin(ang)) * randf_range(170.0, 320.0)
+				sh.z_index = 6
+				add_child(sh)
+				var cv := sh.create_tween()
+				cv.tween_interval(randf_range(0.0, 0.45))
+				cv.tween_property(sh, "position", home + Vector2(0, -30), 0.55) \
+					.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+				cv.parallel().tween_property(sh, "scale", Vector2(0.05, 0.05), 0.55)
+				cv.tween_callback(sh.queue_free)
+			var appear := create_tween()
+			appear.tween_interval(0.5)
+			appear.tween_property(s, "modulate", Color(1.9, 2.0, 2.2, 1.0), 0.5)
+			await appear.finished
+			_flash_screen(Color(0.85, 0.88, 0.96, 0.5))
+			_shake_camera(1.0)
+			var settle := create_tween()
+			settle.tween_property(s, "modulate", tint, 0.9)
 		_:
 			# Aus dem Schlammloch: die Pfütze wächst, der Baron wälzt sich hoch.
 			var pool := Sprite2D.new()
@@ -4935,6 +5384,7 @@ func _victory() -> void:
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.95, 0.7))
 		_say("Der Hass verraucht — Lindenhain atmet auf, und euer Bund wird stärker denn je.")
 		await get_tree().create_timer(2.4).timeout
+		await _announce_unlocked_tier()
 		if GameState.boss_defeated and GameState.boss2_defeated:
 			_say("Doch mit der letzten Plage kehrt keine Ruhe ein — im Norden reißt ein grauer Riss auf.")
 			await get_tree().create_timer(2.4).timeout
@@ -4950,8 +5400,7 @@ func _victory() -> void:
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
 		_say("Der Hort des Fürsten fließt zurück ins Land — sein Dank stärkt euch!")
 		await get_tree().create_timer(2.4).timeout
-		_say("Die letzten Siegel fallen: Klingentanz, Atombombe und Leviathans Pakt!")
-		await get_tree().create_timer(2.4).timeout
+		await _announce_unlocked_tier()
 		if GameState.boss_defeated and GameState.boss3_defeated:
 			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
 			await get_tree().create_timer(2.4).timeout
@@ -4965,12 +5414,25 @@ func _victory() -> void:
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(0.7, 1.0, 0.5))
 		_say("Der Fluss atmet auf — die Segnung des klaren Wassers durchströmt euch!")
 		await get_tree().create_timer(2.4).timeout
-		_say("Siegel gebrochen: Fokusstoß, Raketensalve und Ifrits Pakt erwachen!")
-		await get_tree().create_timer(2.4).timeout
+		await _announce_unlocked_tier()
 		if GameState.boss2_defeated and GameState.boss3_defeated:
 			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
 			await get_tree().create_timer(2.4).timeout
 	finished.emit(true)
+
+## Verkündet die gerade freigeschaltete Fähigkeits-Stufe. Da die Siegel jetzt
+## nach ANZAHL der Bosssiege fallen (nicht nach bestimmtem Boss), richtet sich
+## die Meldung nach dem neuen Zählerstand — egal welcher Dungeon zuerst fiel.
+func _announce_unlocked_tier() -> void:
+	var n: int = GameState.bosses_defeated_count()
+	var names := {
+		1: "Fokusstoß, Raketensalve und Ifrits Pakt",
+		2: "Klingentanz, Atombombe und Leviathans Pakt",
+		3: "Klingensturm, Plasmalanze und Bahamuts Pakt",
+	}
+	if names.has(n):
+		_say("Ein Siegel bricht — %s erwachen!" % names[n])
+		await get_tree().create_timer(2.4).timeout
 
 ## Großes „SIEG!“-Banner, das ins Bild ploppt.
 func _victory_banner() -> void:

@@ -96,6 +96,7 @@ const ENEMIES := {
 	"boss4": {"name": "Die Stille", "hp": 860, "atk": 38, "def": 12, "gold": 0, "xp": 400,
 		"sprite": "boss4", "boss": true, "theme": "void", "song": "boss4",
 		"tint": Color(0.74, 0.77, 0.83),
+		"attack_line": "%s lässt die Leere unter %s aufreißen.",
 		"entrance_line": "Jedes Geräusch erlischt. Eine hohe graue Gestalt steht einfach da — und sieht durch euch hindurch.",
 		"intro": [
 			["Die Stille", "..."],
@@ -187,12 +188,18 @@ func reset_party() -> void:
 				{"name": "Klingenwirbel", "cost": 4, "target": "all",
 					"power": 10, "kind": "phys",
 					"desc": "Trifft alle Gegner."},
+				{"name": "Sturmschnitt", "cost": 2, "target": "one",
+					"power": 13, "kind": "pierce",
+					"desc": "Schneller Einzelhieb."},
 				{"name": "Fokusstoß", "cost": 3, "target": "one",
-					"power": 16, "kind": "pierce", "unlock_flag": "boss_defeated",
+					"power": 16, "kind": "pierce", "unlock_bosses": 1,
 					"desc": "Durchbohrt die Verteidigung."},
 				{"name": "Klingentanz", "cost": 8, "target": "one",
-					"power": 6, "kind": "dance", "unlock_flag": "boss2_defeated",
+					"power": 6, "kind": "dance", "unlock_bosses": 2,
 					"desc": "Fünf Blitzschnitte im Stern, dann der Fallstreich."},
+				{"name": "Klingensturm", "cost": 12, "target": "all",
+					"power": 20, "kind": "phys", "unlock_bosses": 3,
+					"desc": "Ein reißender Klingenorkan über alle Feinde."},
 			],
 			"ultimate": {"name": "Sternenklinge",
 				"desc": "Lichtklingen zerreißen alle Feinde. (1x pro Kampf)"},
@@ -215,12 +222,16 @@ func reset_party() -> void:
 			"summons": [
 				{"id": "ifrit", "name": "Ifrit", "attack": "Höllenfeuer",
 					"cost": 16, "unlock_level": 1, "power": 34,
-					"unlock_flag": "boss_defeated",
+					"unlock_bosses": 1,
 					"desc": "Feuerdämon — Höllenfeuer auf alle Gegner."},
 				{"id": "leviathan", "name": "Leviathan", "attack": "Sintflut",
 					"cost": 24, "unlock_level": 1, "power": 38,
-					"unlock_flag": "boss2_defeated",
+					"unlock_bosses": 2,
 					"desc": "Wasserschlange — Sintflut auf alle Gegner."},
+				{"id": "bahamut", "name": "Bahamut", "attack": "Megaflare",
+					"cost": 32, "unlock_level": 1, "power": 52,
+					"unlock_bosses": 3,
+					"desc": "Drachenkönig — Megaflare zerschmettert alle Gegner."},
 			],
 		},
 		{
@@ -232,12 +243,18 @@ func reset_party() -> void:
 				{"name": "Laserstoß", "cost": 4, "target": "one",
 					"power": 22, "kind": "beam",
 					"desc": "Gebündelter Energiestrahl."},
+				{"name": "Reparatur", "cost": 4, "target": "ally",
+					"power": 30, "kind": "heal",
+					"desc": "Nanit-Reparatur heilt einen Verbündeten."},
 				{"name": "Raketensalve", "cost": 7, "target": "all",
-					"power": 15, "kind": "rocket", "unlock_flag": "boss_defeated",
+					"power": 15, "kind": "rocket", "unlock_bosses": 1,
 					"desc": "Raketen auf alle Gegner."},
 				{"name": "Atombombe", "cost": 14, "target": "all",
-					"power": 46, "kind": "nuke", "unlock_flag": "boss2_defeated",
+					"power": 46, "kind": "nuke", "unlock_bosses": 2,
 					"desc": "Taktischer Sprengkopf — verwüstet das Schlachtfeld."},
+				{"name": "Plasmalanze", "cost": 11, "target": "one",
+					"power": 44, "kind": "beam", "unlock_bosses": 3,
+					"desc": "Gebündelte Plasmalanze durchbohrt ein Ziel komplett."},
 			],
 			"ultimate": {"name": "Orbitallaser",
 				"desc": "Ein Strahl aus dem Orbit vernichtet alle Feinde. (1x pro Kampf)"},
@@ -328,22 +345,32 @@ func award_xp(amount: int) -> Array:
 	return ups
 
 ## ---------- Fähigkeiten-Siegel ----------
-## Mächtige Fähigkeiten sind anfangs versiegelt; die Siegel fallen mit den
-## Boss-Siegen (nach Dungeon 1 und 2 je eines pro Held). Im dritten Dungeon
-## ist damit automatisch alles verfügbar.
+## Mächtige Fähigkeiten sind anfangs versiegelt; die Siegel fallen mit JEDEM
+## Boss-Sieg — unabhängig davon, welcher Dungeon zuerst fällt. Jeder Held hat
+## drei versiegelte Fähigkeiten (`unlock_bosses` 1/2/3): der erste Bosssieg
+## löst Stufe 1, der zweite Stufe 2, der dritte Stufe 3. Im letzten Dungeon
+## (nach allen drei Bossen) steht damit alles zur Verfügung.
+
+## Anzahl der bisher gefallenen Haupt-Bosse (0-3, boss4 zählt nicht mit).
+func bosses_defeated_count() -> int:
+	var c := 0
+	if boss_defeated: c += 1
+	if boss2_defeated: c += 1
+	if boss3_defeated: c += 1
+	return c
 
 func skill_unlocked(member: Dictionary, ab: Dictionary) -> bool:
 	if member.get("level", 1) < ab.get("unlock_level", 0):
 		return false
-	var flag: String = ab.get("unlock_flag", "")
-	return flag == "" or get(flag)
+	return bosses_defeated_count() >= ab.get("unlock_bosses", 0)
+
+const _BOSS_ORDINAL := ["", "ersten", "zweiten", "dritten"]
 
 ## Kurzer Hinweis, warum eine Fähigkeit noch gesperrt ist.
 func skill_lock_hint(member: Dictionary, ab: Dictionary) -> String:
-	var flag: String = ab.get("unlock_flag", "")
-	if flag != "" and not get(flag):
-		return {"boss_defeated": "versiegelt, bis der Schlotbaron fällt",
-			"boss2_defeated": "versiegelt, bis der Monopolfürst fällt"}.get(flag, "versiegelt")
+	var need: int = ab.get("unlock_bosses", 0)
+	if bosses_defeated_count() < need:
+		return "versiegelt bis zum %s Bosssieg" % _BOSS_ORDINAL[clampi(need, 1, 3)]
 	return "ab Stufe %d" % ab.get("unlock_level", 0)
 
 func add_item(item_name: String, count := 1) -> void:

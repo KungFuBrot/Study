@@ -19,6 +19,8 @@ Zuordnung (Originaltitel):
 - boss.ogg     = Evil1 - Ancient Evil Awakens
 - boss2.ogg    = Action2 - Army Approaching
 - boss3.ogg    = Evil3 - Apocalypse
+- dungeon4.ogg = Evil5 - Whispers From Beyond
+- boss4.ogg    = Action1 - Encounter With The Witches
 - ending.ogg   = Calm3 - Peaceful Days
 
 Vielen Dank an Juhani Junkala für die großartige Musik!
