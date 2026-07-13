@@ -493,9 +493,9 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			_tone(buf, 2400, 400, 0.22, 0.24, "noise")
 			_tone(buf, 1800, 300, 0.18, 0.20, "square")
 		"mgun":
-			# Einzelner MG-Schuss: scharfer Knall + kurzer Tiefton-Anschlag.
+			# Einzelner MG-Schuss: harter, trockener Knall + tiefer Anschlag.
 			# Im Kampf schnell hintereinander abgefeuert ergibt das Rattern.
-			_render_gun(buf, 0.09, 0.55)
+			_render_gun(buf, 0.10, 0.45)
 		_:
 			return null
 	return _to_wav(buf, false)
@@ -561,15 +561,25 @@ func _render_gun(buf: PackedFloat32Array, dur: float, vol: float) -> void:
 	var start := buf.size()
 	buf.resize(start + n)
 	var lp := 0.0
+	var prev_noise := 0.0
 	var phase := 0.0
 	for i in n:
 		var k := float(i) / n
-		var crack := randf_range(-1.0, 1.0) * exp(-k * 38.0)
-		phase += lerpf(150.0, 55.0, minf(k * 2.0, 1.0)) / RATE
-		var thump := sin(phase * TAU) * exp(-k * 16.0) * 0.7
-		lp += 0.5 * (randf_range(-1.0, 1.0) - lp)
-		var body := lp * exp(-k * 22.0) * 0.5
-		var x := (crack + thump + body) * vol
+		# Scharfer Crack: breitbandiges Rauschen PLUS hochpassgefilterter Anteil
+		# (Differenz aufeinanderfolgender Samples) für den harten, trockenen Knall.
+		var nz := randf_range(-1.0, 1.0)
+		var hp := nz - prev_noise
+		prev_noise = nz
+		var crack := (nz * 0.45 + hp * 1.0) * exp(-k * 32.0)
+		# Harter tiefer Anschlag mit schnellem Frequenz-Sweep (Sub-Punch).
+		phase += lerpf(230.0, 60.0, minf(k * 3.0, 1.0)) / RATE
+		var thump := sin(phase * TAU) * exp(-k * 20.0)
+		# Kurzes, tiefpassgefiltertes Körpergeräusch.
+		lp += 0.45 * (randf_range(-1.0, 1.0) - lp)
+		var body := lp * exp(-k * 26.0) * 0.4
+		# Aggressiv übersteuern (Pre-Gain vor dem Soft-Clip) = härterer, knalliger
+		# Ton mit Biss statt weichem Plopp.
+		var x := (crack * 0.9 + thump * 0.8 + body) * vol * 2.6
 		buf[start + i] = x / (1.0 + absf(x))
 
 func _to_wav(samples: PackedFloat32Array, loop: bool) -> AudioStreamWAV:

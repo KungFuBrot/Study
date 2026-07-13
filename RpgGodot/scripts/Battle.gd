@@ -13,8 +13,8 @@ const WEAPON_REST := -0.35  # Ruhewinkel der Waffe (leicht zum Gegner geneigt)
 # Griffposition (Faust) und Ruhewinkel pro Held — Schwert kampfbereit
 # geneigt, Stab aufrecht neben dem Körper aufgesetzt.
 const WEAPON_GRIP := {
-	"serena": {"pos": Vector2(-5, 4), "rest": -0.35},
-	"milo": {"pos": Vector2(-6, 2), "rest": 0.18},
+	"serena": {"pos": Vector2(-5, 4), "rest": -0.35, "wscale": 0.85},
+	"milo": {"pos": Vector2(-6, 2), "rest": 0.18, "wscale": 0.6},
 }
 
 # Kampf-Aufstellung (Zickzack in der Tiefe): Serena vordere Reihe oben,
@@ -23,7 +23,7 @@ const WEAPON_GRIP := {
 # links, dass Milos Vortreten (_stance, -56 px) niemanden überlappt.
 const BATTLE_FORMATION := {
 	"serena": {"pos": Vector2(692, 178), "scale": 4.9},
-	"milo": {"pos": Vector2(838, 242), "scale": 4.1},
+	"milo": {"pos": Vector2(842, 236), "scale": 4.8},
 	"rax": {"pos": Vector2(662, 306), "scale": 4.6},
 }
 
@@ -558,7 +558,8 @@ func _attach_weapon(s: Sprite2D, hero_id: String) -> Sprite2D:
 	w.rotation = grip["rest"]
 	w.set_meta("rest", grip["rest"])
 	w.set_meta("grip_x", (grip["pos"] as Vector2).x)
-	w.scale = Vector2(0.85, 0.85)
+	var ws: float = grip.get("wscale", 0.85)  # Milos Stab z. B. etwas kleiner
+	w.scale = Vector2(ws, ws)
 	w.z_index = 1
 	s.add_child(w)
 	return w
@@ -1869,9 +1870,8 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 		var muzzle: Vector2 = s.position + Vector2(-52, -6)
 		var target: Vector2 = es.position + Vector2(randf_range(-12, 12), randf_range(-18, 18))
 		_muzzle_flash(muzzle, (target - muzzle).angle())
-		_tracer(muzzle, target)
+		_fire_bullet(muzzle, target)
 		AudioManager.play_sfx("mgun")
-		_burst(target, Color(1.0, 0.85, 0.4), 3, 70)
 		# Rückstoß: der Roboter ruckelt bei jedem Schuss kurz nach hinten.
 		var jit := create_tween()
 		jit.tween_property(s, "position:x", fire_pos.x + 6.0, 0.03)
@@ -1909,23 +1909,33 @@ func _muzzle_flash(pos: Vector2, angle: float) -> void:
 	tw.tween_property(flash, "modulate:a", 0.0, 0.06)
 	tw.tween_callback(flash.queue_free)
 
-## Leuchtspur eines einzelnen Geschosses: dünne, helle Linie vom Lauf zum Ziel,
-## die sofort wieder verblasst (Line2D, additiv). Sehr leichtgewichtig, damit
-## das schnelle Feuer flüssig bleibt.
-func _tracer(from: Vector2, to: Vector2) -> void:
-	var line := Line2D.new()
-	line.points = PackedVector2Array([from, to])
-	line.width = 2.0
-	line.default_color = Color(1.0, 0.92, 0.55, 0.9)
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+## Fliegendes MG-Geschoss: eine kleine Leuchtspur-Kugel saust vom Lauf zum Ziel,
+## zieht einen kurzen Glühschweif hinter sich her und zerplatzt beim Einschlag in
+## Funken. Sehr schnell, damit das Dauerfeuer flüssig bleibt.
+func _fire_bullet(from: Vector2, to: Vector2) -> void:
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	line.material = m
-	add_child(line)
-	var tw := line.create_tween()
-	tw.tween_property(line, "modulate:a", 0.0, 0.09)
-	tw.tween_callback(line.queue_free)
+	var b := Sprite2D.new()
+	b.texture = SpriteFactory.bullet()
+	b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	b.position = from
+	b.rotation = (to - from).angle()
+	b.scale = Vector2(2.4, 2.4)
+	b.material = m
+	# Kurzer Glühschweif direkt hinter der Kugel.
+	var trail := Sprite2D.new()
+	trail.texture = SpriteFactory.circle(3, Color(1.0, 0.8, 0.4))
+	trail.position = Vector2(-7, 0)
+	trail.scale = Vector2(2.6, 0.7)
+	trail.material = m
+	b.add_child(trail)
+	add_child(b)
+	var dur: float = maxf(from.distance_to(to) / 4200.0, 0.045)
+	var tw := b.create_tween()
+	tw.tween_property(b, "position", to, dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func():
+		_burst(to, Color(1.0, 0.85, 0.4), 4, 90)
+		b.queue_free())
 
 ## Screen-Stoßwelle: Verzerrungs-Ring mit chromatischer Aberration läuft vom
 ## Weltpunkt nach außen. Max. eine gleichzeitig (Vollbild-Shader).

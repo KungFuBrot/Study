@@ -1356,6 +1356,24 @@ static func circle(radius: int, color: Color) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## Leuchtspur-Geschoss (MG-Kugel): kleine, längliche Kugel, heller Kern innen,
+## nach außen ins Orange auslaufend — additiv gezeichnet wirkt sie glühend.
+static func bullet() -> Texture2D:
+	var key := "bullet"
+	if _cache.has(key):
+		return _cache[key]
+	var img := _img(9, 4)
+	for y in 4:
+		for x in 9:
+			var dx := (x - 4.0) / 4.5
+			var dy := (y - 1.5) / 2.0
+			var d := dx * dx + dy * dy
+			if d <= 1.0:
+				img.set_pixel(x, y, Color(1.0, 0.97, 0.75).lerp(Color(1.0, 0.55, 0.15), d))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
 ## Weicher Bodenschatten (Ellipse) — gibt Kämpfern optische Tiefe.
 static func shadow(rx: int, ry: int) -> Texture2D:
 	var key := "shadow_%d_%d" % [rx, ry]
