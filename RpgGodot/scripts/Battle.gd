@@ -104,6 +104,13 @@ func _boss_showcase() -> void:
 	var e: Dictionary = enemies[0]
 	await get_tree().create_timer(0.8).timeout
 	_snap(dir, "boss_idle_" + suffix)
+	# Leerlauf-Gesten prüfen: Boss schnaubt, ein Held reckt/wirbelt.
+	_boss_snort(e)
+	_hero_antic(heroes[0])
+	_hero_antic(heroes[2])
+	await get_tree().create_timer(0.35).timeout
+	_snap(dir, "boss_antic_" + suffix)
+	await get_tree().create_timer(1.0).timeout
 	await _boss_aoe(e, heroes)
 	_snap(dir, "boss_aoe_" + suffix)
 	await get_tree().create_timer(0.5).timeout
@@ -1016,6 +1023,160 @@ func _idle_bob(s: Sprite2D, period: float) -> Tween:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	return tw
 
+## Leerlauf-Gesten: wenn eine Figur gerade nichts tut, macht sie ab und zu
+## etwas — Helden verlagern das Gewicht, recken sich, wirbeln die Waffe; Bosse
+## verlagern drohend das Gewicht, schnauben und lassen die Augen aufflammen.
+## Alles nur Transform-/Partikel-Spielereien: das Idle-Wippen (position:y) und
+## der Frame-Ticker (Textur) bleiben unangetastet, und laufende Rotations-Loops
+## (Boss-Schwanken, Augen-Puls) übernehmen nach der Geste wieder — ein neuerer
+## Tween gewinnt nur während seiner Laufzeit pro Frame.
+func _start_idle_antics() -> void:
+	for h in heroes:
+		_schedule_antic(h, true)
+	for e in enemies:
+		if e.get("is_boss", false):
+			_schedule_antic(e, false)
+
+## Ein Timer je Figur, der sich nach jeder Geste auf ein neues Zufallsintervall
+## setzt — so bleiben die Figuren entsynchronisiert und wirken nie im Gleichtakt.
+func _schedule_antic(u: Dictionary, is_hero: bool) -> void:
+	var t := Timer.new()
+	t.one_shot = true
+	t.wait_time = randf_range(3.5, 7.5)
+	t.timeout.connect(func():
+		if not is_instance_valid(t):
+			return
+		_do_idle_antic(u, is_hero)
+		t.wait_time = randf_range(3.5, 7.5)
+		t.start())
+	add_child(t)
+	t.start()
+
+## Führt eine Geste aus — aber nur, wenn die Figur wirklich in Ruhe ist. Das
+## laufende Idle-Wippen (bob != null) ist genau dieses Ruhesignal: bei jeder
+## Aktion wird der Bob per _pause_bob abgeschaltet, also ruht die Figur nur,
+## solange er läuft.
+func _do_idle_antic(u: Dictionary, is_hero: bool) -> void:
+	if u.get("bob") == null:
+		return
+	var s: Sprite2D = u["sprite"]
+	if not is_instance_valid(s):
+		return
+	if is_hero:
+		if u["data"]["hp"] <= 0:
+			return
+		_hero_antic(u)
+	elif u.get("alive", false):
+		_boss_antic(u)
+
+## Kleine Ruhe-Geste eines Helden (zufällig aus drei Varianten).
+func _hero_antic(h: Dictionary) -> void:
+	var s: Sprite2D = h["sprite"]
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var wp: Sprite2D = h.get("weapon")
+	match randi() % 3:
+		0:  # Gewicht verlagern: sacht hin- und herlehnen und aufrichten.
+			var tw := create_tween()
+			tw.tween_property(s, "rotation", 0.06, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(s, "rotation", -0.05, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(s, "rotation", 0.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		1:  # Recken: kurze Squash-Stretch-Streckung und zurück.
+			var tw := create_tween()
+			tw.tween_property(s, "scale", base * Vector2(0.95, 1.06), 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tw.tween_property(s, "scale", base * Vector2(1.03, 0.97), 0.16)
+			tw.tween_property(s, "scale", base, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		2:  # Waffe wirbeln (mit Waffe) bzw. Visor-Blitz + Nicken (Rax).
+			if wp != null and is_instance_valid(wp):
+				var rest: float = wp.get_meta("rest", WEAPON_REST)
+				_weapon_trail(wp, 0.36)
+				var tw := wp.create_tween()
+				tw.tween_property(wp, "rotation", rest + TAU, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+				tw.tween_callback(func(): if is_instance_valid(wp): wp.rotation = rest)
+			else:
+				_visor_glint(s)
+				var tw := create_tween()
+				tw.tween_property(s, "rotation", 0.05, 0.16).set_trans(Tween.TRANS_SINE)
+				tw.tween_property(s, "rotation", 0.0, 0.22).set_trans(Tween.TRANS_SINE)
+
+## Kurzer blauer Lichtwisch über Rax' Visor (er hat keine Waffe zum Wirbeln).
+func _visor_glint(s: Sprite2D) -> void:
+	var g := Sprite2D.new()
+	g.texture = SpriteFactory.circle(4, Color(0.6, 0.95, 1.0))
+	g.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	g.position = s.position + Vector2(-14, -30)
+	g.scale = Vector2(0.25, 0.7)
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	g.material = m
+	add_child(g)
+	var tw := g.create_tween()
+	tw.tween_property(g, "position:x", s.position.x + 14.0, 0.32).set_trans(Tween.TRANS_SINE)
+	tw.parallel().tween_property(g, "scale", Vector2(1.1, 0.4), 0.32)
+	tw.tween_property(g, "modulate:a", 0.0, 0.14)
+	tw.tween_callback(g.queue_free)
+
+## Kleine Ruhe-Geste eines Bosses (drohender als bei den Helden).
+func _boss_antic(e: Dictionary) -> void:
+	var s: Sprite2D = e["sprite"]
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	match randi() % 3:
+		0:  # Drohend das Gewicht verlagern + tiefes Grollen + Augen aufflammen.
+			AudioManager.play_sfx("growl")
+			_boss_eye_flare(e)
+			var tw := create_tween()
+			tw.tween_property(s, "rotation", 0.09, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(s, "rotation", -0.07, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			tw.tween_property(s, "rotation", 0.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		1:  # Schnauben: kräftiger Dunststoß aus dem Maul + Augen kurz heller.
+			_boss_snort(e)
+		2:  # Schulterrollen: schwerer Squash mit kleinem Bodenbeben.
+			var tw := create_tween()
+			tw.tween_property(s, "scale", base * Vector2(1.04, 0.95), 0.26).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tw.tween_property(s, "scale", base * Vector2(0.98, 1.03), 0.22)
+			tw.tween_property(s, "scale", base, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			_shake_camera(0.4)
+
+## Boss-Augen kurz hell auflodern lassen (nutzt das im Setup abgelegte "eyes").
+func _boss_eye_flare(e: Dictionary) -> void:
+	var s: Sprite2D = e["sprite"]
+	if s.has_meta("eyes") and is_instance_valid(s.get_meta("eyes")):
+		var ey: Sprite2D = s.get_meta("eyes")
+		var tw := create_tween()
+		tw.tween_property(ey, "modulate:a", 1.0, 0.15)
+		tw.tween_property(ey, "modulate:a", 0.55, 0.5)
+
+## Schnauben: kurzer, kräftiger Rauchstoß aus dem Maul (Themenfarbe) + Grollen
+## + Augen-Flackern + kleiner Kopf-Ruck.
+func _boss_snort(e: Dictionary) -> void:
+	var s: Sprite2D = e["sprite"]
+	AudioManager.play_sfx("growl")
+	_boss_eye_flare(e)
+	var face: Vector2 = BOSS_FACE.get(e["id"], Vector2(2, -7)) + Vector2(3, 3)
+	var ember: Color = _style()["ember"]
+	var puff := CPUParticles2D.new()
+	puff.position = face
+	puff.one_shot = true
+	puff.explosiveness = 0.85
+	puff.amount = 9
+	puff.lifetime = 0.7
+	puff.direction = Vector2(1, 0.25)
+	puff.spread = 22.0
+	puff.gravity = Vector2(6, -8)
+	puff.initial_velocity_min = 8.0
+	puff.initial_velocity_max = 18.0
+	puff.scale_amount_min = 0.012
+	puff.scale_amount_max = 0.026
+	puff.color = Color(ember.r, ember.g, ember.b, 0.42)
+	puff.texture = SpriteFactory.particle("smoke_07")
+	puff.emitting = true
+	s.add_child(puff)
+	get_tree().create_timer(1.1).timeout.connect(func():
+		if is_instance_valid(puff):
+			puff.queue_free())
+	var tw := create_tween()
+	tw.tween_property(s, "rotation", -0.05, 0.1).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(s, "rotation", 0.0, 0.25).set_trans(Tween.TRANS_SINE)
+
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -1248,6 +1409,7 @@ func _run_battle() -> void:
 		if not enemies[i]["is_boss"]:
 			enemies[i]["bob"] = _idle_bob(enemies[i]["sprite"], 1.6 + i * 0.25)
 	_start_idle_animations()
+	_start_idle_antics()
 	_camera_idle()
 	if not boss_def.is_empty():
 		await _boss_entrance()
