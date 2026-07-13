@@ -160,6 +160,11 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.85).timeout
 	_snap(dir, "show_fireball")
 	await get_tree().create_timer(1.2).timeout
+	# Rax Standardangriff: Maschinengewehrfeuer auf einen Gegner
+	_rax_gun(heroes[2], enemies[1])
+	await get_tree().create_timer(0.9).timeout
+	_snap(dir, "show_mgun")
+	await get_tree().create_timer(1.6).timeout
 	# Rax Laser
 	_laser(heroes[2], heroes[2]["data"]["abilities"][0], enemies[1])
 	await get_tree().create_timer(0.55).timeout
@@ -1277,7 +1282,11 @@ func _hero_turn(h: Dictionary) -> bool:
 				var t := await _pick_enemy()
 				if t < 0: continue
 				_pause_bob(h)
-				await _hero_attack(h, enemies[t])
+				# Rax feuert statt eines Nahkampfschlags sein MG auf das Ziel.
+				if h["data"]["id"] == "rax":
+					await _rax_gun(h, enemies[t])
+				else:
+					await _hero_attack(h, enemies[t])
 				_resume_bob(h, 2.0)
 				return false
 			1:
@@ -1632,6 +1641,94 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	await _sprint(h, h["home"], 0.22)
 	s.rotation = 0.0
 	s.scale = base
+
+## Rax' Standardangriff: anhaltendes Maschinengewehrfeuer auf EINEN Gegner.
+## Eine Salve schneller Leuchtspur-Schüsse (Mündungsblitz, Rückstoß, Funken,
+## ratterndes MG-Geräusch). Der Gesamtschaden wird vorab gewürfelt und erst am
+## Ende als eine Zahl gebucht — so gibt es nur eine Todes-/Wutprüfung und keine
+## Zahlenflut, während die vielen Schüsse rein optisch/akustisch rattern.
+func _rax_gun(h: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var es: Sprite2D = e["sprite"]
+	_say("%s eröffnet das Maschinengewehrfeuer!" % d["name"])
+	# In den Schützenstand schweben und einrasten (wie beim Laser).
+	var fire_pos: Vector2 = h["home"] + Vector2(-58, 6)
+	await _sprint(h, fire_pos, 0.2)
+	h["anim"] = "aim"
+	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var snap := create_tween()
+	snap.tween_property(s, "scale", base * Vector2(1.06, 0.94), 0.06)
+	snap.tween_property(s, "scale", base, 0.10) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await snap.finished
+	# Gesamtschaden wie beim Nahkampf, nur minimal stärker (Signaturangriff).
+	var rounds := 14
+	var total: int = maxi(int(d["atk"] * randf_range(1.0, 1.3)) - e["def"], rounds)
+	for i in rounds:
+		if not e["alive"] or not is_instance_valid(es):
+			break
+		var muzzle: Vector2 = s.position + Vector2(-52, -6)
+		var target: Vector2 = es.position + Vector2(randf_range(-12, 12), randf_range(-18, 18))
+		_muzzle_flash(muzzle, (target - muzzle).angle())
+		_tracer(muzzle, target)
+		AudioManager.play_sfx("mgun")
+		_burst(target, Color(1.0, 0.85, 0.4), 3, 70)
+		# Rückstoß: der Roboter ruckelt bei jedem Schuss kurz nach hinten.
+		var jit := create_tween()
+		jit.tween_property(s, "position:x", fire_pos.x + 6.0, 0.03)
+		jit.tween_property(s, "position:x", fire_pos.x, 0.05)
+		if i % 4 == 3:
+			_shake(es)
+			_shake_camera(0.5)
+		await get_tree().create_timer(0.055).timeout
+	# Ausklang, dann der gesammelte Schaden als eine Zahl (eine Todesprüfung).
+	_flash_screen(Color(1.0, 0.8, 0.4, 0.12))
+	_shake_camera(1.2)
+	if e["alive"]:
+		await _damage_enemy(e, total)
+	# Zurück in die Reihe.
+	h["anim"] = "idle"
+	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	s.position = fire_pos
+	await _sprint(h, h["home"], 0.2)
+
+## Kurzer Mündungsblitz am Lauf (additives Kenney-Blitz-Sprite, dreht in
+## Schussrichtung, blitzt einmal auf und verschwindet).
+func _muzzle_flash(pos: Vector2, angle: float) -> void:
+	var flash := Sprite2D.new()
+	flash.texture = SpriteFactory.particle("muzzle_02")
+	flash.position = pos
+	flash.rotation = angle - PI / 2
+	flash.scale = Vector2(0.28, 0.28)
+	flash.modulate = Color(1.0, 0.9, 0.5)
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	flash.material = m
+	add_child(flash)
+	var tw := flash.create_tween()
+	tw.tween_property(flash, "scale", Vector2(0.42, 0.42), 0.04)
+	tw.tween_property(flash, "modulate:a", 0.0, 0.06)
+	tw.tween_callback(flash.queue_free)
+
+## Leuchtspur eines einzelnen Geschosses: dünne, helle Linie vom Lauf zum Ziel,
+## die sofort wieder verblasst (Line2D, additiv). Sehr leichtgewichtig, damit
+## das schnelle Feuer flüssig bleibt.
+func _tracer(from: Vector2, to: Vector2) -> void:
+	var line := Line2D.new()
+	line.points = PackedVector2Array([from, to])
+	line.width = 2.0
+	line.default_color = Color(1.0, 0.92, 0.55, 0.9)
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	line.material = m
+	add_child(line)
+	var tw := line.create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, 0.09)
+	tw.tween_callback(line.queue_free)
 
 ## Screen-Stoßwelle: Verzerrungs-Ring mit chromatischer Aberration läuft vom
 ## Weltpunkt nach außen. Max. eine gleichzeitig (Vollbild-Shader).

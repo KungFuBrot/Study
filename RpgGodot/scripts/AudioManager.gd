@@ -492,6 +492,10 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			# Kreischende Hetz-Attacke: fallendes Krächzen
 			_tone(buf, 2400, 400, 0.22, 0.24, "noise")
 			_tone(buf, 1800, 300, 0.18, 0.20, "square")
+		"mgun":
+			# Einzelner MG-Schuss: scharfer Knall + kurzer Tiefton-Anschlag.
+			# Im Kampf schnell hintereinander abgefeuert ergibt das Rattern.
+			_render_gun(buf, 0.09, 0.55)
 		_:
 			return null
 	return _to_wav(buf, false)
@@ -547,6 +551,26 @@ func _tone(buf: PackedFloat32Array, f0: float, f1: float, dur: float, vol: float
 			_: v = 0.7 if fmod(phase, 1.0) < 0.5 else -0.7
 		var env := minf(t * 12.0, 1.0) * (1.0 - t)
 		buf[start + i] = v * vol * env
+
+## Einzelner Gewehrschuss: heller Knall-Transient (breitbandiges Rauschen, sehr
+## schnelle exp-Hüllkurve), ein tiefer Anschlag-„Wumms" (Sinus 150→55 Hz) und
+## etwas tiefpassgefiltertes Rausch-Körpergeräusch — alles in dieselben Samples
+## überlagert und weich geclippt. Kurz (~90 ms), damit sich Schüsse stapeln.
+func _render_gun(buf: PackedFloat32Array, dur: float, vol: float) -> void:
+	var n := int(dur * RATE)
+	var start := buf.size()
+	buf.resize(start + n)
+	var lp := 0.0
+	var phase := 0.0
+	for i in n:
+		var k := float(i) / n
+		var crack := randf_range(-1.0, 1.0) * exp(-k * 38.0)
+		phase += lerpf(150.0, 55.0, minf(k * 2.0, 1.0)) / RATE
+		var thump := sin(phase * TAU) * exp(-k * 16.0) * 0.7
+		lp += 0.5 * (randf_range(-1.0, 1.0) - lp)
+		var body := lp * exp(-k * 22.0) * 0.5
+		var x := (crack + thump + body) * vol
+		buf[start + i] = x / (1.0 + absf(x))
 
 func _to_wav(samples: PackedFloat32Array, loop: bool) -> AudioStreamWAV:
 	var bytes := PackedByteArray()
