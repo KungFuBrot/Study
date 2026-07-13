@@ -2761,28 +2761,28 @@ func _crosshair(pos: Vector2) -> void:
 	var ch := Node2D.new()
 	ch.position = pos
 	ch.z_index = 3
-	var col := Color(1.0, 0.30, 0.24)
+	var col := Color(1.0, 0.12, 0.10)  # kräftiges Rot
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	var ring := Line2D.new()
 	var pts := PackedVector2Array()
 	for k in 25:
 		var a := TAU * k / 24.0
-		pts.append(Vector2(cos(a), sin(a)) * 17.0)
+		pts.append(Vector2(cos(a), sin(a)) * 27.0)
 	ring.points = pts
-	ring.width = 2.0
+	ring.width = 2.6
 	ring.default_color = col
 	ring.material = m
 	ch.add_child(ring)
 	for dir: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
 		var tick := Line2D.new()
-		tick.points = PackedVector2Array([dir * 9.0, dir * 24.0])
-		tick.width = 2.0
+		tick.points = PackedVector2Array([dir * 14.0, dir * 39.0])
+		tick.width = 2.6
 		tick.default_color = col
 		tick.material = m
 		ch.add_child(tick)
 	add_child(ch)
-	ch.scale = Vector2(1.7, 1.7)
+	ch.scale = Vector2(1.8, 1.8)
 	ch.modulate.a = 0.0
 	var tw := ch.create_tween()
 	tw.tween_property(ch, "modulate:a", 1.0, 0.18)
@@ -2846,37 +2846,41 @@ func _ground_flame(pos: Vector2) -> void:
 	f.material = m
 	f.z_index = 1
 	add_child(f)
-	get_tree().create_timer(1.0).timeout.connect(func():
+	# Flammen brennen nur kurz und verlöschen dann klar (nichts bleibt liegen).
+	get_tree().create_timer(0.7).timeout.connect(func():
 		if is_instance_valid(f):
 			f.emitting = false)
-	get_tree().create_timer(2.0).timeout.connect(func():
+	get_tree().create_timer(1.4).timeout.connect(func():
 		if is_instance_valid(f):
 			f.queue_free())
 	var scorch := Sprite2D.new()
 	scorch.texture = SpriteFactory.particle("scorch_01")
 	scorch.position = pos
 	scorch.scale = Vector2(0.42, 0.26)
-	scorch.modulate = Color(0.08, 0.06, 0.06, 0.75)
+	scorch.modulate = Color(0.08, 0.06, 0.06, 0.7)
 	scorch.z_index = -9
 	add_child(scorch)
 	var st := scorch.create_tween()
-	st.tween_interval(1.0)
-	st.tween_property(scorch, "modulate:a", 0.0, 1.8)
+	st.tween_interval(0.7)
+	st.tween_property(scorch, "modulate:a", 0.0, 1.3)
 	st.tween_callback(scorch.queue_free)
 
 ## Ein Schritt des Orbitallaser-Sweeps: bewegt den Strahl entlang der liegenden
 ## Acht, hinterlässt gedrosselt Bodenflammen und erfasst passierte Gegner (Funken
 ## + Licht; der Schaden folgt gesammelt am Ende).
 func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: float,
-		alive: Array, hit: Dictionary, state: Dictionary) -> void:
+		rot: float, alive: Array, hit: Dictionary, state: Dictionary) -> void:
 	if not is_instance_valid(beam):
 		return
 	var ang := t * TAU
-	# Liegende Acht (Lemniskate): x = sin, y = sin·cos.
-	var p := Vector2(cx + aa * sin(ang), cy + bb * sin(ang) * cos(ang))
+	# Liegende Acht (Lemniskate): lx = sin, ly = sin·cos — dann um rot gekippt,
+	# damit die Bahn schräg verläuft (wirkt wie „nach hinten und vorne fahren").
+	var lx := aa * sin(ang)
+	var ly := bb * sin(ang) * cos(ang)
+	var p := Vector2(cx + lx * cos(rot) - ly * sin(rot), cy + lx * sin(rot) + ly * cos(rot))
 	beam.position = p
 	state["n"] += 1
-	if int(state["n"]) % 10 == 0:
+	if int(state["n"]) % 13 == 0:
 		_ground_flame(p)
 	for e in alive:
 		var esp: Sprite2D = e["sprite"]
@@ -2915,8 +2919,10 @@ func _ultimate_rax(h: Dictionary) -> void:
 	var fr: Dictionary = _enemy_field_rect(alive)
 	var cx: float = fr["cx"]
 	var cy: float = fr["cy"]
-	var aa: float = maxf(fr["ax"], 95.0)
-	var bb: float = maxf(fr["ay"], 68.0)
+	# Deutlich größere 8 als das reine Gegner-Feld, leicht schräg gekippt.
+	var aa: float = maxf(fr["ax"] * 1.35, 135.0)
+	var bb: float = maxf(fr["ay"] * 1.35, 96.0)
+	var rot: float = deg_to_rad(20.0)
 	var beam := _orbital_beam_make(Vector2(cx, cy))
 	AudioManager.play_sfx("laser")
 	_shake_camera(1.6)
@@ -2926,8 +2932,8 @@ func _ultimate_rax(h: Dictionary) -> void:
 	var hit := {}
 	var state := {"n": 0}
 	var sweep := create_tween()
-	sweep.tween_method(_orbital_step.bind(beam, cx, cy, aa, bb, alive, hit, state),
-		0.0, 1.0, 2.8).set_trans(Tween.TRANS_SINE)
+	sweep.tween_method(_orbital_step.bind(beam, cx, cy, aa, bb, rot, alive, hit, state),
+		0.0, 1.0, 3.0).set_trans(Tween.TRANS_SINE)
 	await sweep.finished
 	# Abschluss: greller Blitz, Einschlag, Strahl abbauen.
 	_flash_screen(Color(0.6, 0.9, 1.0, 0.45))
@@ -3052,6 +3058,20 @@ func _ultimate_serena(h: Dictionary) -> void:
 	await back.finished
 	h["bob"] = _idle_bob(s, 2.0)
 
+## Ein Schritt eines fallenden Meteors: Kopf + die beiden Schweif-Emitter
+## (Feuer, Rauch) wandern gemeinsam entlang der Bahn — so bleibt die Spur hinter
+## dem Brocken stehen, statt als starres Sprite mitzukippen.
+func _meteor_step(t: float, meteor: Sprite2D, trail: CPUParticles2D, smoke: CPUParticles2D,
+		from: Vector2, to: Vector2) -> void:
+	if not is_instance_valid(meteor):
+		return
+	var p := from.lerp(to, t)
+	meteor.position = p
+	if is_instance_valid(trail):
+		trail.position = p
+	if is_instance_valid(smoke):
+		smoke.position = p
+
 ## Milos Ultimative „Meteorregen“: brennende Meteore stürzen auf alle Gegner.
 func _ultimate_milo(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
@@ -3093,44 +3113,65 @@ func _ultimate_milo(h: Dictionary) -> void:
 		meteor.texture = SpriteFactory.meteor_rock(i)
 		meteor.scale = Vector2(big, big)
 		meteor.rotation = randf_range(-0.4, 0.4)
-		# Feuerschweif: additive Flamme, die dem Brocken nach oben rechts folgt
-		var tail := Sprite2D.new()
-		tail.texture = SpriteFactory.particle("flame_05")
-		tail.rotation = PI * 0.25  # zeigt nach oben rechts (gegen Flugrichtung)
-		tail.position = Vector2(14, -12)
-		tail.scale = Vector2(0.2, 0.45)
-		tail.modulate = Color(1.0, 0.6, 0.2, 0.9)
-		var tmat := CanvasItemMaterial.new()
-		tmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		tail.material = tmat
-		meteor.add_child(tail)
+		# DYNAMISCHER Kometenschweif: zwei eigenständige Emitter (Feuer + Rauch)
+		# folgen dem Kopf und legen eine echte Spur entlang der Flugbahn ab — kein
+		# starres Flammensprite mehr, das beim Taumeln in die Flugrichtung kippt.
+		var fmat := CanvasItemMaterial.new()
+		fmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		var trail := CPUParticles2D.new()
-		trail.amount = 18
-		trail.lifetime = 0.4
-		trail.direction = Vector2(1, -1)
-		trail.spread = 24.0
-		trail.gravity = Vector2.ZERO
-		trail.initial_velocity_min = 50.0
-		trail.initial_velocity_max = 110.0
-		trail.scale_amount_min = 0.06
-		trail.scale_amount_max = 0.14
-		trail.color = Color(1.0, 0.55, 0.1, 0.8)
-		trail.texture = SpriteFactory.particle("smoke_07")
-		meteor.add_child(trail)
-		meteor.position = impact + Vector2(randf_range(140, 300), -440)
+		trail.amount = 30
+		trail.lifetime = 0.55
+		trail.direction = Vector2(0, -1)
+		trail.spread = 42.0
+		trail.gravity = Vector2(0, -30)
+		trail.initial_velocity_min = 8.0
+		trail.initial_velocity_max = 42.0
+		trail.scale_amount_min = 0.10
+		trail.scale_amount_max = 0.24
+		trail.color = Color(1.0, 0.55, 0.15, 0.9)
+		trail.texture = SpriteFactory.particle("fire_01")
+		trail.material = fmat
+		trail.z_index = -1
+		var smoke := CPUParticles2D.new()
+		smoke.amount = 16
+		smoke.lifetime = 0.75
+		smoke.direction = Vector2(0, -1)
+		smoke.spread = 46.0
+		smoke.gravity = Vector2(0, -12)
+		smoke.initial_velocity_min = 5.0
+		smoke.initial_velocity_max = 24.0
+		smoke.scale_amount_min = 0.10
+		smoke.scale_amount_max = 0.24
+		smoke.color = Color(0.5, 0.28, 0.16, 0.5)
+		smoke.texture = SpriteFactory.particle("smoke_07")
+		smoke.z_index = -2
+		var start: Vector2 = impact + Vector2(randf_range(150, 320), -460)
+		meteor.position = start
+		trail.position = start
+		smoke.position = start
+		add_child(smoke)
+		add_child(trail)
 		add_child(meteor)
 		if i % 2 == 0:
 			AudioManager.play_sfx("meteor")
-		var dur := randf_range(0.34, 0.48)
+		var dur := randf_range(0.36, 0.5)
+		var mimpact := impact
+		var mbig := big
 		var fall := create_tween()
-		fall.tween_property(meteor, "position", impact, dur) \
+		fall.tween_method(_meteor_step.bind(meteor, trail, smoke, start, impact), 0.0, 1.0, dur) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		# Nur leicht taumeln — der Feuerschweif ist ein Kind und würde bei
-		# starker Drehung plötzlich in Flugrichtung zeigen.
-		fall.parallel().tween_property(meteor, "rotation", meteor.rotation + randf_range(0.25, 0.6), dur)
+		# Brocken taumelt jetzt frei (der Schweif ist unabhängig, dreht nicht mit).
+		fall.parallel().tween_property(meteor, "rotation", meteor.rotation + randf_range(0.6, 1.4), dur)
 		fall.tween_callback(func():
 			meteor.queue_free()
-			_explosion(impact, 0.9 + big * 0.16)
+			trail.emitting = false
+			smoke.emitting = false
+			get_tree().create_timer(0.7).timeout.connect(func():
+				if is_instance_valid(trail):
+					trail.queue_free()
+				if is_instance_valid(smoke):
+					smoke.queue_free())
+			_explosion(mimpact, 0.9 + mbig * 0.16)
 			AudioManager.play_sfx("boom")
 			_shake_camera(1.5))
 		await get_tree().create_timer(0.11).timeout

@@ -12,7 +12,6 @@ Zuordnung (Originaldatei):
 - menu.ogg       = interface-sounds/click_001
 - buy.ogg        = rpg-audio/handleCoins
 - error.ogg      = interface-sounds/error_004
-- slash.ogg      = rpg-audio/knifeSlice
 - hit.ogg        = impact-sounds/impactPunch_heavy_001
 - heal.ogg       = digital-audio/powerUp5
 - coin.ogg       = rpg-audio/handleCoins2
@@ -22,16 +21,23 @@ Zuordnung (Originaldatei):
 - laser.ogg      = sci-fi-sounds/laserLarge_000
 - charge.ogg     = digital-audio/phaserUp2
 - ult_charge.ogg = sci-fi-sounds/forceField_000
-- die.ogg        = sci-fi-sounds/slime_000
 - rocket.ogg     = sci-fi-sounds/thrusterFire_000
 - stomp.ogg      = impact-sounds/impactPlate_heavy_000
 
-Zusätzliche Effekte aus dem Pack "80 CC0 RPG SFX" von artisticdude
-(https://opengameart.org/content/80-cc0-rpg-sfx) — ebenfalls CC0 1.0:
-- fire.ogg    = spell_fire_02   (Feuerball)
-- summon.ogg  = spell_02        (Beschwörung/Magie)
+Fantasy-Effekte aus dem Pack "80 CC0 RPG SFX" von artisticdude
+(https://opengameart.org/content/80-cc0-rpg-sfx) — ebenfalls CC0 1.0.
+Diese ersetzen bewusst die frueheren Synth-/Kenney-Toene fuer mehr
+Wucht und Abwechslung im Kampf:
+- fire.ogg    = spell_fire_04    (Feuerball)
+- summon.ogg  = spell_02         (Beschwörung/Magie)
 - roar.ogg    = creature_roar_02 (Boss-Gebrüll)
+- growl.ogg   = creature_monster_03 (Boss-Grollen)
 - splat.ogg   = creature_slime_01 (Schlamm-/Schleimtreffer)
+- screech.ogg = creature_misc_03 (Hetz-Kreischen)
+- die.ogg     = creature_die_01  (Gegner-Tod)
+- slash.ogg   = blade_01         (Schwerthieb)
+- whirl.ogg   = blade_03         (Klingenwirbel-Swoosh)
+- meteor.ogg  = stones_02        (fallender Meteor)
 
-Alle übrigen Effekte (Explosionen, MG-Feuer, Grollen usw.) rendert weiterhin
-der eingebaute Synthesizer. Danke an Kenney und artisticdude für die Assets!
+Alle übrigen Effekte (Explosionen, MG-Feuer usw.) rendert weiterhin der
+eingebaute Synthesizer. Danke an Kenney und artisticdude für die Assets!
