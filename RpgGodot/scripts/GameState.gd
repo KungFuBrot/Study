@@ -6,9 +6,10 @@ var main: Node = null
 var gold := 120
 var inventory := {}  # name -> anzahl
 var party := []      # Array aus Dictionaries (siehe reset_party)
-var boss_defeated := false   # Schlotbaron (Schlotwerk) — öffnet den Konzernturm
-var boss2_defeated := false  # Monopolfürst (Konzernturm) — öffnet die Hassfestung
-var boss3_defeated := false  # Der Spalter (Hassfestung) — beendet das Spiel
+var boss_defeated := false   # Schlotbaron (Schlotwerk)
+var boss2_defeated := false  # Monopolfürst (Konzernturm)
+var boss3_defeated := false  # Der Spalter (Hassfestung) — alle drei öffnen Die Leere
+var boss4_defeated := false  # Die Stille (Die Leere) — beendet das Spiel
 
 const ITEMS := {
 	"Trank": {"price": 20, "desc": "Heilt 30 LP.", "hp": 30, "mp": 0},
@@ -82,6 +83,26 @@ const ENEMIES := {
 			["Der Spalter", "Zusammen?! Ich SPALTE euch wie morsches Holz!"],
 		],
 		"aoe_name": "Hasstirade", "ultimate_name": "Mauer des Hasses"},
+	# --- Die Leere: keine Emotionen, Einsamkeit, Gleichgültigkeit ---
+	"hohlgaenger": {"name": "Hohlgänger", "hp": 96, "atk": 30, "def": 8,
+		"gold": 40, "xp": 48, "sprite": "hohlgaenger", "tint": Color(0.72, 0.74, 0.80),
+		"attack_line": "%s greift %s an, ganz ohne Regung."},
+	"grauschemen": {"name": "Grauschemen", "hp": 84, "atk": 33, "def": 6,
+		"gold": 42, "xp": 50, "sprite": "grauschemen", "tint": Color(0.70, 0.76, 0.82),
+		"attack_line": "%s streift %s mit eisiger Gleichgültigkeit."},
+	"namenlose": {"name": "Der Namenlose", "hp": 110, "atk": 31, "def": 11,
+		"gold": 44, "xp": 54, "sprite": "namenlose", "tint": Color(0.68, 0.70, 0.74),
+		"attack_line": "%s schlägt nach %s, als wäre da niemand."},
+	"boss4": {"name": "Die Stille", "hp": 860, "atk": 38, "def": 12, "gold": 0, "xp": 400,
+		"sprite": "boss4", "boss": true, "theme": "void", "song": "boss4",
+		"tint": Color(0.74, 0.77, 0.83),
+		"entrance_line": "Jedes Geräusch erlischt. Eine hohe graue Gestalt steht einfach da — und sieht durch euch hindurch.",
+		"intro": [
+			["Die Stille", "..."],
+			["Serena", "So sag doch etwas! Wüte, hasse — IRGENDwas!"],
+			["Die Stille", "Wozu. Nichts davon bedeutet etwas. Ihr auch nicht."],
+		],
+		"aoe_name": "Grauschleier", "ultimate_name": "Das große Vergessen"},
 }
 
 # Zufalls-Begegnungen pro Dungeon (Gruppen von Gegner-IDs).
@@ -106,6 +127,13 @@ const ENCOUNTERS := {
 		["schlaeger", "wutgeist"],
 		["hassprediger", "hetzer"],
 		["schlaeger", "hassprediger", "wutgeist"],
+	],
+	"dungeon4": [
+		["grauschemen", "grauschemen"],
+		["hohlgaenger", "grauschemen"],
+		["namenlose"],
+		["namenlose", "hohlgaenger"],
+		["hohlgaenger", "grauschemen", "namenlose"],
 	],
 }
 
@@ -137,7 +165,15 @@ func reset_all() -> void:
 	boss_defeated = false
 	boss2_defeated = false
 	boss3_defeated = false
+	boss4_defeated = false
 	reset_party()
+
+## Portal-Sperre: einfache Boss-Flags werden direkt gelesen; der Sonderfall
+## „all_bosses" verlangt, dass alle drei Plagen gefallen sind (öffnet Die Leere).
+func is_unlocked(flag: String) -> bool:
+	if flag == "all_bosses":
+		return boss_defeated and boss2_defeated and boss3_defeated
+	return get(flag)
 
 func reset_party() -> void:
 	inventory = {"Trank": 3, "Äther": 1}
@@ -213,6 +249,8 @@ func reset_party() -> void:
 		apply_blessing()
 	if boss2_defeated:
 		apply_blessing2()
+	if boss3_defeated:
+		apply_blessing3()
 
 ## Segnung des reinen Flusses (nach dem Schlotbaron): Machtschub für den Konzernturm.
 func apply_blessing() -> void:
@@ -236,6 +274,18 @@ func apply_blessing2() -> void:
 		member["atk"] += 5
 		member["mag"] += 6
 		member["def"] += 3
+
+## Segnung der geeinten Herzen (nach dem Spalter) — letzter Rückenwind, bevor
+## sich Die Leere öffnet, in der Gefühl selbst zur Waffe wird.
+func apply_blessing3() -> void:
+	for member in party:
+		member["max_hp"] += 30
+		member["hp"] = member["max_hp"]
+		member["max_mp"] += 10
+		member["mp"] = member["max_mp"]
+		member["atk"] += 5
+		member["mag"] += 6
+		member["def"] += 4
 
 ## ---------- Stufenaufstieg (Level-System) ----------
 

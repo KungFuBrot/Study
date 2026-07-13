@@ -44,6 +44,11 @@ const MON_DTII := {
 	"schlaeger": {"anim": "orc_warrior_idle_anim", "big": false},
 	"hassprediger": {"anim": "orc_shaman_idle_anim", "big": false},
 	"boss3": {"anim": "big_demon_idle_anim", "big": true},
+	# Die Leere (keine Emotionen, Einsamkeit, Gleichgültigkeit)
+	"hohlgaenger": {"anim": "wizzard_f_idle_anim", "big": false},
+	"grauschemen": {"anim": "ice_zombie_anim", "big": false},
+	"namenlose": {"anim": "elf_f_idle_anim", "big": false},
+	"boss4": {"anim": "skelet_idle_anim", "big": true},
 }
 
 # Dungeon-Kacheln aus DTII (der Rest bleibt prozedural).
@@ -277,6 +282,24 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 		"bridge":
 			if y % 3 == 0: return Color(0.45, 0.32, 0.18)
 			return Color(0.55, 0.40, 0.22)
+		"void":
+			# Die Leere: kalter, entsättigter Steinboden, fast ohne Struktur.
+			if (x % 8 == 0) or (y % 8 == 0): return Color(0.15, 0.16, 0.19)
+			var cv := Color(0.23, 0.24, 0.27)
+			if n > 0.85: cv = Color(0.26, 0.27, 0.30)
+			elif n < 0.1: cv = Color(0.20, 0.21, 0.24)
+			return cv
+		"vwall":
+			if y % 4 == 0 or (x + (y / 4) * 2) % 6 == 0: return Color(0.09, 0.10, 0.13)
+			return Color(0.16, 0.17, 0.21) if n > 0.2 else Color(0.13, 0.14, 0.18)
+		"void_icon":
+			# Ein einzelner grauer Monolith in totem, entsättigtem Umland.
+			if x >= 7 and x <= 9 and y >= 2 and y < 14:
+				return Color(0.30, 0.31, 0.34) if n > 0.3 else Color(0.23, 0.24, 0.27)
+			if x >= 6 and x <= 10 and y >= 12 and y < 14: return Color(0.18, 0.19, 0.22)
+			var g := _tile_color("grass", x, y)
+			var lum := (g.r + g.g + g.b) / 3.0
+			return Color(lum * 0.7 + 0.07, lum * 0.72 + 0.07, lum * 0.7 + 0.1)
 	return Color.MAGENTA
 
 ## ---------- Charaktere (12x16, prozedural, 2 Laufframes) ----------

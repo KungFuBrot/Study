@@ -186,6 +186,26 @@ const SONGS := {
 			[33, 0.5], [45, 0.5], [33, 0.5], [45, 0.5], [33, 0.5], [45, 0.5], [33, 0.5], [45, 0.5],
 			[31, 0.5], [43, 0.5], [31, 0.5], [43, 0.5], [34, 0.5], [46, 0.5], [34, 0.5], [46, 0.5]],
 		"drums": "kkBhkkBh"},
+	# „Die Leere" — sehr langsam, karg, unaufgelöst. Weite Pausen, tiefer Drone:
+	# musikalische Einsamkeit, in der nichts irgendwohin strebt.
+	"dungeon4": {"bpm": 58, "loop": true,
+		"mel": [[-1, 2], [69, 3], [-1, 1], [67, 2], [-1, 2],
+			[64, 3], [-1, 1], [65, 2], [-1, 2],
+			[62, 3], [-1, 1], [60, 2], [-1, 2],
+			[57, 4], [-1, 4]],
+		"harm": [[45, 8], [43, 8], [41, 8], [45, 10]],
+		"bass": [[33, 4], [-1, 4], [31, 4], [-1, 4], [29, 4], [-1, 4], [33, 4], [-1, 2], [33, 2]],
+		"drums": ""},
+	# „Die Stille" — Ganzton-Skala (kein Leitton, keine Auflösung): eine kühle,
+	# gleichgültige Boss-Musik, die weder wütet noch tröstet, nur unaufhaltsam pulst.
+	"boss4": {"bpm": 112, "loop": true,
+		"mel": [[72, 1], [74, 1], [76, 1.5], [78, 0.5], [76, 1], [74, 1],
+			[70, 1], [72, 1], [74, 1.5], [76, 0.5], [74, 1], [72, 1],
+			[68, 1], [70, 1], [72, 1.5], [74, 0.5], [72, 1], [70, 1],
+			[76, 2], [74, 1], [72, 1], [70, 2], [68, 2]],
+		"harm": [[60, 4], [62, 4], [64, 4], [66, 4], [60, 4], [64, 2], [62, 2]],
+		"bass": [[36, 1], [36, 1], [38, 1], [38, 1], [36, 1], [36, 1], [34, 1], [34, 1]],
+		"drums": "k...k...k...k..."},
 	# Sieg-Fanfare — C-Dur, kurzer Aufschwung mit Oktavsprung.
 	"victory": {"bpm": 132, "loop": false,
 		"mel": [[67, 0.5], [72, 0.5], [76, 0.5], [79, 1.5], [76, 0.5], [79, 2],
@@ -496,6 +516,12 @@ func _render_sfx(id: String) -> AudioStreamWAV:
 			# Einzelner MG-Schuss: harter, trockener Knall + tiefer Anschlag.
 			# Im Kampf schnell hintereinander abgefeuert ergibt das Rattern.
 			_render_gun(buf, 0.10, 0.45)
+		"sizzle":
+			# Glühendes Metall, das sich in den Boden brennt: hohes Zischen
+			# (gefiltertes Rauschen) über einem knisternden Mittenband.
+			_tone(buf, 6200, 3400, 0.20, 0.16, "noise")
+			_tone(buf, 2600, 1500, 0.16, 0.12, "noise")
+			_tone(buf, 520, 380, 0.08, 0.05, "square")
 		_:
 			return null
 	return _to_wav(buf, false)

@@ -17,6 +17,8 @@ const FIELD_BOSSES := {
 		"glow": Color(1.0, 0.80, 0.20, 0.35)},
 	"dungeon3": {"id": "boss3", "tile": Vector2i(18, 10), "flag": "boss3_defeated",
 		"glow": Color(1.0, 0.15, 0.05, 0.35)},
+	"dungeon4": {"id": "boss4", "tile": Vector2i(18, 10), "flag": "boss4_defeated",
+		"glow": Color(0.70, 0.76, 0.90, 0.30)},
 }
 
 var map_id := "town"
@@ -65,6 +67,9 @@ const LIGHTING := {
 	# Hassfestung: rote Banner, glutrote Fackelschächte.
 	"dungeon3": {"ambient": Color(0.42, 0.28, 0.28), "lantern": Color(1.0, 0.72, 0.45),
 		"wall_prop": "banner_red", "light": Color(1.0, 0.42, 0.22)},
+	# Die Leere: fahles, farbloses Dämmerlicht, kalte graue Kristallsplitter.
+	"dungeon4": {"ambient": Color(0.34, 0.36, 0.40), "lantern": Color(0.78, 0.82, 0.90),
+		"wall_prop": "crystal", "light": Color(0.70, 0.78, 0.90)},
 }
 
 # Kacheln, die einen Kontaktschatten auf den Boden darunter werfen.
@@ -165,16 +170,18 @@ static func _additive() -> CanvasItemMaterial:
 ## Versiegelte Portale schimmern eisig, solange sie verschlossen sind.
 func _add_barrier_shimmer() -> void:
 	for portal in map["portals"]:
-		if not portal.has("locked_until") or GameState.get(portal["locked_until"]):
+		if not portal.has("locked_until") or GameState.is_unlocked(portal["locked_until"]):
 			continue
 		var p: Vector2i = portal["pos"]
 		# Barrierenfarbe passend zum Ziel: goldene Konzern-Versiegelung,
-		# roter Hass-Wall, sonst eisblau.
+		# roter Hass-Wall, grauer Riss der Leere, sonst eisblau.
 		var bcol := Color(0.45, 0.85, 1.0, 0.5)
 		if portal["to"] == "dungeon2":
 			bcol = Color(1.0, 0.85, 0.30, 0.5)
 		elif portal["to"] == "dungeon3":
 			bcol = Color(1.0, 0.35, 0.25, 0.5)
+		elif portal["to"] == "dungeon4":
+			bcol = Color(0.62, 0.66, 0.74, 0.55)
 		var shimmer := Sprite2D.new()
 		shimmer.texture = SpriteFactory.circle(10, bcol)
 		shimmer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -233,6 +240,17 @@ func _add_ambience() -> void:
 			p.initial_velocity_min = 4.0
 			p.initial_velocity_max = 11.0
 			p.color = Color(1.0, 0.45, 0.20, 0.45)
+			p.texture = SpriteFactory.circle(1, Color.WHITE)
+		"dungeon4":
+			# Fahle Staubkörnchen schweben regungslos in der Leere
+			p.amount = 20
+			p.emission_rect_extents = Vector2(190, 120)
+			p.position = Vector2(6, 8)
+			p.direction = Vector2(0, -1)
+			p.gravity = Vector2(0, -1)
+			p.initial_velocity_min = 1.0
+			p.initial_velocity_max = 5.0
+			p.color = Color(0.74, 0.78, 0.86, 0.35)
 			p.texture = SpriteFactory.circle(1, Color.WHITE)
 		"world":
 			p.amount = 16
@@ -580,7 +598,7 @@ func _after_step() -> void:
 	for portal in map["portals"]:
 		if portal["pos"] == player_tile:
 			# Versiegelte Portale (z. B. Frostgrotte) erst nach Freischaltung.
-			if portal.has("locked_until") and not GameState.get(portal["locked_until"]):
+			if portal.has("locked_until") and not GameState.is_unlocked(portal["locked_until"]):
 				AudioManager.play_sfx("error")
 				dialog_name.text = portal.get("locked_name", "Barriere")
 				dialog_lines = [portal["locked_msg"]]

@@ -47,6 +47,12 @@ const THEME_STYLE := {
 		"bar_border": Color(0.55, 0.10, 0.08), "rage": Color(1.7, 0.45, 0.35),
 		"aura": Color(1.0, 0.15, 0.05, 0.30), "ember": Color(1.0, 0.25, 0.08, 0.8),
 		"burst": Color(1.0, 0.40, 0.30)},
+	# Die Leere: kalt, entsättigt, gefühllos — blasses Grau mit einem Hauch Blau.
+	"void": {"flash": Color(0.80, 0.84, 0.90, 0.38), "banner": Color(0.82, 0.86, 0.92),
+		"banner_outline": Color(0.12, 0.13, 0.16), "bar": Color(0.72, 0.78, 0.86),
+		"bar_border": Color(0.32, 0.36, 0.42), "rage": Color(0.85, 0.90, 1.0),
+		"aura": Color(0.70, 0.76, 0.85, 0.26), "ember": Color(0.78, 0.83, 0.92, 0.7),
+		"burst": Color(0.80, 0.85, 0.92)},
 }
 
 ## Stil des aktuellen Boss-Themas (Fallback: Arena-Thema).
@@ -272,6 +278,19 @@ func _palette() -> Dictionary:
 				"pool_hero": Color(1.0, 0.75, 0.55, 0.12), "pool_enemy": Color(1.0, 0.35, 0.25, 0.11),
 				"fg": Color(0.04, 0.01, 0.02), "ambient": Color(0.66, 0.52, 0.52),
 			}
+		"void":
+			return {
+				"bg_top": Color(0.12, 0.13, 0.16) if boss_fight else Color(0.11, 0.12, 0.15),
+				"bg_bottom": Color(0.03, 0.03, 0.04),
+				"floor_top": Color(0.22, 0.23, 0.26), "floor_bottom": Color(0.08, 0.09, 0.11),
+				"stone": Color(0.30, 0.31, 0.35), "stal": Color(0.06, 0.07, 0.09, 0.85),
+				"flame": Color(0.78, 0.83, 0.92), "glow": Color(0.70, 0.78, 0.90, 0.28),
+				"fog": Color(0.55, 0.58, 0.66, 0.09), "hit": Color(0.82, 0.86, 0.94),
+				"ray": Color(0.70, 0.76, 0.88, 0.05), "dust": Color(0.72, 0.76, 0.85, 0.45),
+				"grade_top": Color(0.60, 0.66, 0.78, 0.06), "grade_bottom": Color(0.05, 0.06, 0.10, 0.20),
+				"pool_hero": Color(0.80, 0.85, 0.92, 0.10), "pool_enemy": Color(0.70, 0.76, 0.86, 0.10),
+				"fg": Color(0.02, 0.02, 0.03), "ambient": Color(0.60, 0.63, 0.70),
+			}
 		_:  # toxic
 			return {
 				"bg_top": Color(0.09, 0.15, 0.08) if boss_fight else Color(0.10, 0.13, 0.10),
@@ -382,6 +401,7 @@ func _build_scene() -> void:
 	match arena_theme:
 		"gold": prop_kinds = ["coins", "crate", "pebble"]
 		"hate": prop_kinds = ["bones", "crack", "pebble"]
+		"void": prop_kinds = ["bones", "crack", "pebble"]
 		_: prop_kinds = ["barrel", "sludge", "crack"]
 	for i in 6:
 		var pr := Sprite2D.new()
@@ -513,9 +533,11 @@ func _add_sky(pal: Dictionary) -> void:
 			tw.parallel().tween_property(band, "position:x", 22.0, 3.6 + i * 0.7) \
 				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		return
-	# Pulsierende Glutblasen: golden im Konzernturm, blutrot in der Hassfestung
+	# Pulsierende Glutblasen: golden im Konzernturm, blutrot in der Hassfestung,
+	# fahles Grau in der Leere.
 	var blob_col := Color(1.0, 0.80, 0.30, 0.10) if arena_theme == "gold" \
-		else Color(1.0, 0.30, 0.12, 0.10)
+		else (Color(0.70, 0.76, 0.88, 0.08) if arena_theme == "void" \
+		else Color(1.0, 0.30, 0.12, 0.10))
 	for i in 4:
 		var blob := Sprite2D.new()
 		blob.texture = SpriteFactory.circle(26, blob_col)
@@ -633,6 +655,7 @@ func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
 ## Gesichtsposition der Boss-Sprites (lokale Pixel, Ursprung Sprite-Mitte).
 const BOSS_FACE := {
 	"boss": Vector2(3, -3), "boss2": Vector2(3, -4), "boss3": Vector2(1, -5),
+	"boss4": Vector2(1, -5),
 }
 
 ## Lebenszeichen des Bosses: glimmende Augen-Glut (mit Blinzeln), giftiger
@@ -913,6 +936,20 @@ func _add_theme_weather() -> void:
 			p.scale_amount_min = 0.5
 			p.scale_amount_max = 1.1
 			p.color = Color(1.0, 0.42, 0.15, 0.7)
+		"void":
+			# Fahle Aschekörnchen treiben lautlos und richtungslos — nichts strebt
+			# irgendwohin, nichts fällt mit Absicht. Nur Leere, die schwebt.
+			p.position = Vector2(480, 260)
+			p.amount = 30
+			p.emission_rect_extents = Vector2(520, 260)
+			p.direction = Vector2(0, -1)
+			p.spread = 180.0
+			p.gravity = Vector2(0, -2)
+			p.initial_velocity_min = 2.0
+			p.initial_velocity_max = 7.0
+			p.scale_amount_min = 0.4
+			p.scale_amount_max = 1.0
+			p.color = Color(0.74, 0.78, 0.86, 0.4)
 		_:
 			# Giftblasen steigen träge aus dem Boden
 			p.position = Vector2(480, 560)
@@ -2825,49 +2862,50 @@ func _orbital_beam_make(pos: Vector2) -> Node2D:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return beam
 
-## Brennende Flamme am Boden (Einschlagspur des Orbitallasers): lodert kurz und
-## verlischt, hinterlässt einen verblassenden Brandfleck.
-func _ground_flame(pos: Vector2) -> void:
-	var m := CanvasItemMaterial.new()
-	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	var f := CPUParticles2D.new()
-	f.position = pos
-	f.amount = 12
-	f.lifetime = 0.6
-	f.direction = Vector2(0, -1)
-	f.spread = 20.0
-	f.gravity = Vector2(0, -28)
-	f.initial_velocity_min = 22.0
-	f.initial_velocity_max = 60.0
-	f.scale_amount_min = 0.10
-	f.scale_amount_max = 0.22
-	f.color = Color(1.0, 0.6, 0.2, 0.9)
-	f.texture = SpriteFactory.particle("fire_01")
-	f.material = m
-	f.z_index = 1
-	add_child(f)
-	# Flammen brennen nur kurz und verlöschen dann klar (nichts bleibt liegen).
-	get_tree().create_timer(0.7).timeout.connect(func():
-		if is_instance_valid(f):
-			f.emitting = false)
-	get_tree().create_timer(1.4).timeout.connect(func():
-		if is_instance_valid(f):
-			f.queue_free())
+## Glühender Spur-Fleck des Orbitallasers: eingebranntes Metall, das weißglühend
+## aufsetzt und dann langsam abkühlt (weiß → gelb → orange → tiefrot → dunkel).
+## `depth` (Nähe zur Kamera) skaliert Größe und Helligkeit für den Tiefeneindruck.
+func _molten_spot(pos: Vector2, depth: float) -> void:
+	# Dauerhafte Brandnarbe darunter (kühlt nie ganz zurück, bleibt liegen).
 	var scorch := Sprite2D.new()
 	scorch.texture = SpriteFactory.particle("scorch_01")
 	scorch.position = pos
-	scorch.scale = Vector2(0.42, 0.26)
-	scorch.modulate = Color(0.08, 0.06, 0.06, 0.7)
+	scorch.scale = Vector2(0.34, 0.2) * depth
+	scorch.modulate = Color(0.06, 0.05, 0.05, 0.0)
 	scorch.z_index = -9
 	add_child(scorch)
-	var st := scorch.create_tween()
-	st.tween_interval(0.7)
-	st.tween_property(scorch, "modulate:a", 0.0, 1.3)
-	st.tween_callback(scorch.queue_free)
+	var sc: Tween = scorch.create_tween()
+	sc.tween_property(scorch, "modulate:a", 0.6, 0.3)
+	sc.tween_interval(2.6)
+	sc.tween_property(scorch, "modulate:a", 0.0, 1.6)
+	sc.tween_callback(scorch.queue_free)
+	# Das glühende Metall selbst: additiver Fleck, der die Farbstufen durchläuft.
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var glow := Sprite2D.new()
+	glow.texture = SpriteFactory.circle(10, Color(1, 1, 1))
+	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	glow.position = pos
+	glow.material = m
+	glow.z_index = 0
+	# Am Boden liegend: horizontal breiter als hoch, mit der Tiefe skaliert.
+	glow.scale = Vector2(1.5, 0.8) * depth
+	glow.modulate = Color(1.7, 1.55, 1.15)  # weißglühend
+	add_child(glow)
+	var cool: Tween = glow.create_tween()
+	cool.tween_property(glow, "modulate", Color(1.6, 1.15, 0.4), 0.5)   # gelb
+	cool.tween_property(glow, "modulate", Color(1.3, 0.6, 0.16), 1.0)   # orange
+	cool.tween_property(glow, "modulate", Color(0.85, 0.22, 0.07), 1.4) # tiefrot
+	cool.tween_property(glow, "modulate", Color(0.3, 0.06, 0.03, 0.0), 1.5)  # erkaltet
+	cool.tween_callback(glow.queue_free)
+	# Beim Abkühlen zieht sich das Metall leicht zusammen.
+	var sh: Tween = glow.create_tween()
+	sh.tween_property(glow, "scale", Vector2(1.0, 0.55) * depth, 4.4).set_trans(Tween.TRANS_SINE)
 
 ## Ein Schritt des Orbitallaser-Sweeps: bewegt den Strahl entlang der liegenden
-## Acht, hinterlässt gedrosselt Bodenflammen und erfasst passierte Gegner (Funken
-## + Licht; der Schaden folgt gesammelt am Ende).
+## Acht, zieht eine dichte glühende Metallspur und erfasst passierte Gegner
+## (Funken + Licht; der Schaden folgt gesammelt am Ende). Über die Bahntiefe
+## werden Strahlbreite und Spur skaliert, damit ein Vorne/Hinten-Eindruck entsteht.
 func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: float,
 		rot: float, alive: Array, hit: Dictionary, state: Dictionary) -> void:
 	if not is_instance_valid(beam):
@@ -2879,9 +2917,19 @@ func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: 
 	var ly := bb * sin(ang) * cos(ang)
 	var p := Vector2(cx + lx * cos(rot) - ly * sin(rot), cy + lx * sin(rot) + ly * cos(rot))
 	beam.position = p
+	# Tiefe: weiter oben im Feld = weiter „hinten" = schmaler/kleiner, weiter unten
+	# = näher an der Kamera = breiter/größer. Ergibt räumliche Vor-/Zurück-Fahrt.
+	var depth := clampf(remap(p.y, cy - bb, cy + bb, 0.62, 1.32), 0.5, 1.5)
+	beam.scale = Vector2(depth, 1.0)
+	beam.z_index = 2 + int(p.y * 0.05)  # vordere Bahnabschnitte über hintere
 	state["n"] += 1
-	if int(state["n"]) % 13 == 0:
-		_ground_flame(p)
+	var n := int(state["n"])
+	# Dichte, lückenlose Glutspur — jeder Fleck kühlt einzeln ab (Kopf hell, Schweif rot).
+	if n % 4 == 0:
+		_molten_spot(p, depth)
+	# Anhaltendes Zischen des einbrennenden Metalls.
+	if n % 20 == 0:
+		AudioManager.play_sfx("sizzle")
 	for e in alive:
 		var esp: Sprite2D = e["sprite"]
 		if e["alive"] and not hit.has(esp) and p.distance_to(esp.position) < 52.0:
@@ -2891,7 +2939,8 @@ func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: 
 
 ## Rax' Ultimative „Orbitallaser": Fadenkreuze erfassen die Gegner und
 ## verschwinden wieder; dann fährt der Strahl von oben herab und zieht langsam
-## eine liegende Acht über das Gegnerfeld, die den Boden in Flammen hinterlässt.
+## eine schräge, liegende Acht über das Gegnerfeld und brennt dabei eine
+## glühende Metallspur in den Boden, die langsam abkühlt.
 func _ultimate_rax(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
@@ -4874,8 +4923,23 @@ func _victory() -> void:
 				_say("%s kann nun %s beschwören!" % [up["name"], up["unlock"]])
 				await get_tree().create_timer(1.8).timeout
 	# Boss-Siege schalten den Fortschritt frei.
-	if enemy_ids.has("boss3"):
+	if enemy_ids.has("boss4"):
+		GameState.boss4_defeated = true
+	elif enemy_ids.has("boss3"):
 		GameState.boss3_defeated = true
+		GameState.apply_blessing3()
+		_refresh_party()
+		AudioManager.play_sfx("heal")
+		for h in heroes:
+			_sparkle(h["sprite"].position, Color(1.0, 0.95, 0.7))
+			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.95, 0.7))
+		_say("Der Hass verraucht — Lindenhain atmet auf, und euer Bund wird stärker denn je.")
+		await get_tree().create_timer(2.4).timeout
+		if GameState.boss_defeated and GameState.boss2_defeated:
+			_say("Doch mit der letzten Plage kehrt keine Ruhe ein — im Norden reißt ein grauer Riss auf.")
+			await get_tree().create_timer(2.4).timeout
+			_say("Aus ihm weht eine Kälte, die nicht hasst und nicht liebt. Dort wartet Die Leere.")
+			await get_tree().create_timer(2.4).timeout
 	elif enemy_ids.has("boss2"):
 		GameState.boss2_defeated = true
 		GameState.apply_blessing2()
@@ -4888,8 +4952,9 @@ func _victory() -> void:
 		await get_tree().create_timer(2.4).timeout
 		_say("Die letzten Siegel fallen: Klingentanz, Atombombe und Leviathans Pakt!")
 		await get_tree().create_timer(2.4).timeout
-		_say("Im Südwesten bröckelt der Wall aus Misstrauen um die Hassfestung ...")
-		await get_tree().create_timer(2.2).timeout
+		if GameState.boss_defeated and GameState.boss3_defeated:
+			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
+			await get_tree().create_timer(2.4).timeout
 	elif enemy_ids.has("boss"):
 		GameState.boss_defeated = true
 		GameState.apply_blessing()
@@ -4902,8 +4967,9 @@ func _victory() -> void:
 		await get_tree().create_timer(2.4).timeout
 		_say("Siegel gebrochen: Fokusstoß, Raketensalve und Ifrits Pakt erwachen!")
 		await get_tree().create_timer(2.4).timeout
-		_say("Im Nordosten springen die goldenen Tore des Konzernturms auf ...")
-		await get_tree().create_timer(2.2).timeout
+		if GameState.boss2_defeated and GameState.boss3_defeated:
+			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
+			await get_tree().create_timer(2.4).timeout
 	finished.emit(true)
 
 ## Großes „SIEG!“-Banner, das ins Bild ploppt.

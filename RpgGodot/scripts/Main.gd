@@ -36,7 +36,8 @@ func _ready() -> void:
 		var bid := OS.get_environment("BOSSKEY")
 		if bid == "":
 			bid = "boss"
-		var bmap: String = {"boss": "dungeon", "boss2": "dungeon2", "boss3": "dungeon3"}[bid]
+		var bmap: String = {"boss": "dungeon", "boss2": "dungeon2", "boss3": "dungeon3",
+			"boss4": "dungeon4"}[bid]
 		start_battle([bid], bmap, Vector2i(4, 10))
 	else:
 		show_title()
@@ -109,7 +110,7 @@ func goto_map(map_id: String, spawn_id: String, exact_pos := Vector2i(-1, -1)) -
 
 func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	field_return = {"map": from_map, "spawn": "", "pos": pos}
-	last_battle_was_final_boss = enemy_ids.has("boss3")
+	last_battle_was_final_boss = enemy_ids.has("boss4")
 	AudioManager.play_sfx("encounter")
 	# Kurzes Aufblitzen als Kampf-Übergang.
 	for i in 2:
@@ -122,7 +123,7 @@ func start_battle(enemy_ids: Array, from_map: String, pos: Vector2i) -> void:
 	var battle := Battle.new()
 	battle.enemy_ids = enemy_ids
 	battle.arena_theme = {"dungeon": "toxic", "dungeon2": "gold",
-		"dungeon3": "hate"}.get(from_map, "toxic")
+		"dungeon3": "hate", "dungeon4": "void"}.get(from_map, "toxic")
 	battle.finished.connect(_on_battle_finished)
 	add_child(battle)
 	current_screen = battle
@@ -137,7 +138,7 @@ func _on_battle_finished(victory: bool) -> void:
 	if not victory:
 		GameState.reset_party()
 		goto_map("town", "start")
-	elif last_battle_was_final_boss and GameState.boss3_defeated:
+	elif last_battle_was_final_boss and GameState.boss4_defeated:
 		_show_ending()
 	else:
 		goto_map(field_return["map"], "", field_return["pos"])

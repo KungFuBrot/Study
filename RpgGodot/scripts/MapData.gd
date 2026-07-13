@@ -3,17 +3,19 @@ class_name MapData
 ##  g Gras, t Baum, p Weg, w Wasser, b Brücke, m Berg,
 ##  R Dach, W Hauswand, D Tür, f Fabrikboden, # Fabrikwand,
 ##  i Marmorboden, I Turmwand, y Festungsboden, Y Festungswand,
+##  n Leere-Boden, N Leere-Wand,
 ##  T Stadt (Portal), C Schlotwerk (Portal), F Konzernturm (Portal),
-##  H Hassfestung (Portal), X Dungeon-Ausgang (Portal)
+##  H Hassfestung (Portal), V Die Leere (Portal), X Dungeon-Ausgang (Portal)
 
-const WALKABLE := ["g", "p", "b", "f", "i", "y", "T", "C", "F", "H", "X"]
+const WALKABLE := ["g", "p", "b", "f", "i", "y", "n", "T", "C", "F", "H", "V", "X"]
 
 const TILE_FOR_CHAR := {
 	"g": "grass", "t": "tree", "p": "path", "w": "water", "b": "bridge",
 	"m": "mount", "R": "roof", "W": "wall", "D": "door", "f": "floor",
 	"#": "dwall", "i": "ice", "I": "iwall", "y": "hfloor", "Y": "hwall",
+	"n": "void", "N": "vwall",
 	"T": "town_icon", "C": "factory_icon", "F": "tower_icon", "H": "keep_icon",
-	"X": "path",
+	"V": "void_icon", "X": "path",
 }
 
 const MAPS := {
@@ -51,8 +53,11 @@ const MAPS := {
 					"der Schlotbaron kippt seinen Giftschlamm einfach hinein.",
 					"Im Nordosten presst der Konzernturm die Dörfer aus,",
 					"und im Südwesten schürt eine Festung Hass und Zwietracht.",
-					"Beginnt beim Schlotwerk. Eines führt zum anderen:",
-					"Der Baron schmiert den Fürsten, der Fürst füttert den Hass."]},
+					"Geht sie an, in welcher Reihenfolge ihr wollt — jede",
+					"macht euch stärker für die nächste.",
+					"Doch hütet euch: Fallen alle drei, öffnet sich im Norden",
+					"ein grauer Riss. Was dahinter wohnt, hasst nicht einmal —",
+					"es fühlt gar nichts mehr. Das ist das Kälteste von allem."]},
 			{"id": "npc_kid", "name": "Pia", "pos": Vector2i(12, 8),
 				"lines": [
 					"Der Fluss hat früher geglitzert! Jetzt ist er ganz braun.",
@@ -69,7 +74,7 @@ const MAPS := {
 		"rows": [
 			"mmmmmmmmmmmmmmmmmmmmmm",
 			"mggggtgggggwwggmmmmmmm",
-			"mggggggggggwwggmmmFmmm",
+			"mggggggVgggwwggmmmFmmm",
 			"mgTggggggggwwggggggggm",
 			"mgpggggggggwwggggggggm",
 			"mgpppppppppbbppppppggm",
@@ -85,16 +90,16 @@ const MAPS := {
 			"mmmmmmmmmmmmmmmmmmmmmm",
 		],
 		"spawns": {"from_town": Vector2i(2, 4), "from_dungeon": Vector2i(18, 9),
-			"from_dungeon2": Vector2i(18, 3), "from_dungeon3": Vector2i(4, 12)},
+			"from_dungeon2": Vector2i(18, 3), "from_dungeon3": Vector2i(4, 12),
+			"from_dungeon4": Vector2i(7, 3)},
 		"portals": [
 			{"pos": Vector2i(2, 3), "to": "town", "spawn": "from_world"},
 			{"pos": Vector2i(18, 10), "to": "dungeon", "spawn": "entrance"},
-			{"pos": Vector2i(18, 2), "to": "dungeon2", "spawn": "entrance",
-				"locked_until": "boss_defeated", "locked_name": "Goldene Versiegelung",
-				"locked_msg": "Die goldenen Tore des Konzernturms sind verriegelt. Am Portal prangt: „Kein Zutritt — erst wenn die Schmiergeld-Pipeline aus dem Schlotwerk versiegt.“ Bezwingt den Schlotbaron!"},
-			{"pos": Vector2i(4, 13), "to": "dungeon3", "spawn": "entrance",
-				"locked_until": "boss2_defeated", "locked_name": "Wall aus Misstrauen",
-				"locked_msg": "Ein Wall aus Misstrauen umgibt die Hassfestung. Solange der Monopolfürst den Hass finanziert, ist hier kein Durchkommen — stürzt ihn zuerst!"},
+			{"pos": Vector2i(18, 2), "to": "dungeon2", "spawn": "entrance"},
+			{"pos": Vector2i(4, 13), "to": "dungeon3", "spawn": "entrance"},
+			{"pos": Vector2i(7, 2), "to": "dungeon4", "spawn": "entrance",
+				"locked_until": "all_bosses", "locked_name": "Grauer Riss",
+				"locked_msg": "Ein grauer Riss klafft in der Welt — dahinter nichts als Stille. Er lässt sich nicht öffnen, solange auch nur eine der drei Plagen weiterlebt. Erst wenn Schlotbaron, Monopolfürst und der Spalter gefallen sind, gibt die Leere ihren Eingang frei."},
 		],
 		"npcs": [],
 	},
@@ -173,6 +178,32 @@ const MAPS := {
 		"spawns": {"entrance": Vector2i(2, 1)},
 		"portals": [
 			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon3"},
+		],
+		"npcs": [],
+	},
+	"dungeon4": {
+		"name": "Die Leere",
+		"music": "dungeon4",
+		"encounters": true,
+		"ground": "void",
+		"rows": [
+			"NNNNNNNNNNNNNNNNNNNNNN",
+			"NXnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnNnnnnnnnnnNnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnNnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnNnnnnnnnnnNnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NNNNNNNNNNNNNNNNNNNNNN",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon4"},
 		],
 		"npcs": [],
 	},
