@@ -187,11 +187,13 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(1.55).timeout
 	_snap(dir, "show_rockets")
 	await get_tree().create_timer(2.0).timeout
-	# Rax Ultimate
+	# Rax Ultimate: Orbitallaser (Fadenkreuze -> liegende 8 mit Bodenflammen)
 	_ultimate_rax(heroes[2])
-	await get_tree().create_timer(1.95).timeout
-	_snap(dir, "show_ultimate")
 	await get_tree().create_timer(1.8).timeout
+	_snap(dir, "show_orbit_cross")
+	await get_tree().create_timer(1.9).timeout
+	_snap(dir, "show_orbit_beam")
+	await get_tree().create_timer(2.4).timeout
 	# Milos Beschwörungen (Level freischalten, MP auffüllen)
 	heroes[1]["data"]["level"] = 5
 	heroes[1]["data"]["mp"] = 99
@@ -2597,9 +2599,9 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	for e in alive:
 		center += (e["sprite"] as Sprite2D).position
 	center /= alive.size()
-	# Zielmarkierung + Warnton
+	# Zielerfassung + Warnton
 	for e in alive:
-		_target_reticle(e["sprite"].position)
+		_crosshair(e["sprite"].position)
 	AudioManager.play_sfx("alarm")
 	await get_tree().create_timer(0.6).timeout
 	# Bombe fällt pfeifend und leicht taumelnd, Zünderlicht blinkt.
@@ -2729,42 +2731,163 @@ func _mushroom_cloud(pos: Vector2, size := 1.0) -> void:
 	_spell_light(pos, Color(1.0, 0.6, 0.2), 420.0 * size, 1.4, 2.0)
 
 ## Zielmarker, der über einem Gegner zusammenzieht (Orbital-Anvisierung).
-func _target_reticle(pos: Vector2) -> void:
-	var r := Sprite2D.new()
-	r.texture = SpriteFactory.circle(20, Color(0.5, 0.95, 1.0, 0.55))
-	r.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	r.position = pos
-	r.scale = Vector2(2.3, 2.3)
+## Zielumgrenzung des GEGNER-Feldes (Bounding-Box aller lebenden Gegner + Rand),
+## nie auf die Heldenseite hinausragend. Von Meteorregen und Orbitallaser genutzt.
+func _enemy_field_rect(alive: Array) -> Dictionary:
+	if alive.is_empty():
+		return {"x0": 150.0, "x1": 380.0, "y0": 170.0, "y1": 360.0,
+			"cx": 265.0, "cy": 265.0, "ax": 115.0, "ay": 95.0}
+	var x0 := INF
+	var x1 := -INF
+	var y0 := INF
+	var y1 := -INF
+	for e in alive:
+		var p: Vector2 = e["sprite"].position
+		x0 = minf(x0, p.x)
+		x1 = maxf(x1, p.x)
+		y0 = minf(y0, p.y)
+		y1 = maxf(y1, p.y)
+	x0 -= 55.0
+	x1 = minf(x1 + 55.0, 470.0)  # Sicherheitsgrenze: nie auf die Heldenseite
+	y0 -= 40.0
+	y1 += 48.0
+	return {"x0": x0, "x1": x1, "y0": y0, "y1": y1,
+		"cx": (x0 + x1) * 0.5, "cy": (y0 + y1) * 0.5,
+		"ax": (x1 - x0) * 0.5, "ay": (y1 - y0) * 0.5}
+
+## Zielerfassungs-Fadenkreuz: leuchtender Ring + vier Striche, das aufploppt,
+## kurz hält und wieder verschwindet.
+func _crosshair(pos: Vector2) -> void:
+	var ch := Node2D.new()
+	ch.position = pos
+	ch.z_index = 3
+	var col := Color(1.0, 0.30, 0.24)
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	r.material = m
-	add_child(r)
-	var tw := create_tween()
-	tw.tween_property(r, "scale", Vector2(0.7, 0.7), 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.parallel().tween_property(r, "modulate:a", 1.0, 0.4)
-	tw.tween_callback(r.queue_free)
+	var ring := Line2D.new()
+	var pts := PackedVector2Array()
+	for k in 25:
+		var a := TAU * k / 24.0
+		pts.append(Vector2(cos(a), sin(a)) * 17.0)
+	ring.points = pts
+	ring.width = 2.0
+	ring.default_color = col
+	ring.material = m
+	ch.add_child(ring)
+	for dir: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		var tick := Line2D.new()
+		tick.points = PackedVector2Array([dir * 9.0, dir * 24.0])
+		tick.width = 2.0
+		tick.default_color = col
+		tick.material = m
+		ch.add_child(tick)
+	add_child(ch)
+	ch.scale = Vector2(1.7, 1.7)
+	ch.modulate.a = 0.0
+	var tw := ch.create_tween()
+	tw.tween_property(ch, "modulate:a", 1.0, 0.18)
+	tw.parallel().tween_property(ch, "scale", Vector2.ONE, 0.26) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.4)
+	tw.tween_property(ch, "modulate:a", 0.0, 0.22)
+	tw.tween_callback(ch.queue_free)
 
-## Gewaltige Strahlensäule, die von oben auf einen Punkt niederfährt.
-func _orbital_column(pos: Vector2) -> void:
-	var col := Polygon2D.new()
-	var w := 26.0
-	col.polygon = PackedVector2Array([Vector2(-w, -540), Vector2(w, -540),
-		Vector2(w * 0.45, 0), Vector2(-w * 0.45, 0)])
-	col.color = Fx.hot(Color(0.6, 0.95, 1.0, 0.85))
-	col.position = pos
+## Der Orbitallaser-Strahl: eine leuchtende Säule von oben mit hellem Kern und
+## Boden-Glut, die dem Einschlagpunkt folgt. Gibt den beweglichen Strahl zurück.
+func _orbital_beam_make(pos: Vector2) -> Node2D:
+	var beam := Node2D.new()
+	beam.position = pos
+	beam.z_index = 2
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	col.material = m
-	col.scale = Vector2(0.15, 1)
-	add_child(col)
-	var tw := create_tween()
-	tw.tween_property(col, "scale", Vector2(1, 1), 0.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(0.14)
-	tw.tween_property(col, "modulate:a", 0.0, 0.3)
-	tw.tween_callback(col.queue_free)
+	var w := 30.0
+	var glow := Polygon2D.new()
+	glow.polygon = PackedVector2Array([Vector2(-w, -560), Vector2(w, -560),
+		Vector2(w * 0.35, 0), Vector2(-w * 0.35, 0)])
+	glow.color = Color(0.5, 0.9, 1.0, 0.5)
+	glow.material = m
+	beam.add_child(glow)
+	var core := Polygon2D.new()
+	core.polygon = PackedVector2Array([Vector2(-w * 0.4, -560), Vector2(w * 0.4, -560),
+		Vector2(w * 0.14, 0), Vector2(-w * 0.14, 0)])
+	core.color = Color(1, 1, 1, 0.95)
+	core.material = m
+	beam.add_child(core)
+	var base := Sprite2D.new()
+	base.texture = SpriteFactory.circle(20, Color(0.75, 0.97, 1.0))
+	base.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	base.scale = Vector2(2.4, 1.0)
+	base.material = m
+	beam.add_child(base)
+	add_child(beam)
+	beam.scale = Vector2(0.1, 1.0)
+	beam.create_tween().tween_property(beam, "scale", Vector2(1, 1), 0.18) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return beam
 
-## Rax' Ultimative „Orbitallaser": Zielmarker, dann niederfahrende Strahlensäulen
-## auf alle Gegner mit weißem Blitz, Beben und Zeitlupe.
+## Brennende Flamme am Boden (Einschlagspur des Orbitallasers): lodert kurz und
+## verlischt, hinterlässt einen verblassenden Brandfleck.
+func _ground_flame(pos: Vector2) -> void:
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var f := CPUParticles2D.new()
+	f.position = pos
+	f.amount = 12
+	f.lifetime = 0.6
+	f.direction = Vector2(0, -1)
+	f.spread = 20.0
+	f.gravity = Vector2(0, -28)
+	f.initial_velocity_min = 22.0
+	f.initial_velocity_max = 60.0
+	f.scale_amount_min = 0.10
+	f.scale_amount_max = 0.22
+	f.color = Color(1.0, 0.6, 0.2, 0.9)
+	f.texture = SpriteFactory.particle("fire_01")
+	f.material = m
+	f.z_index = 1
+	add_child(f)
+	get_tree().create_timer(1.0).timeout.connect(func():
+		if is_instance_valid(f):
+			f.emitting = false)
+	get_tree().create_timer(2.0).timeout.connect(func():
+		if is_instance_valid(f):
+			f.queue_free())
+	var scorch := Sprite2D.new()
+	scorch.texture = SpriteFactory.particle("scorch_01")
+	scorch.position = pos
+	scorch.scale = Vector2(0.42, 0.26)
+	scorch.modulate = Color(0.08, 0.06, 0.06, 0.75)
+	scorch.z_index = -9
+	add_child(scorch)
+	var st := scorch.create_tween()
+	st.tween_interval(1.0)
+	st.tween_property(scorch, "modulate:a", 0.0, 1.8)
+	st.tween_callback(scorch.queue_free)
+
+## Ein Schritt des Orbitallaser-Sweeps: bewegt den Strahl entlang der liegenden
+## Acht, hinterlässt gedrosselt Bodenflammen und erfasst passierte Gegner (Funken
+## + Licht; der Schaden folgt gesammelt am Ende).
+func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: float,
+		alive: Array, hit: Dictionary, state: Dictionary) -> void:
+	if not is_instance_valid(beam):
+		return
+	var ang := t * TAU
+	# Liegende Acht (Lemniskate): x = sin, y = sin·cos.
+	var p := Vector2(cx + aa * sin(ang), cy + bb * sin(ang) * cos(ang))
+	beam.position = p
+	state["n"] += 1
+	if int(state["n"]) % 10 == 0:
+		_ground_flame(p)
+	for e in alive:
+		var esp: Sprite2D = e["sprite"]
+		if e["alive"] and not hit.has(esp) and p.distance_to(esp.position) < 52.0:
+			hit[esp] = true
+			_burst(esp.position, Color(0.7, 0.97, 1.0), 8, 120)
+			_spell_light(esp.position, Color(0.6, 0.9, 1.0), 120.0, 0.3)
+
+## Rax' Ultimative „Orbitallaser": Fadenkreuze erfassen die Gegner und
+## verschwinden wieder; dann fährt der Strahl von oben herab und zieht langsam
+## eine liegende Acht über das Gegnerfeld, die den Boden in Flammen hinterlässt.
 func _ultimate_rax(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
@@ -2783,18 +2906,37 @@ func _ultimate_rax(h: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
+	# Phase 1: Fadenkreuze erfassen die Gegner und verschwinden wieder.
 	for e in alive:
-		_target_reticle(e["sprite"].position)
-	await get_tree().create_timer(0.55).timeout
+		_crosshair(e["sprite"].position)
+	AudioManager.play_sfx("charge")
+	await get_tree().create_timer(1.05).timeout
+	# Phase 2: Der Strahl fährt von oben herab und zieht eine 8 übers Gegnerfeld.
+	var fr: Dictionary = _enemy_field_rect(alive)
+	var cx: float = fr["cx"]
+	var cy: float = fr["cy"]
+	var aa: float = maxf(fr["ax"], 95.0)
+	var bb: float = maxf(fr["ay"], 68.0)
+	var beam := _orbital_beam_make(Vector2(cx, cy))
 	AudioManager.play_sfx("laser")
-	_flash_screen(Color(0.6, 0.9, 1.0, 0.5))
-	_shake_camera(2.4)
-	_punch_zoom(0.12, Vector2(280, 250))
-	for e in alive:
-		_orbital_column(e["sprite"].position)
-		_explosion(e["sprite"].position, 1.6)
+	_shake_camera(1.6)
+	await get_tree().create_timer(0.22).timeout
+	# Bewegung als gebundene Methode (kein mehrzeiliges Lambda mit Folgeargumenten
+	# in tween_method — das bricht in GDScript). hit/state sind Referenz-Dicts.
+	var hit := {}
+	var state := {"n": 0}
+	var sweep := create_tween()
+	sweep.tween_method(_orbital_step.bind(beam, cx, cy, aa, bb, alive, hit, state),
+		0.0, 1.0, 2.8).set_trans(Tween.TRANS_SINE)
+	await sweep.finished
+	# Abschluss: greller Blitz, Einschlag, Strahl abbauen.
+	_flash_screen(Color(0.6, 0.9, 1.0, 0.45))
 	AudioManager.play_sfx("bigboom")
-	await _hitstop(0.16)
+	_shake_camera(2.2)
+	var bt := beam.create_tween()
+	bt.tween_property(beam, "modulate:a", 0.0, 0.35)
+	bt.tween_callback(beam.queue_free)
+	await _hitstop(0.14)
 	s.modulate = Color.WHITE
 	for e in alive:
 		if e["alive"]:
@@ -2933,15 +3075,19 @@ func _ultimate_milo(h: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
-	# Gesteinsbrocken prasseln über das GANZE Feld: jeder zweite gezielt auf
-	# einen Gegner, der Rest schlägt wahllos zwischen den Reihen ein.
+	# Gesteinsbrocken prasseln NUR über dem Gegnerfeld nieder (nie auf der
+	# Heldenseite): jeder zweite gezielt auf einen Gegner, der Rest wahllos
+	# innerhalb der Gegner-Zone.
+	var fr: Dictionary = _enemy_field_rect(alive)
 	for i in 13:
 		var impact: Vector2
 		if i % 2 == 0 and alive.size() > 0:
 			var target: Dictionary = alive[(i / 2) % alive.size()]
-			impact = target["sprite"].position + Vector2(randf_range(-40, 40), randf_range(-24, 24))
+			impact = target["sprite"].position + Vector2(randf_range(-34, 34), randf_range(-22, 22))
 		else:
-			impact = Vector2(randf_range(60, 900), randf_range(230, 390))
+			impact = Vector2(randf_range(fr["x0"], fr["x1"]), randf_range(fr["y0"], fr["y1"]))
+		impact.x = clampf(impact.x, fr["x0"], fr["x1"])
+		impact.y = clampf(impact.y, fr["y0"], fr["y1"])
 		var big := randf_range(2.2, 3.8)  # Brocken unterschiedlicher Größe
 		var meteor := Sprite2D.new()
 		meteor.texture = SpriteFactory.meteor_rock(i)

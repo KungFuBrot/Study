@@ -26,5 +26,12 @@ Zuordnung (Originaldatei):
 - rocket.ogg     = sci-fi-sounds/thrusterFire_000
 - stomp.ogg      = impact-sounds/impactPlate_heavy_000
 
-Alle übrigen Effekte (Explosionen, Brüllen, Beschwörungen usw.) rendert
-weiterhin der eingebaute Synthesizer. Danke an Kenney für die Assets!
+Zusätzliche Effekte aus dem Pack "80 CC0 RPG SFX" von artisticdude
+(https://opengameart.org/content/80-cc0-rpg-sfx) — ebenfalls CC0 1.0:
+- fire.ogg    = spell_fire_02   (Feuerball)
+- summon.ogg  = spell_02        (Beschwörung/Magie)
+- roar.ogg    = creature_roar_02 (Boss-Gebrüll)
+- splat.ogg   = creature_slime_01 (Schlamm-/Schleimtreffer)
+
+Alle übrigen Effekte (Explosionen, MG-Feuer, Grollen usw.) rendert weiterhin
+der eingebaute Synthesizer. Danke an Kenney und artisticdude für die Assets!
