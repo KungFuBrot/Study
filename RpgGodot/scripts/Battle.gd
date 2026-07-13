@@ -142,6 +142,11 @@ func _spell_showcase() -> void:
 	_highlight_hero(heroes[2], true)
 	await get_tree().create_timer(0.6).timeout
 	_snap(dir, "show_turnarrow")
+	# Kampfbereitschaft (Vortreten + Waffe in Anschlag) einfangen
+	_ready_pose(heroes[0], true)
+	await get_tree().create_timer(0.35).timeout
+	_snap(dir, "show_ready")
+	_ready_pose(heroes[0], false)
 	_highlight_hero(heroes[2], false)
 	# Serena Normalangriff (Ausholen + Waffenschwung einfangen)
 	_hero_attack(heroes[0], enemies[2])
@@ -1420,7 +1425,9 @@ func _run_battle() -> void:
 		for h in heroes:
 			if h["data"]["hp"] <= 0 or not _any_enemy_alive():
 				continue
+			_ready_pose(h, true)
 			var fled: bool = await _hero_turn(h)
+			_ready_pose(h, false)
 			if fled:
 				finished.emit(true)
 				return
@@ -1608,6 +1615,34 @@ func _highlight_hero(h: Dictionary, on: bool) -> void:
 	elif h.get("turn_arrow") != null:
 		(h["turn_arrow"] as Node).queue_free()
 		h["turn_arrow"] = null
+
+## Kampfbereitschaft: Wenn ein Held am Zug ist, tritt er einen Schritt vor,
+## richtet sich auf und hebt die Waffe in Anschlag; danach entspannt er wieder.
+## Umschließt den ganzen Zug (in _run_battle), damit es nicht bei jedem Untermenü
+## zuckt. Nur Position:x/Scale/Waffenwinkel — Bob (position:y) bleibt unberührt.
+func _ready_pose(h: Dictionary, on: bool) -> void:
+	if h["data"]["hp"] <= 0:
+		return
+	var s: Sprite2D = h["sprite"]
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var wp: Sprite2D = h.get("weapon")
+	var tw := create_tween()
+	if on:
+		tw.tween_property(s, "position:x", h["home"].x - 18.0, 0.22) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(s, "scale", base * Vector2(1.05, 1.05), 0.22) \
+			.set_trans(Tween.TRANS_SINE)
+		if wp != null and is_instance_valid(wp):
+			var rest: float = wp.get_meta("rest", WEAPON_REST)
+			wp.create_tween().tween_property(wp, "rotation", rest - 0.55, 0.22) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		tw.tween_property(s, "position:x", h["home"].x, 0.2) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.parallel().tween_property(s, "scale", base, 0.2).set_trans(Tween.TRANS_SINE)
+		if wp != null and is_instance_valid(wp):
+			var rest: float = wp.get_meta("rest", WEAPON_REST)
+			wp.create_tween().tween_property(wp, "rotation", rest, 0.2).set_trans(Tween.TRANS_SINE)
 
 func _redraw_menu() -> void:
 	for c in menu_box.get_children():
@@ -3970,7 +4005,7 @@ func _ult_mauer(targets: Array) -> void:
 func _damage_hero(target: Dictionary, dmg: int) -> void:
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)
 	_float_text(target["sprite"].position, str(dmg), Color(1.0, 0.45, 0.35))
-	_shake(target["sprite"])
+	_shake(target["sprite"], 1.0)  # Held wird nach rechts (von den Gegnern weg) geworfen
 	_shake_camera()
 	_refresh_party()
 	if target["data"]["hp"] <= 0:
@@ -3983,7 +4018,8 @@ func _damage_hero(target: Dictionary, dmg: int) -> void:
 func _damage_enemy(e: Dictionary, dmg: int) -> void:
 	e["hp"] -= dmg
 	_float_text(e["sprite"].position + Vector2(0, -40 if e["is_boss"] else 0), str(dmg), Color(1, 1, 0.5))
-	_shake(e["sprite"])
+	# Bosse stehen bombenfest; normale Gegner werden nach links (von den Helden weg) geworfen.
+	_shake(e["sprite"], 0.0 if e["is_boss"] else -1.0)
 	_shake_camera(1.4 if e["is_boss"] else 1.0)
 	if e["is_boss"]:
 		_refresh_boss_bar(e)
@@ -4075,12 +4111,22 @@ func _boss_death(e: Dictionary) -> void:
 		bt.tween_property(boss_bar_holder, "modulate:a", 0.0, 0.5)
 	await get_tree().create_timer(0.4).timeout
 
-func _shake(s: Sprite2D) -> void:
+func _shake(s: Sprite2D, recoil := 0.0) -> void:
 	var orig: Vector2 = s.position
 	var tw := create_tween()
-	for i in 4:
-		tw.tween_property(s, "position:x", orig.x + (8 if i % 2 == 0 else -8), 0.04)
-	tw.tween_property(s, "position:x", orig.x, 0.04)
+	if recoil != 0.0:
+		# Gerichteter Rückstoß: der Treffer schleudert die Figur in Trefferrichtung
+		# (Held nach rechts, Gegner nach links), dann federt sie gedämpft zurück.
+		tw.tween_property(s, "position:x", orig.x + recoil * 17.0, 0.05) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(s, "position:x", orig.x - recoil * 5.0, 0.10) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(s, "position:x", orig.x, 0.13) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		for i in 4:
+			tw.tween_property(s, "position:x", orig.x + (8 if i % 2 == 0 else -8), 0.04)
+		tw.tween_property(s, "position:x", orig.x, 0.04)
 	var flash := create_tween()
 	flash.tween_property(s, "modulate", Fx.hot(Color(1.0, 0.45, 0.4), 1.6), 0.08)
 	# Zurück zur Grundtönung (Themen-Tint bzw. Wutfärbung), nicht stur zu Weiß.
@@ -4587,12 +4633,33 @@ func _victory() -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		ct.tween_property(coin, "modulate:a", 0.0, 0.25)
 		ct.tween_callback(coin.queue_free)
+	# Siegesjubel: die Überlebenden hüpfen zweimal mit Squash-Landung und recken
+	# triumphierend die Waffe. Bob vorher anhalten, damit die Sprünge sauber von
+	# der Grundhöhe (home.y) starten statt gegen das Wippen zu kämpfen.
 	for h in heroes:
-		if h["data"]["hp"] > 0:
-			var s: Sprite2D = h["sprite"]
-			var tw := create_tween()
-			tw.tween_property(s, "position:y", s.position.y - 30.0, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tw.tween_property(s, "position:y", s.position.y, 0.25).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		if h["data"]["hp"] <= 0:
+			continue
+		_pause_bob(h)
+		var s: Sprite2D = h["sprite"]
+		var base: Vector2 = s.get_meta("base_scale", s.scale)
+		var home_y: float = h["home"].y
+		var tw := create_tween()
+		for j in 2:
+			tw.tween_property(s, "position:y", home_y - 34.0, 0.22) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.parallel().tween_property(s, "scale", base * Vector2(0.95, 1.07), 0.22)
+			tw.tween_property(s, "position:y", home_y, 0.24) \
+				.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+			tw.parallel().tween_property(s, "scale", base, 0.24) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		var wp: Sprite2D = h.get("weapon")
+		if wp != null and is_instance_valid(wp):
+			var rest: float = wp.get_meta("rest", WEAPON_REST)
+			var wt := wp.create_tween()
+			wt.tween_property(wp, "rotation", rest - 1.4, 0.2) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			wt.tween_interval(0.7)
+			wt.tween_property(wp, "rotation", rest, 0.3).set_trans(Tween.TRANS_SINE)
 	await get_tree().create_timer(2.0).timeout
 	# Stufenaufstiege feiern (heilt voll, LP/MP-Leisten aktualisieren).
 	if not level_ups.is_empty():
