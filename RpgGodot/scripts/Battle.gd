@@ -4165,7 +4165,12 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 			_burst(e["sprite"].position, Color(1.0, 0.9, 0.6), 18, 200)
 			var dmg: int = int((d["mag"] * 2.1 + sm["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
-	await sweep.finished
+	# Der Schadensdurchlauf kann länger dauern als der Schwenk (mehrere Gegner
+	# = mehrere Auflöse-Animationen). Ist der Sweep dann schon fertig, dürfen wir
+	# NICHT erneut auf sein finished-Signal warten — das käme nie wieder und der
+	# Strahl/Drache bliebe für immer stehen (Hänger). Nur warten, wenn er läuft.
+	if sweep.is_running():
+		await sweep.finished
 	var bfade := beam.create_tween()
 	bfade.tween_property(beam, "color:a", 0.0, 0.4)
 	bfade.parallel().tween_property(core_beam, "color:a", 0.0, 0.4)
