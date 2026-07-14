@@ -273,7 +273,7 @@ func _spell_showcase() -> void:
 	_snap(dir, "show_bahamut_2")
 	await get_tree().create_timer(2.5).timeout
 	# Milo Meteorregen (Gesteinsbrocken über dem ganzen Feld)
-	_ultimate_milo(heroes[1])
+	_meteor_rain(heroes[1], heroes[1]["data"]["abilities"][2])
 	await get_tree().create_timer(2.1).timeout
 	_snap(dir, "show_meteor_1")
 	await get_tree().create_timer(0.6).timeout
@@ -1674,7 +1674,8 @@ func _ability_menu(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
 	var abilities: Array = d["abilities"]
 	var summons: Array = d.get("summons", [])
-	var ult: Dictionary = d["ultimate"]
+	var ult: Dictionary = d.get("ultimate", {})
+	var has_ult: bool = not ult.is_empty()
 	var entries := []
 	var dim := []
 	for ab in abilities:
@@ -1690,10 +1691,16 @@ func _ability_menu(h: Dictionary) -> bool:
 		if not GameState.skill_unlocked(d, sm):
 			dim.append(entries.size())
 			entries.append("◈ %s — %s" % [sm["name"], GameState.skill_lock_hint(d, sm)])
+		elif sm.get("once", false) and _once_used(h, sm):
+			dim.append(entries.size())
+			entries.append("◈ %s — bereits beschworen" % sm["name"])
 		else:
 			entries.append("◈ %s (%d MP) — %s" % [sm["name"], sm["cost"], sm["desc"]])
-	entries.append("★ %s — %s" % [ult["name"],
-		"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
+	var ult_idx := -1
+	if has_ult:
+		ult_idx = entries.size()
+		entries.append("★ %s — %s" % [ult["name"],
+			"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
 	entries.append("Zurück")
 	var pick: int = await _menu(entries, h, dim)
 	if pick < 0:  # B/X = Zurück
@@ -1704,18 +1711,24 @@ func _ability_menu(h: Dictionary) -> bool:
 			_say("%s ist noch %s!" % [sm["name"], GameState.skill_lock_hint(d, sm)])
 			AudioManager.play_sfx("error")
 			return false
+		if sm.get("once", false) and _once_used(h, sm):
+			_say("%s ist in diesem Kampf bereits beschworen!" % sm["name"])
+			AudioManager.play_sfx("error")
+			return false
 		if d["mp"] < sm["cost"]:
 			_say("Nicht genug MP!")
 			AudioManager.play_sfx("error")
 			return false
 		d["mp"] -= sm["cost"]
+		if sm.get("once", false):
+			_mark_once_used(h, sm)
 		_refresh_party()
 		match sm["id"]:
 			"ifrit": await _summon_ifrit(h, sm)
 			"leviathan": await _summon_leviathan(h, sm)
 			"bahamut": await _summon_bahamut(h, sm)
 		return true
-	if pick == abilities.size() + summons.size():
+	if has_ult and pick == ult_idx:
 		if h["ult_used"]:
 			_say("Die ultimative Kraft ist in diesem Kampf bereits verbraucht!")
 			AudioManager.play_sfx("error")
@@ -1724,9 +1737,8 @@ func _ability_menu(h: Dictionary) -> bool:
 		match d["id"]:
 			"serena": await _ultimate_serena(h)
 			"rax": await _ultimate_rax(h)
-			_: await _ultimate_milo(h)
 		return true
-	if pick > abilities.size() + summons.size():
+	if pick >= abilities.size():  # „Zurück"
 		return false
 	var ab: Dictionary = abilities[pick]
 	if not GameState.skill_unlocked(d, ab):
@@ -1751,6 +1763,7 @@ func _ability_menu(h: Dictionary) -> bool:
 			match ab["kind"]:
 				"rocket": await _rocket_all(h, ab)
 				"nuke": await _nuke(h, ab)
+				"meteor": await _meteor_rain(h, ab)
 				"bladestorm": await _blade_storm(h, ab)
 				_: await _whirl_all(h, ab)
 			_resume_bob(h, 2.0)
@@ -3010,34 +3023,41 @@ func _nuke_sky_sequence() -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tin.finished
 	await get_tree().create_timer(0.5).timeout
-	# Die Bombe saust quer durchs Bild (mit Pfeifen und Rauchschweif).
+	# Die Bombe zieht gemächlich von oben rechts nach unten links durchs Bild.
+	# Nase zeigt in Flugrichtung (bomb-Sprite zeigt nativ nach unten → +1.27 rad).
 	var wb := Sprite2D.new()
 	wb.texture = SpriteFactory.bomb(0)
-	wb.scale = Vector2(2.8, 2.8)
-	wb.position = Vector2(-110, 170)
-	wb.rotation = 1.25
+	wb.scale = Vector2(3.0, 3.0)
+	wb.position = Vector2(1080.0, 80.0)
+	wb.rotation = 1.27
 	sky.add_child(wb)
+	# Kondensstreifen: eigenständiger Emitter (NICHT Kind der Bombe, sonst
+	# verdreht die Bombenrotation die Partikelrichtung). local_coords=false +
+	# quasi keine Startgeschwindigkeit → die Puffs bleiben als Spur liegen,
+	# während der Emitter der Bombe folgt.
 	var trail := CPUParticles2D.new()
-	trail.amount = 40
-	trail.lifetime = 0.7
+	trail.amount = 55
+	trail.lifetime = 1.1
 	trail.local_coords = false
-	trail.direction = Vector2(-1, 0)
-	trail.spread = 12.0
-	trail.gravity = Vector2.ZERO
-	trail.initial_velocity_min = 20.0
-	trail.initial_velocity_max = 40.0
-	trail.scale_amount_min = 0.15
-	trail.scale_amount_max = 0.3
-	trail.color = Color(0.9, 0.9, 0.92, 0.7)
+	trail.spread = 20.0
+	trail.gravity = Vector2(0, 6)
+	trail.initial_velocity_min = 0.0
+	trail.initial_velocity_max = 8.0
+	trail.scale_amount_min = 0.16
+	trail.scale_amount_max = 0.34
+	trail.color = Color(0.92, 0.92, 0.95, 0.7)
 	trail.texture = SpriteFactory.particle("smoke_07")
-	wb.add_child(trail)
+	trail.position = wb.position
+	sky.add_child(trail)
 	trail.emitting = true
 	AudioManager.play_sfx("whistle")
 	var fly := create_tween()
-	fly.tween_property(wb, "position", Vector2(1080.0, 400.0), 0.55) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	fly.tween_property(wb, "position", Vector2(-150.0, 470.0), 1.4)
+	fly.parallel().tween_property(trail, "position", Vector2(-150.0, 470.0), 1.4)
 	await fly.finished
-	await get_tree().create_timer(0.2).timeout
+	trail.emitting = false
+	wb.queue_free()
+	await get_tree().create_timer(0.3).timeout
 	# Schwenk zurück: der Himmel gleitet wieder hoch, das Schlachtfeld erscheint.
 	var tout := create_tween()
 	tout.tween_property(sky, "offset", Vector2(0, -540), 0.6) \
@@ -3472,13 +3492,13 @@ func _meteor_step(t: float, meteor: Sprite2D, trail: CPUParticles2D, smoke: CPUP
 	if is_instance_valid(smoke):
 		smoke.position = p
 
-## Milos Ultimative „Meteorregen“: brennende Meteore stürzen auf alle Gegner.
-func _ultimate_milo(h: Dictionary) -> void:
+## Meteorregen (Janoschs MP-Zauber): brennende Meteore stürzen auf alle Gegner.
+## Wird über die "all"-Fähigkeiten-Dispatch aufgerufen; das Bob-Wippen managt
+## dort der _pause_bob/_resume_bob-Rahmen (hier NICHT selbst anfassen).
+func _meteor_rain(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s entfesselt seine ultimative Kraft!" % d["name"])
-	if h.get("bob") != null:
-		(h["bob"] as Tween).kill()
+	_say("%s beschwört einen Meteorregen!" % d["name"])
 	var dim := _dim_world(0.55)
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
@@ -3584,14 +3604,13 @@ func _ultimate_milo(h: Dictionary) -> void:
 	s.modulate = Color.WHITE
 	for e in alive:
 		if e["alive"]:
-			var dmg: int = int((d["mag"] * 2.5 + 40) * randf_range(0.95, 1.1)) - e["def"] / 2
+			var dmg: int = int((d["mag"] * 1.4 + ab["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
 	_undim(dim)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await back.finished
-	h["bob"] = _idle_bob(s, 2.0)
 
 ## ---------- Beschwörungen (Milo): Ifrit & Leviathan ----------
 
