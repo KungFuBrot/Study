@@ -279,7 +279,7 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_snap(dir, "show_meteor_2")
 	await get_tree().create_timer(2.4).timeout
-	# Übungsgegner wiederbeleben, damit die Atombombe Ziele hat
+	# Übungsgegner wiederbeleben, damit die Nuke Ziele hat
 	for e in enemies:
 		e["alive"] = true
 		e["hp"] = 999
@@ -287,7 +287,7 @@ func _spell_showcase() -> void:
 		esp.visible = true
 		esp.material = null
 		esp.modulate = Color.WHITE
-	# Rax Atombombe zuletzt — sie reißt vermutlich alle Übungsgegner um.
+	# Rax Nuke zuletzt — sie reißt vermutlich alle Übungsgegner um.
 	_nuke(heroes[2], heroes[2]["data"]["abilities"][3])
 	await get_tree().create_timer(1.3).timeout
 	_snap(dir, "show_nuke_1")
@@ -1658,6 +1658,17 @@ func _end_defend_node(h: Dictionary) -> void:
 		ft.tween_callback(g.queue_free)
 	h["guard"] = null
 
+## Einmal-pro-Kampf-Fähigkeiten (z. B. Nuke): Nutzung je Held in h["used_once"]
+## (Array der Fähigkeitsnamen) vermerken.
+func _once_used(h: Dictionary, ab: Dictionary) -> bool:
+	return ab["name"] in h.get("used_once", [])
+
+func _mark_once_used(h: Dictionary, ab: Dictionary) -> void:
+	if not h.has("used_once"):
+		h["used_once"] = []
+	if not (ab["name"] in h["used_once"]):
+		h["used_once"].append(ab["name"])
+
 ## Untermenü: Fähigkeiten, Beschwörungen (Milo) oder die Ultimative wählen.
 func _ability_menu(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
@@ -1670,6 +1681,9 @@ func _ability_menu(h: Dictionary) -> bool:
 		if not GameState.skill_unlocked(d, ab):
 			dim.append(entries.size())
 			entries.append("%s — %s" % [ab["name"], GameState.skill_lock_hint(d, ab)])
+		elif ab.get("once", false) and _once_used(h, ab):
+			dim.append(entries.size())
+			entries.append("%s — bereits eingesetzt" % ab["name"])
 		else:
 			entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
 	for sm in summons:
@@ -1719,10 +1733,16 @@ func _ability_menu(h: Dictionary) -> bool:
 		_say("%s ist noch %s!" % [ab["name"], GameState.skill_lock_hint(d, ab)])
 		AudioManager.play_sfx("error")
 		return false
+	if ab.get("once", false) and _once_used(h, ab):
+		_say("%s ist in diesem Kampf bereits verbraucht!" % ab["name"])
+		AudioManager.play_sfx("error")
+		return false
 	if d["mp"] < ab["cost"]:
 		_say("Nicht genug MP!")
 		AudioManager.play_sfx("error")
 		return false
+	if ab.get("once", false):
+		_mark_once_used(h, ab)
 	match ab["target"]:
 		"all":
 			d["mp"] -= ab["cost"]
@@ -2837,8 +2857,9 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 			await _damage_enemy(e, maxi(dmg, 1))
 	await _sprint(h, h["home"], 0.2)
 
-## Atombombe: Rax markiert alle Ziele, ein Sprengkopf fällt pfeifend vom
-## Himmel — Weißblitz, Schockwelle, Atompilz, massiver Flächenschaden.
+## Nuke: Rax markiert alle Ziele; der Blick schwenkt in den Himmel, die Bombe
+## saust vorbei, dann zurück zum Feld — Weißblitz, Schockwelle, Atompilz mit
+## Nachrauch, massiver Flächenschaden. Nur EINMAL pro Kampf einsetzbar.
 func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
@@ -2861,7 +2882,11 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	for e in alive:
 		_crosshair(e["sprite"].position)
 	AudioManager.play_sfx("alarm")
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(0.4).timeout
+	# Kino-Einschub: Der Blick schwenkt hinauf in den Himmel (Wolken, Vögel),
+	# die Bombe saust quer durchs Bild, dann zurück zum Schlachtfeld — und der
+	# Sprengkopf stürzt auf die Gegner.
+	await _nuke_sky_sequence()
 	# Bombe fällt pfeifend und leicht taumelnd, Zünderlicht blinkt.
 	var b := Sprite2D.new()
 	b.texture = SpriteFactory.bomb(0)
@@ -2914,6 +2939,111 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	h["anim"] = "idle"
 	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
 	await _sprint(h, h["home"], 0.2)
+
+## Kino-Sequenz vor dem Nuke-Einschlag: eine eigene, NICHT vom Ambiente
+## abgedunkelte CanvasLayer (heller Tageshimmel) gleitet von oben herein (=
+## der Blick schwenkt hinauf), Wolken ziehen, Vögel flattern; die Bombe saust
+## quer durchs Bild; dann gleitet der Himmel wieder hoch (Schwenk zurück).
+func _nuke_sky_sequence() -> void:
+	var sky := CanvasLayer.new()
+	sky.layer = 20  # über Bühne UND UI
+	sky.offset = Vector2(0, -540)  # startet oberhalb, aus dem Bild geschoben
+	add_child(sky)
+	# Himmelsverlauf (kräftiges Blau oben, heller Dunst am Horizont).
+	var grad := TextureRect.new()
+	grad.texture = SpriteFactory.gradient(8, 64, Color(0.30, 0.56, 0.92), Color(0.78, 0.88, 0.98))
+	grad.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	grad.stretch_mode = TextureRect.STRETCH_SCALE
+	grad.size = Vector2(960, 540)
+	sky.add_child(grad)
+	# Dunstige Sonne oben rechts.
+	var sun := Sprite2D.new()
+	sun.texture = SpriteFactory.circle(60, Color(1.0, 0.97, 0.85, 0.85))
+	sun.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sun.position = Vector2(760, 150)
+	sun.scale = Vector2(1.4, 1.4)
+	sky.add_child(sun)
+	# Wolkenbänke ziehen träge nach rechts.
+	for c: Array in [[Vector2(180, 150), 1.4], [Vector2(520, 240), 1.8],
+			[Vector2(340, 380), 1.2], [Vector2(720, 330), 1.5]]:
+		var cloud := Node2D.new()
+		cloud.position = c[0]
+		cloud.scale = Vector2(c[1], c[1])
+		sky.add_child(cloud)
+		for off: Vector2 in [Vector2(-26, 5), Vector2(-10, -6), Vector2(6, -8),
+				Vector2(22, 0), Vector2(4, 7), Vector2(-16, 7)]:
+			var puff := Sprite2D.new()
+			puff.texture = SpriteFactory.circle(18, Color(1, 1, 1, 0.92))
+			puff.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			puff.position = off
+			puff.scale = Vector2(1.3, 0.95)
+			cloud.add_child(puff)
+		var drift := cloud.create_tween()
+		drift.tween_property(cloud, "position:x", c[0].x + 70.0, 7.0) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Vögel: schlichte Möwen-Silhouetten, flattern und ziehen durchs Bild.
+	var up := PackedVector2Array([Vector2(-8, 1), Vector2(-3, -5), Vector2(0, -1),
+		Vector2(3, -5), Vector2(8, 1)])
+	var dn := PackedVector2Array([Vector2(-8, -3), Vector2(-3, 1), Vector2(0, -2),
+		Vector2(3, 1), Vector2(8, -3)])
+	for k in 5:
+		var bird := Line2D.new()
+		bird.width = 2.2
+		bird.default_color = Color(0.16, 0.17, 0.24)
+		bird.joint_mode = Line2D.LINE_JOINT_ROUND
+		bird.points = up
+		var by := 120.0 + k * 34.0
+		bird.position = Vector2(120.0 + k * 150.0, by)
+		bird.scale = Vector2(1.0 + (k % 2) * 0.5, 1.0 + (k % 2) * 0.5)
+		sky.add_child(bird)
+		var flap := bird.create_tween().set_loops()
+		flap.tween_interval(0.24)
+		flap.tween_callback(func(): bird.points = dn)
+		flap.tween_interval(0.24)
+		flap.tween_callback(func(): bird.points = up)
+		var glide := bird.create_tween()
+		glide.tween_property(bird, "position", bird.position + Vector2(90.0, -14.0), 6.0) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Schwenk hinauf: der Himmel gleitet von oben ins Bild.
+	var tin := create_tween()
+	tin.tween_property(sky, "offset", Vector2.ZERO, 0.7) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await tin.finished
+	await get_tree().create_timer(0.5).timeout
+	# Die Bombe saust quer durchs Bild (mit Pfeifen und Rauchschweif).
+	var wb := Sprite2D.new()
+	wb.texture = SpriteFactory.bomb(0)
+	wb.scale = Vector2(2.8, 2.8)
+	wb.position = Vector2(-110, 170)
+	wb.rotation = 1.25
+	sky.add_child(wb)
+	var trail := CPUParticles2D.new()
+	trail.amount = 40
+	trail.lifetime = 0.7
+	trail.local_coords = false
+	trail.direction = Vector2(-1, 0)
+	trail.spread = 12.0
+	trail.gravity = Vector2.ZERO
+	trail.initial_velocity_min = 20.0
+	trail.initial_velocity_max = 40.0
+	trail.scale_amount_min = 0.15
+	trail.scale_amount_max = 0.3
+	trail.color = Color(0.9, 0.9, 0.92, 0.7)
+	trail.texture = SpriteFactory.particle("smoke_07")
+	wb.add_child(trail)
+	trail.emitting = true
+	AudioManager.play_sfx("whistle")
+	var fly := create_tween()
+	fly.tween_property(wb, "position", Vector2(1080.0, 400.0), 0.55) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await fly.finished
+	await get_tree().create_timer(0.2).timeout
+	# Schwenk zurück: der Himmel gleitet wieder hoch, das Schlachtfeld erscheint.
+	var tout := create_tween()
+	tout.tween_property(sky, "offset", Vector2(0, -540), 0.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await tout.finished
+	sky.queue_free()
 
 ## Atompilz: heißer Stamm wächst hoch, glühende Kappe wölbt sich auf,
 ## Glutpartikel steigen — alles additiv und selbstaufräumend.
@@ -5901,7 +6031,7 @@ func _announce_unlocked_tier() -> void:
 	var n: int = GameState.bosses_defeated_count()
 	var names := {
 		1: "Fokusstoß, Raketensalve und Ifrits Pakt",
-		2: "Klingentanz, Atombombe und Leviathans Pakt",
+		2: "Klingentanz, Nuke und Leviathans Pakt",
 		3: "Klingensturm, Plasmalanze und Bahamuts Pakt",
 	}
 	if names.has(n):
