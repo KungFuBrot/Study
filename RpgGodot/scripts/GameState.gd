@@ -95,7 +95,7 @@ const ENEMIES := {
 		"attack_line": "%s schlägt nach %s, als wäre da niemand."},
 	"boss4": {"name": "Die Stille", "hp": 860, "atk": 38, "def": 12, "gold": 0, "xp": 400, "tier": 3,
 		"sprite": "boss4", "boss": true, "theme": "void", "song": "boss4",
-		"tint": Color(0.74, 0.77, 0.83),
+		"tint": Color(0.96, 0.94, 1.0),  # neutral: das dunkle Spinnentier bleibt dunkel, Augen leuchten
 		"attack_line": "%s lässt die Leere unter %s aufreißen.",
 		"entrance_line": "Jedes Geräusch erlischt. Eine hohe graue Gestalt steht einfach da — und sieht durch euch hindurch.",
 		"intro": [

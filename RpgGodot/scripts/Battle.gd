@@ -527,8 +527,9 @@ func _build_scene() -> void:
 		var e_xp: int = int(round(def.get("xp", 0) * mul))
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
-		# Der finale Boss „Die Stille" thront deutlich größer als die übrigen.
-		var boss_sc := 9.6 if def["sprite"] == "boss4" else 7.2
+		# Der finale Boss „Die Stille" (dunkles Spinnentier) thront breit und
+		# bedrohlich über den anderen — sein Sprite ist zudem breiter angelegt.
+		var boss_sc := 7.8 if def["sprite"] == "boss4" else 7.2
 		s.scale = Vector2(boss_sc, boss_sc) if is_boss else Vector2(6.5, 6.5)
 		s.set_meta("base_scale", s.scale)
 		var home := Vector2(222, 222) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
@@ -721,7 +722,7 @@ func _attach_boss_aura(s: Sprite2D, theme: String) -> void:
 ## Gesichtsposition der Boss-Sprites (lokale Pixel, Ursprung Sprite-Mitte).
 const BOSS_FACE := {
 	"boss": Vector2(3, -3), "boss2": Vector2(3, -4), "boss3": Vector2(1, -5),
-	"boss4": Vector2(1, -5),
+	"boss4": Vector2(0, 2),  # Augencluster des Spinnentiers (Vorderkörper)
 }
 
 ## Lebenszeichen des Bosses: glimmende Augen-Glut (mit Blinzeln), giftiger
@@ -729,8 +730,13 @@ const BOSS_FACE := {
 func _attach_boss_life(s: Sprite2D, theme: String, sprite_id: String) -> void:
 	var st: Dictionary = THEME_STYLE.get(theme, THEME_STYLE["toxic"])
 	var face: Vector2 = BOSS_FACE.get(sprite_id, Vector2(2, -7))
-	# Glut in den Augenhöhlen: kleiner additiver Schein, der pulsiert
-	# und hin und wieder kurz erlischt (Blinzeln).
+	# Augen-Glut: additiver Schein, der pulsiert und ab und zu kurz erlischt
+	# (Blinzeln). Das Spinnentier (boss4) glüht kräftig ROT statt themengrau.
+	var eye_rgb: Color = st["ember"]
+	var eye_wide := 1.4
+	if sprite_id == "boss4":
+		eye_rgb = Color(1.0, 0.12, 0.08)
+		eye_wide = 2.1  # breiter Schein über dem ganzen Augencluster
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	var eyes := Sprite2D.new()
@@ -738,8 +744,8 @@ func _attach_boss_life(s: Sprite2D, theme: String, sprite_id: String) -> void:
 	eyes.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	eyes.material = mat
 	eyes.position = face
-	eyes.scale = Vector2(1.4, 0.7)
-	eyes.modulate = Color(st["ember"].r, st["ember"].g, st["ember"].b, 0.55)
+	eyes.scale = Vector2(eye_wide, 0.7)
+	eyes.modulate = Color(eye_rgb.r, eye_rgb.g, eye_rgb.b, 0.6)
 	s.add_child(eyes)
 	s.set_meta("eyes", eyes)
 	var pulse := eyes.create_tween().set_loops()
@@ -5317,8 +5323,8 @@ func _boss4_phase(e: Dictionary) -> void:
 	if es.has_meta("eyes") and is_instance_valid(es.get_meta("eyes")):
 		var ey: Sprite2D = es.get_meta("eyes")
 		var et := create_tween()
-		et.tween_property(ey, "modulate", Color(1.6, 1.7, 2.0, 1.0), 0.3)
-		et.parallel().tween_property(ey, "scale", Vector2(2.0, 1.0), 0.3)
+		et.tween_property(ey, "modulate", Color(2.0, 0.25, 0.18, 1.0), 0.3)  # Augen lodern rot auf
+		et.parallel().tween_property(ey, "scale", Vector2(2.6, 1.0), 0.3)
 	# Splitter saugen einwärts — die Leere zieht sich enger um die Gestalt.
 	var vmat := CanvasItemMaterial.new()
 	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD

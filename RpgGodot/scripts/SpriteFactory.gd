@@ -173,6 +173,26 @@ static func _img(w: int, h: int, base := Color(0, 0, 0, 0)) -> Image:
 	img.fill(base)
 	return img
 
+## Gefüllte Ellipse (für rundliche Körper wie den Spinnenleib).
+static func _fill_ellipse(img: Image, ecx: int, ecy: int, rx: int, ry: int, col: Color) -> void:
+	var w := img.get_width(); var h := img.get_height()
+	for y in range(maxi(ecy - ry, 0), mini(ecy + ry + 1, h)):
+		for x in range(maxi(ecx - rx, 0), mini(ecx + rx + 1, w)):
+			var dx := float(x - ecx) / float(rx)
+			var dy := float(y - ecy) / float(ry)
+			if dx * dx + dy * dy <= 1.0:
+				img.set_pixel(x, y, col)
+
+## Dünne Linie zwischen zwei Punkten (Beine); zeichnet 1px, lückenlos.
+static func _thick_line(img: Image, a: Vector2, b: Vector2, col: Color) -> void:
+	var w := img.get_width(); var h := img.get_height()
+	var steps := int(ceil(a.distance_to(b)))
+	for i in steps + 1:
+		var p := a.lerp(b, float(i) / float(maxi(steps, 1)))
+		var x := int(round(p.x)); var y := int(round(p.y))
+		if x >= 0 and x < w and y >= 0 and y < h:
+			img.set_pixel(x, y, col)
+
 # Deterministisches Rauschen, damit Tiles lebendig, aber stabil aussehen.
 static func _n(x: int, y: int, seed_: int) -> float:
 	var h := (x * 374761393 + y * 668265263 + seed_ * 1274126177) & 0x7fffffff
@@ -1087,6 +1107,73 @@ static func bahamut(frame: int) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## Endboss „Die Stille" als dunkles Spinnentier mit rot glühenden Augen.
+## Frontal zum Betrachter aufgerichtet: großer Hinterleib oben, Vorderkörper
+## unten mit acht roten Augen und Fängen; acht geknickte Beine spreizen sich.
+## 4 Frames = leichtes Zucken der Beine (Bewegungsanimation). Der zusätzliche
+## additive Augen-Glimmer kommt im Kampf über _attach_boss_life obendrauf.
+static func spider_boss(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "spider_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var w := 46; var h := 40; var cx := 23
+	var img := _img(w, h)
+	var dark := Color(0.09, 0.08, 0.11)
+	var mid := Color(0.16, 0.14, 0.19)
+	var edge := Color(0.27, 0.23, 0.31)
+	var legd := Color(0.07, 0.06, 0.09)
+	var legj := Color(0.22, 0.17, 0.26)
+	var eyer := Color(1.0, 0.13, 0.10)
+	var eyeh := Color(1.0, 0.62, 0.45)
+	var fang := Color(0.46, 0.42, 0.48)
+	var mark := Color(0.42, 0.05, 0.07)
+	var flap: int = [0, -1, -2, -1][f]
+	# --- Acht geknickte Beine (hinter dem Körper) ---
+	var base_y := [19, 21, 24, 27]
+	var knee_dx := [10, 15, 18, 16]
+	var knee_dy := [-9, -7, -3, 1]
+	var foot_dx := [14, 19, 21, 18]
+	var foot_dy := [10, 12, 10, 7]
+	for side: int in [-1, 1]:
+		for i in 4:
+			var base := Vector2(cx + side * 5, base_y[i])
+			var knee := Vector2(cx + side * knee_dx[i], base_y[i] + knee_dy[i] + flap)
+			var foot := Vector2(cx + side * foot_dx[i], base_y[i] + foot_dy[i])
+			_thick_line(img, base, knee, legd)
+			_thick_line(img, knee, foot, legd)
+			if knee.x >= 0 and knee.x < w and knee.y >= 0 and knee.y < h:
+				img.set_pixel(int(knee.x), int(knee.y), legj)  # Gelenk
+	# --- Hinterleib (großer Bulb oben) ---
+	_fill_ellipse(img, cx, 12, 12, 10, dark)
+	_fill_ellipse(img, cx, 10, 9, 7, mid)  # oberer Schimmer
+	img.set_pixel(cx - 5, 6, edge); img.set_pixel(cx + 4, 6, edge)
+	# Dunkelrote Sanduhr-Markierung (schmal in der Mitte, breit an den Enden)
+	for my in range(6, 18):
+		var half: int = 1 + absi(11 - my) / 2
+		for mx in range(cx - half, cx + half + 1):
+			img.set_pixel(mx, my, mark)
+	# --- Vorderkörper/Kopf (unten, dem Betrachter zu) ---
+	_fill_ellipse(img, cx, 24, 9, 7, dark)
+	_fill_ellipse(img, cx, 23, 6, 4, mid)
+	# --- Acht rot glühende Augen ---
+	var main_eyes := [Vector2(cx - 4, 22), Vector2(cx + 3, 22)]
+	for e: Vector2 in main_eyes:
+		img.fill_rect(Rect2i(int(e.x), int(e.y), 2, 2), eyer)
+		img.set_pixel(int(e.x), int(e.y), eyeh)
+	for e: Vector2 in [Vector2(cx - 6, 20), Vector2(cx - 1, 19), Vector2(cx + 2, 19),
+			Vector2(cx + 6, 20), Vector2(cx - 7, 24), Vector2(cx + 7, 24)]:
+		img.set_pixel(int(e.x), int(e.y), eyer)
+	# --- Cheliceren/Fänge (unten, nach innen gebogen) ---
+	for side: int in [-1, 1]:
+		var fxb := cx + side * 3
+		img.fill_rect(Rect2i(fxb - (1 if side < 0 else 0), 28, 2, 3), dark)
+		img.set_pixel(fxb, 31, fang)  # heller Fangzahn-Spitz
+	img.set_pixel(cx - 5, 28, legj); img.set_pixel(cx + 5, 28, legj)  # Pedipalpen
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
 ## ---------- Gegner (String-Pixel-Art) ----------
 
 const ENEMY_ART := {
@@ -1430,6 +1517,9 @@ static func enemy_has_anim(id: String) -> bool:
 	return MON_DTII.has(id)
 
 static func enemy_frame(id: String, frame: int) -> Texture2D:
+	# Der Endboss ist ein eigens gezeichnetes Spinnentier statt eines DTII-Frames.
+	if id == "boss4":
+		return spider_boss(frame)
 	var def: Dictionary = MON_DTII.get(id, MON_DTII["schlammschleim"])
 	return dtii("%s_f%d" % [def["anim"], frame % ENEMY_FRAMES])
 
