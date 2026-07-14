@@ -21,6 +21,8 @@ var flame: Sprite2D
 var help_panel: PanelContainer
 var settings_panel: PanelContainer
 var pad_label: Label
+var debug_label: Label
+var settings_index := 0
 var ui: CanvasLayer
 var _locked := false
 
@@ -323,8 +325,12 @@ func _build_ui() -> void:
 	pad_label.add_theme_font_size_override("font_size", 18)
 	pad_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(pad_label)
+	debug_label = Label.new()
+	debug_label.add_theme_font_size_override("font_size", 18)
+	debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(debug_label)
 	var shint := Label.new()
-	shint.text = "Z: Umschalten   ·   X: Zurück"
+	shint.text = "↑↓: Wählen   ·   Z: Umschalten   ·   X: Zurück"
 	shint.add_theme_font_size_override("font_size", 15)
 	shint.add_theme_color_override("font_color", Color(0.75, 0.75, 0.9))
 	shint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -335,14 +341,25 @@ func _build_ui() -> void:
 	shint2.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
 	shint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(shint2)
-	_refresh_pad_label()
+	var shint3 := Label.new()
+	shint3.text = "Debug-Modus: alle Fähigkeiten und Dungeons sofort verfügbar"
+	shint3.add_theme_font_size_override("font_size", 13)
+	shint3.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
+	shint3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(shint3)
+	_refresh_settings_labels()
 	settings_panel.visible = false
 	ui.add_child(settings_panel)
 
-func _refresh_pad_label() -> void:
-	pad_label.text = "Bildschirm-Tasten (Pad):  %s" % ("AN" if GameState.touch_pad else "AUS")
+func _refresh_settings_labels() -> void:
+	var pcur := "> " if settings_index == 0 else "   "
+	pad_label.text = "%sBildschirm-Tasten (Pad):  %s" % [pcur, "AN" if GameState.touch_pad else "AUS"]
 	pad_label.add_theme_color_override("font_color",
 		Color(0.55, 1.0, 0.6) if GameState.touch_pad else Color(1.0, 0.55, 0.5))
+	var dcur := "> " if settings_index == 1 else "   "
+	debug_label.text = "%sDebug-Modus:  %s" % [dcur, "AN" if GameState.debug_mode else "AUS"]
+	debug_label.add_theme_color_override("font_color",
+		Color(0.55, 1.0, 0.6) if GameState.debug_mode else Color(1.0, 0.55, 0.5))
 
 func _label(text: String, size: int, color: Color, y: float) -> Label:
 	var l := Label.new()
@@ -374,11 +391,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			help_panel.visible = false
 		return
 	if settings_panel.visible:
-		if event.is_action_pressed("confirm"):
-			# Bildschirm-Tasten umschalten (wird sofort angewendet + gespeichert)
+		if event.is_action_pressed("move_up") or event.is_action_pressed("move_down"):
+			AudioManager.play_sfx("menu")
+			settings_index = (settings_index + 1) % 2
+			_refresh_settings_labels()
+		elif event.is_action_pressed("confirm"):
+			# Ausgewählte Einstellung umschalten (sofort angewendet + gespeichert)
 			AudioManager.play_sfx("buy")
-			GameState.set_touch_pad(not GameState.touch_pad)
-			_refresh_pad_label()
+			if settings_index == 0:
+				GameState.set_touch_pad(not GameState.touch_pad)
+			else:
+				GameState.set_debug_mode(not GameState.debug_mode)
+			_refresh_settings_labels()
 		elif event.is_action_pressed("cancel"):
 			AudioManager.play_sfx("menu")
 			settings_panel.visible = false
@@ -402,5 +426,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				help_panel.visible = true
 			2:
 				AudioManager.play_sfx("menu")
-				_refresh_pad_label()
+				settings_index = 0
+				_refresh_settings_labels()
 				settings_panel.visible = true

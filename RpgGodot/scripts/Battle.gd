@@ -511,22 +511,20 @@ func _build_scene() -> void:
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false,
 			"frame": 0, "weapon": wp, "anim": "idle"})
 
-	# Gegner-Skalierung: normale Monster werden mit jedem bereits erledigten
-	# Dungeon (= gefallener Boss) stärker, damit die Herausforderung unabhängig
-	# von der gewählten Reihenfolge mitwächst. Bosse behalten ihre festen Werte.
-	var scale_n := GameState.bosses_defeated_count()
-	var hp_mul := 1.0 + 0.42 * scale_n
-	var atk_mul := 1.0 + 0.30 * scale_n
-	var def_mul := 1.0 + 0.22 * scale_n
-	var loot_mul := 1.0 + 0.5 * scale_n
+	# Gegner-Skalierung: Am Anfang sind alle Dungeons gleich schwer — die höheren
+	# Grundwerte der späteren Dungeons werden über ihre `tier`-Stufe aufs
+	# Einstiegsniveau normiert. Mit jedem erledigten Dungeon wachsen die noch
+	# offenen Dungeons mit (GameState.enemy_multiplier), egal in welcher
+	# Reihenfolge man vorgeht. Boss inklusive, damit auch er mitskaliert.
 	for i in enemy_ids.size():
 		var def: Dictionary = GameState.ENEMIES[enemy_ids[i]]
 		var is_boss: bool = def.get("boss", false)
-		var e_hp: int = def["hp"] if is_boss else int(round(def["hp"] * hp_mul))
-		var e_atk: int = def["atk"] if is_boss else int(round(def["atk"] * atk_mul))
-		var e_def: int = def["def"] if is_boss else int(round(def["def"] * def_mul))
-		var e_gold: int = def["gold"] if is_boss else int(round(def["gold"] * loot_mul))
-		var e_xp: int = def.get("xp", 0) if is_boss else int(round(def.get("xp", 0) * loot_mul))
+		var mul := GameState.enemy_multiplier(def.get("tier", 0))
+		var e_hp: int = int(round(def["hp"] * mul))
+		var e_atk: int = int(round(def["atk"] * mul))
+		var e_def: int = int(round(def["def"] * mul))
+		var e_gold: int = int(round(def["gold"] * mul))
+		var e_xp: int = int(round(def.get("xp", 0) * mul))
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.enemy(def["sprite"])
 		# Der finale Boss „Die Stille" thront deutlich größer als die übrigen.
@@ -3876,60 +3874,6 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 
 ## Draconische Silhouette für Bahamut: dunkler Körper mit Schwingen, glühender
 ## Kern und Augen (alles additiv). Gibt den Wurzelknoten zurück.
-func _bahamut_body(sc: float) -> Node2D:
-	var root := Node2D.new()
-	var dark := Color(0.10, 0.08, 0.14)
-	var rim := Color(0.55, 0.30, 0.12)
-	# Schwingen (zwei große, gezackte Flügel)
-	for side: int in [-1, 1]:
-		var wing := Polygon2D.new()
-		wing.polygon = PackedVector2Array([Vector2(0, -6), Vector2(side * 60, -34),
-			Vector2(side * 78, -6), Vector2(side * 66, 6), Vector2(side * 44, 2),
-			Vector2(side * 30, 18), Vector2(side * 20, 4)])
-		wing.color = dark
-		root.add_child(wing)
-		var edge := Line2D.new()
-		edge.points = wing.polygon
-		edge.width = 1.6
-		edge.default_color = rim
-		edge.closed = true
-		root.add_child(edge)
-	# Körper (Rumpf + Hals + Kopf)
-	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([Vector2(-12, 8), Vector2(-6, -10),
-		Vector2(6, -14), Vector2(12, -26), Vector2(20, -30), Vector2(16, -18),
-		Vector2(10, -8), Vector2(12, 10), Vector2(0, 22)])
-	body.color = dark
-	root.add_child(body)
-	var bedge := Line2D.new()
-	bedge.points = body.polygon
-	bedge.width = 1.6
-	bedge.default_color = rim
-	bedge.closed = true
-	root.add_child(bedge)
-	# Glühender Brustkern (additiv, pulsiert)
-	var mat := CanvasItemMaterial.new()
-	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	var core := Sprite2D.new()
-	core.texture = SpriteFactory.particle("light_01")
-	core.material = mat
-	core.scale = Vector2(0.5, 0.5)
-	core.modulate = Color(1.0, 0.65, 0.25)
-	core.position = Vector2(2, -2)
-	root.add_child(core)
-	var pc := core.create_tween().set_loops()
-	pc.tween_property(core, "scale", Vector2(0.7, 0.7), 0.5).set_trans(Tween.TRANS_SINE)
-	pc.tween_property(core, "scale", Vector2(0.5, 0.5), 0.5).set_trans(Tween.TRANS_SINE)
-	# Glühende Augen
-	for ex: float in [16.0, 21.0]:
-		var eye := Sprite2D.new()
-		eye.texture = SpriteFactory.circle(2, Color(1.0, 0.85, 0.4))
-		eye.material = mat
-		eye.position = Vector2(ex, -24)
-		root.add_child(eye)
-	root.scale = Vector2(sc, sc)
-	return root
-
 ## Bahamut (Milos 3. Beschwörung, nach dem 3. Bosssieg): Der Drachenkönig fährt
 ## über dem Gegnerfeld herab, lädt am Maul die „Megaflare" und entlädt einen
 ## gewaltigen Strahl über die gesamte Reihe. Milos stärkste Beschwörung.
@@ -3956,21 +3900,39 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	# Drache fährt aus einem Portal hoch über dem Gegnerfeld herein.
 	var origin := Vector2(250, -40)
 	_summon_portal(Vector2(250, 90), gold)
-	var drag := _bahamut_body(3.4)
+	var bsc := 3.4
+	var drag := Sprite2D.new()
+	drag.texture = SpriteFactory.bahamut(0)
 	drag.position = origin
+	drag.scale = Vector2(bsc, bsc)
 	drag.z_index = 6
 	add_child(drag)
+	# Flügelschlag-Frames werden lebendig getickt (Bewegungsanimation).
+	var bfr := [0]
+	var btick := Timer.new()
+	btick.wait_time = 0.13
+	btick.autostart = true
+	drag.add_child(btick)
+	btick.timeout.connect(func():
+		bfr[0] += 1
+		drag.texture = SpriteFactory.bahamut(bfr[0]))
+	# Drachenpräsenz beleuchtet das Feld (Kind → skaliert mit dem Sprite).
+	var blight := Fx.point_light(Color(1.0, 0.7, 0.3), 62.0, 1.2)
+	drag.add_child(blight)
+	Fx.flicker(blight, 1.2)
 	AudioManager.play_sfx("roar")
 	var descend := drag.create_tween()
-	descend.tween_property(drag, "position:y", 120.0, 0.7) \
+	descend.tween_property(drag, "position:y", 100.0, 0.7) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	await descend.finished
 	_shake_camera(1.2)
-	# Flügelschlag-Wippen, während sich die Megaflare am Maul auflädt.
+	# Sanftes Schweben, während sich die Megaflare am Maul auflädt.
 	var hover := drag.create_tween().set_loops()
-	hover.tween_property(drag, "position:y", 108.0, 0.6).set_trans(Tween.TRANS_SINE)
-	hover.tween_property(drag, "position:y", 120.0, 0.6).set_trans(Tween.TRANS_SINE)
-	var maw := Vector2(250, 120) + Vector2(20, -24) * 3.4
+	hover.tween_property(drag, "position:y", 92.0, 0.6).set_trans(Tween.TRANS_SINE)
+	hover.tween_property(drag, "position:y", 104.0, 0.6).set_trans(Tween.TRANS_SINE)
+	# Fixer Ursprungspunkt des Strahls am Maul — bobbt bewusst NICHT mit,
+	# damit der Schwenk sich sauber nur am unteren Ende auffächert.
+	var maw := Vector2(250.0, 100.0 + 20.0 * bsc)
 	var cmat := CanvasItemMaterial.new()
 	cmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	var orb := Sprite2D.new()
@@ -4008,21 +3970,23 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
+	# Strahl entspringt am Maul (position = maw) und reicht weit übers Feld
+	# hinaus, damit er auch im geschwenkten Zustand voll deckt.
 	var beam := Polygon2D.new()
-	beam.polygon = PackedVector2Array([Vector2(-18, 0), Vector2(18, 0),
-		Vector2(150, 520), Vector2(-150, 520)])
+	beam.polygon = PackedVector2Array([Vector2(-16, 0), Vector2(16, 0),
+		Vector2(120, 600), Vector2(-120, 600)])
 	beam.color = Color(1.0, 0.9, 0.6, 0.0)
 	beam.position = maw
 	beam.material = cmat
 	beam.z_index = 7
 	add_child(beam)
 	var core_beam := Polygon2D.new()
-	core_beam.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0),
-		Vector2(70, 520), Vector2(-70, 520)])
+	core_beam.polygon = PackedVector2Array([Vector2(-6, 0), Vector2(6, 0),
+		Vector2(52, 600), Vector2(-52, 600)])
 	core_beam.color = Color(1, 1, 1, 0.0)
 	core_beam.position = maw
 	core_beam.material = cmat
-	core_beam.z_index = 7
+	core_beam.z_index = 8
 	add_child(core_beam)
 	AudioManager.play_sfx("bigboom")
 	_flash_screen(Color(1.0, 0.92, 0.7, 0.6))
@@ -4032,18 +3996,28 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	bt.tween_property(beam, "color:a", 0.85, 0.12)
 	bt.parallel().tween_property(core_beam, "color:a", 0.95, 0.12)
 	var orb_fade := orb.create_tween()
-	orb_fade.tween_property(orb, "scale", Vector2(1.6, 1.6), 0.12)
-	orb_fade.parallel().tween_property(orb, "modulate:a", 0.0, 0.5)
+	orb_fade.tween_property(orb, "scale", Vector2(1.7, 1.7), 0.12)
+	orb_fade.parallel().tween_property(orb, "modulate:a", 0.0, 0.6)
 	orb_fade.tween_callback(orb.queue_free)
-	_shockwave(Vector2(300, 300))
+	_shockwave(Vector2(maw.x, maw.y + 120.0))
+	# Nach dem Auflösen fegt der Strahl um seinen fixen Ursprung leicht nach
+	# rechts und links — nur das ferne Ende wandert, das Maul bleibt fix.
+	var sweep := create_tween()
+	sweep.tween_property(beam, "rotation", 0.14, 0.30).set_trans(Tween.TRANS_SINE)
+	sweep.parallel().tween_property(core_beam, "rotation", 0.14, 0.30).set_trans(Tween.TRANS_SINE)
+	sweep.tween_property(beam, "rotation", -0.14, 0.52).set_trans(Tween.TRANS_SINE)
+	sweep.parallel().tween_property(core_beam, "rotation", -0.14, 0.52).set_trans(Tween.TRANS_SINE)
+	sweep.tween_property(beam, "rotation", 0.0, 0.30).set_trans(Tween.TRANS_SINE)
+	sweep.parallel().tween_property(core_beam, "rotation", 0.0, 0.30).set_trans(Tween.TRANS_SINE)
 	await _hitstop(0.18)
+	# Schaden trifft, während der Strahl über die Gegner hinwegfegt.
 	for e in alive:
 		if e["alive"]:
 			_burst(e["sprite"].position, Color(1.0, 0.9, 0.6), 18, 200)
 			var dmg: int = int((d["mag"] * 2.1 + sm["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
+	await sweep.finished
 	var bfade := beam.create_tween()
-	bfade.tween_interval(0.15)
 	bfade.tween_property(beam, "color:a", 0.0, 0.4)
 	bfade.parallel().tween_property(core_beam, "color:a", 0.0, 0.4)
 	bfade.tween_callback(beam.queue_free)

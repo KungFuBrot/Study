@@ -22,16 +22,16 @@ const ITEMS := {
 # "tint" färbt das Sprite im Kampf, "attack_line" ersetzt den Standard-Angriffstext.
 const ENEMIES := {
 	# --- Schlotwerk: die Umweltverschmutzer ---
-	"schlammschleim": {"name": "Schlammschleim", "hp": 26, "atk": 7, "def": 2,
+	"schlammschleim": {"name": "Schlammschleim", "hp": 26, "atk": 7, "def": 2, "tier": 0,
 		"gold": 8, "xp": 7, "sprite": "schlammschleim", "proj": "sludge",
 		"attack_line": "%s spuckt Giftschlamm auf %s!"},
-	"qualmgeist": {"name": "Qualmgeist", "hp": 20, "atk": 9, "def": 1,
+	"qualmgeist": {"name": "Qualmgeist", "hp": 20, "atk": 9, "def": 1, "tier": 0,
 		"gold": 10, "xp": 8, "sprite": "qualmgeist", "proj": "smog",
 		"attack_line": "%s hüllt %s in beißenden Qualm!"},
-	"muellgnom": {"name": "Müllgnom", "hp": 40, "atk": 11, "def": 4,
+	"muellgnom": {"name": "Müllgnom", "hp": 40, "atk": 11, "def": 4, "tier": 0,
 		"gold": 18, "xp": 15, "sprite": "muellgnom",
 		"attack_line": "%s wirft sich mit rostigem Schrott auf %s!"},
-	"boss": {"name": "Schlotbaron", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130,
+	"boss": {"name": "Schlotbaron", "hp": 450, "atk": 20, "def": 6, "gold": 500, "xp": 130, "tier": 0,
 		"sprite": "boss", "boss": true, "theme": "toxic", "song": "boss",
 		"entrance_line": "Der Schlamm brodelt — etwas Riesiges wälzt sich empor!",
 		"intro": [
@@ -41,17 +41,17 @@ const ENEMIES := {
 		],
 		"aoe_name": "Giftflut", "ultimate_name": "Schwarzer Himmel"},
 	# --- Konzernturm: die Kapitalisten ---
-	"gierschlund": {"name": "Gierschlund", "hp": 55, "atk": 18, "def": 5,
+	"gierschlund": {"name": "Gierschlund", "hp": 55, "atk": 18, "def": 5, "tier": 1,
 		"gold": 30, "xp": 22, "sprite": "gierschlund", "proj": "coin",
 		"tint": Color(1.2, 1.05, 0.6),
 		"attack_line": "%s schleudert glühende Münzen auf %s!"},
-	"paragraphengeist": {"name": "Paragraphengeist", "hp": 48, "atk": 20, "def": 3,
+	"paragraphengeist": {"name": "Paragraphengeist", "hp": 48, "atk": 20, "def": 3, "tier": 1,
 		"gold": 34, "xp": 24, "sprite": "paragraphengeist", "proj": "page",
 		"attack_line": "%s wirft %s eine Abmahnung an den Kopf!"},
-	"zinshund": {"name": "Zinshund", "hp": 58, "atk": 17, "def": 6,
+	"zinshund": {"name": "Zinshund", "hp": 58, "atk": 17, "def": 6, "tier": 1,
 		"gold": 36, "xp": 23, "sprite": "zinshund", "tint": Color(1.15, 1.0, 0.65),
 		"attack_line": "%s treibt bei %s Schulden ein!"},
-	"boss2": {"name": "Monopolfürst", "hp": 560, "atk": 26, "def": 8, "gold": 1200, "xp": 190,
+	"boss2": {"name": "Monopolfürst", "hp": 560, "atk": 26, "def": 8, "gold": 1200, "xp": 190, "tier": 1,
 		"sprite": "boss2", "boss": true, "theme": "gold", "song": "boss2",
 		"entrance_line": "Goldstaub rieselt — die Chefetage fährt persönlich herab!",
 		"intro": [
@@ -61,20 +61,20 @@ const ENEMIES := {
 		],
 		"aoe_name": "Münzhagel", "ultimate_name": "Feindliche Übernahme"},
 	# --- Hassfestung: die Rassisten und Nationalisten ---
-	"hetzer": {"name": "Hetzer", "hp": 72, "atk": 25, "def": 6,
+	"hetzer": {"name": "Hetzer", "hp": 72, "atk": 25, "def": 6, "tier": 2,
 		"gold": 30, "xp": 34, "sprite": "hetzer", "proj": "hate",
 		"attack_line": "%s bewirft %s mit giftigen Parolen!"},
-	"wutgeist": {"name": "Wutgeist", "hp": 60, "atk": 28, "def": 4,
+	"wutgeist": {"name": "Wutgeist", "hp": 60, "atk": 28, "def": 4, "tier": 2,
 		"gold": 28, "xp": 36, "sprite": "wutgeist", "tint": Color(1.35, 0.62, 0.62),
 		"attack_line": "%s stürzt sich blind vor Wut auf %s!"},
-	"schlaeger": {"name": "Schläger", "hp": 88, "atk": 26, "def": 9,
+	"schlaeger": {"name": "Schläger", "hp": 88, "atk": 26, "def": 9, "tier": 2,
 		"gold": 34, "xp": 40, "sprite": "schlaeger",
 		"attack_line": "%s holt zum brutalen Schlag gegen %s aus!"},
-	"hassprediger": {"name": "Hassprediger", "hp": 66, "atk": 30, "def": 5,
+	"hassprediger": {"name": "Hassprediger", "hp": 66, "atk": 30, "def": 5, "tier": 2,
 		"gold": 36, "xp": 42, "sprite": "hassprediger", "proj": "hate",
 		"tint": Color(1.15, 0.8, 0.8),
 		"attack_line": "%s schleudert %s einen Fluch aus Hass entgegen!"},
-	"boss3": {"name": "Der Spalter", "hp": 680, "atk": 33, "def": 10, "gold": 900, "xp": 280,
+	"boss3": {"name": "Der Spalter", "hp": 680, "atk": 33, "def": 10, "gold": 900, "xp": 280, "tier": 2,
 		"sprite": "boss3", "boss": true, "theme": "hate", "song": "boss3",
 		"entrance_line": "Die Glut verdichtet sich zu einem Schatten — er nimmt Gestalt an!",
 		"intro": [
@@ -84,16 +84,16 @@ const ENEMIES := {
 		],
 		"aoe_name": "Hasstirade", "ultimate_name": "Mauer des Hasses"},
 	# --- Die Leere: keine Emotionen, Einsamkeit, Gleichgültigkeit ---
-	"hohlgaenger": {"name": "Hohlgänger", "hp": 96, "atk": 30, "def": 8,
+	"hohlgaenger": {"name": "Hohlgänger", "hp": 96, "atk": 30, "def": 8, "tier": 3,
 		"gold": 40, "xp": 48, "sprite": "hohlgaenger", "tint": Color(0.72, 0.74, 0.80),
 		"attack_line": "%s greift %s an, ganz ohne Regung."},
-	"grauschemen": {"name": "Grauschemen", "hp": 84, "atk": 33, "def": 6,
+	"grauschemen": {"name": "Grauschemen", "hp": 84, "atk": 33, "def": 6, "tier": 3,
 		"gold": 42, "xp": 50, "sprite": "grauschemen", "tint": Color(0.70, 0.76, 0.82),
 		"attack_line": "%s streift %s mit eisiger Gleichgültigkeit."},
-	"namenlose": {"name": "Der Namenlose", "hp": 110, "atk": 31, "def": 11,
+	"namenlose": {"name": "Der Namenlose", "hp": 110, "atk": 31, "def": 11, "tier": 3,
 		"gold": 44, "xp": 54, "sprite": "namenlose", "tint": Color(0.68, 0.70, 0.74),
 		"attack_line": "%s schlägt nach %s, als wäre da niemand."},
-	"boss4": {"name": "Die Stille", "hp": 860, "atk": 38, "def": 12, "gold": 0, "xp": 400,
+	"boss4": {"name": "Die Stille", "hp": 860, "atk": 38, "def": 12, "gold": 0, "xp": 400, "tier": 3,
 		"sprite": "boss4", "boss": true, "theme": "void", "song": "boss4",
 		"tint": Color(0.74, 0.77, 0.83),
 		"attack_line": "%s lässt die Leere unter %s aufreißen.",
@@ -140,6 +140,7 @@ const ENCOUNTERS := {
 
 ## Nutzer-Einstellungen (überleben Neustarts via user://settings.cfg).
 var touch_pad := true  # Bildschirm-Tasten (D-Pad) anzeigen — Standard: an
+var debug_mode := false  # schaltet alle Fähigkeiten und Dungeons frei — Standard: aus
 
 func _ready() -> void:
 	_load_settings()
@@ -149,16 +150,26 @@ func _load_settings() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load("user://settings.cfg") == OK:
 		touch_pad = cfg.get_value("input", "touch_pad", true)
+		debug_mode = cfg.get_value("debug", "enabled", false)
+
+func _save_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")  # bestehende Werte bewahren
+	cfg.set_value("input", "touch_pad", touch_pad)
+	cfg.set_value("debug", "enabled", debug_mode)
+	cfg.save("user://settings.cfg")
 
 func set_touch_pad(value: bool) -> void:
 	touch_pad = value
-	var cfg := ConfigFile.new()
-	cfg.set_value("input", "touch_pad", value)
-	cfg.save("user://settings.cfg")
+	_save_settings()
 	if main != null:
 		var t: Variant = main.get("touch")
 		if t != null and is_instance_valid(t):
 			t.apply_setting()
+
+func set_debug_mode(value: bool) -> void:
+	debug_mode = value
+	_save_settings()
 
 ## Kompletter Neustart (nach dem Abspann): alles zurück auf Anfang.
 func reset_all() -> void:
@@ -172,6 +183,8 @@ func reset_all() -> void:
 ## Portal-Sperre: einfache Boss-Flags werden direkt gelesen; der Sonderfall
 ## „all_bosses" verlangt, dass alle drei Plagen gefallen sind (öffnet Die Leere).
 func is_unlocked(flag: String) -> bool:
+	if debug_mode:
+		return true
 	if flag == "all_bosses":
 		return boss_defeated and boss2_defeated and boss3_defeated
 	return get(flag)
@@ -359,7 +372,21 @@ func bosses_defeated_count() -> int:
 	if boss3_defeated: c += 1
 	return c
 
+## ---------- Gegner-Skalierung ----------
+## Am Anfang sind ALLE Dungeon-Gegner gleich stark: die von Haus aus höheren
+## Grundwerte der späteren Dungeons werden über ihre Stufe (`tier`) wieder auf
+## das Einstiegsniveau normiert. Mit jedem besiegten Dungeon wächst der Wert
+## der noch offenen Dungeons — egal, in welcher Reihenfolge man vorgeht.
+const _TIER_BASE := [1.0, 1.9, 2.5, 3.4]  # native Stärke je Herkunfts-Dungeon
+const _DUNGEON_GROWTH := 0.75  # Zuwachs je bereits erledigtem Dungeon
+
+func enemy_multiplier(tier: int) -> float:
+	var growth := 1.0 + _DUNGEON_GROWTH * float(bosses_defeated_count())
+	return growth / _TIER_BASE[clampi(tier, 0, 3)]
+
 func skill_unlocked(member: Dictionary, ab: Dictionary) -> bool:
+	if debug_mode:
+		return true
 	if member.get("level", 1) < ab.get("unlock_level", 0):
 		return false
 	return bosses_defeated_count() >= ab.get("unlock_bosses", 0)

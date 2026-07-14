@@ -1010,6 +1010,83 @@ static func leviathan_tail(frame: int) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## Bahamut, Janoschs stärkste Beschwörung (3. Bosssieg): der Drachenkönig
+## schwebt über dem Gegnerfeld und speit die „Megaflare" nach UNTEN. Darum
+## blickt er zum Betrachter herab — Kopf/Maul zeigen nach unten (Strahl-
+## Ursprung), die Schwingen spannen nach oben-außen und schlagen pro Frame.
+const BAHA_PAL := {
+	"dark": Color(0.18, 0.14, 0.10), "mid": Color(0.32, 0.24, 0.14),
+	"lite": Color(0.60, 0.44, 0.22), "memb": Color(0.26, 0.13, 0.11),
+	"memb2": Color(0.46, 0.25, 0.15), "bone": Color(0.86, 0.80, 0.58),
+	"hot": Color(1.0, 0.86, 0.42), "ember": Color(1.0, 0.5, 0.16),
+}
+
+static func bahamut(frame: int) -> Texture2D:
+	var f := frame % 4
+	var key := "bahamut_%d" % f
+	if _cache.has(key):
+		return _cache[key]
+	var p := BAHA_PAL
+	var dark: Color = p["dark"]; var mid: Color = p["mid"]; var lite: Color = p["lite"]
+	var memb: Color = p["memb"]; var memb2: Color = p["memb2"]; var bone: Color = p["bone"]
+	var hot: Color = p["hot"]; var ember: Color = p["ember"]
+	var img := _img(52, 48)
+	var cx := 26
+	var flap: int = [0, -4, -6, -3][f]  # Flügelspitzen heben und senken sich
+	# --- Schwingen (hinter dem Körper, symmetrisch gefüllt) ---
+	for side: int in [-1, 1]:
+		var sx := cx + side * 5       # Schulteransatz
+		var span := 25               # Spannweite nach außen
+		for step in range(span + 1):
+			var t := float(step) / float(span)
+			var x := sx + side * step
+			if x < 0 or x > 51:
+				continue
+			# Vorderkante hebt sich nach außen (verstärkt durch den Flügelschlag)
+			var top_y := int(round(lerp(16.0, 8.0 + flap, t)))
+			# Hinterkante fällt ab und ist leicht gezackt (Drachenmembran)
+			var scallop := int(round(2.0 * absf(sin(t * 9.0))))
+			var bot_y := int(round(lerp(18.0, 25.0, t))) - scallop
+			for y in range(top_y, bot_y + 1):
+				if y < 0 or y > 47:
+					continue
+				img.set_pixel(x, y, memb2 if y - top_y <= 1 else memb)
+			# Knochenspeiche entlang der Vorderkante
+			if top_y >= 0 and top_y <= 47:
+				img.set_pixel(x, top_y, bone if t > 0.55 else lite)
+	# --- Schwanz ragt zwischen den Schwingen nach oben ---
+	for i in range(11):
+		var tw: int = maxi(1, 3 - i / 4)
+		img.fill_rect(Rect2i(cx - tw, 13 - i, tw * 2, 1), mid if i % 2 == 0 else dark)
+	# --- Rumpf/Hals (senkrecht, Kopf unten) ---
+	img.fill_rect(Rect2i(cx - 5, 14, 10, 18), mid)
+	img.fill_rect(Rect2i(cx - 4, 14, 8, 18), dark)
+	for y in range(16, 31, 3):  # Brust-Panzerplatten schimmern
+		img.fill_rect(Rect2i(cx - 3, y, 6, 1), lite)
+	img.fill_rect(Rect2i(cx - 2, 21, 4, 4), ember)  # glühender Brustkern
+	img.set_pixel(cx, 22, hot); img.set_pixel(cx - 1, 23, hot)
+	# --- Kopf (unten, dem Gegnerfeld zugewandt) ---
+	img.fill_rect(Rect2i(cx - 6, 30, 12, 8), dark)
+	img.fill_rect(Rect2i(cx - 6, 30, 12, 2), mid)
+	for i in range(7):  # Hörner nach oben-hinten
+		img.set_pixel(cx - 5 - i / 2, 30 - i, bone)
+		img.set_pixel(cx + 5 + i / 2, 30 - i, bone)
+	# Glühende Augenbrauen/Augen
+	img.fill_rect(Rect2i(cx - 5, 32, 3, 2), hot)
+	img.fill_rect(Rect2i(cx + 2, 32, 3, 2), hot)
+	img.set_pixel(cx - 4, 32, Color(1, 1, 0.85)); img.set_pixel(cx + 3, 32, Color(1, 1, 0.85))
+	# Aufgerissener Oberkiefer mit Zähnen
+	img.fill_rect(Rect2i(cx - 4, 37, 8, 2), dark)
+	for tx: int in [cx - 3, cx - 1, cx + 1, cx + 3]:
+		img.set_pixel(tx, 39, Color(0.95, 0.92, 0.8))
+	# Offener Rachen mit Glut — hier entspringt die Megaflare (~y 42-44)
+	img.fill_rect(Rect2i(cx - 3, 40, 6, 4), ember)
+	img.fill_rect(Rect2i(cx - 2, 41, 4, 3), hot)
+	img.set_pixel(cx, 43, Color(1, 1, 0.9))
+	var t := _tex(_outlined(img))
+	_cache[key] = t
+	return t
+
 ## ---------- Gegner (String-Pixel-Art) ----------
 
 const ENEMY_ART := {
