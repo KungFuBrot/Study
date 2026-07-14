@@ -93,8 +93,31 @@ func _ready() -> void:
 		_spell_showcase()
 	elif OS.get_environment("BOSSSHOT") != "":
 		_boss_showcase()
+	elif OS.get_environment("MENUSHOT") != "":
+		_menu_showcase()
 	else:
 		_run_battle()
+
+## Debug: öffnet Milos volle Fähigkeitenliste (mit gesperrten Einträgen) und
+## fährt sie per Tastatur rauf und runter — prüft Auto-Scroll + Überspringen
+## gesperrter Einträge. env MENUSHOT=Zielordner.
+func _menu_showcase() -> void:
+	var dir := OS.get_environment("MENUSHOT")
+	for i in heroes.size():
+		heroes[i]["bob"] = _idle_bob(heroes[i]["sprite"], 2.0)
+	# Milo hat die längste Liste (5? bzw. 2 aktiv + 3 gesperrte Summons + Ult + Zurück).
+	_ability_menu(heroes[1])  # bewusst NICHT awaiten: öffnet das Menü und wartet
+	await get_tree().create_timer(0.35).timeout
+	_snap(dir, "menu_top")
+	for i in 7:
+		_menu_move(1)
+		await get_tree().create_timer(0.16).timeout
+		_snap(dir, "menu_down_%d" % i)
+	for i in 7:
+		_menu_move(-1)
+		await get_tree().create_timer(0.16).timeout
+		_snap(dir, "menu_up_%d" % i)
+	get_tree().quit()
 
 ## Debug: spielt AoE + Ultimate des aktuellen Bosses ab und macht Screenshots
 ## (env BOSSSHOT=Zielordner). Nur zum visuellen Prüfen, kein Spielinhalt.
@@ -1313,6 +1336,10 @@ func _build_ui() -> void:
 	menu_scroll_c.custom_minimum_size = Vector2(300, 126)
 	menu_scroll_c.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	menu_scroll_c.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	# Weder Rahmen noch Scrollbalken dürfen Tastatur-Fokus greifen — sonst
+	# verschluckt der Scrollbalken die Hoch/Runter-Eingaben der Menüführung.
+	menu_scroll_c.focus_mode = Control.FOCUS_NONE
+	menu_scroll_c.get_v_scroll_bar().focus_mode = Control.FOCUS_NONE
 	hb.add_child(menu_scroll_c)
 	menu_box = VBoxContainer.new()
 	menu_box.custom_minimum_size = Vector2(280, 0)
@@ -1751,9 +1778,12 @@ func _menu(entries: Array, h: Dictionary, dim_indices: Array = []) -> int:
 	_highlight_hero(h, true)
 	current_menu = entries
 	menu_dim = dim_indices
-	menu_index = 0
+	# Vorauswahl ist immer die oberste AKTIVE (nicht gesperrte) Fähigkeit.
+	menu_index = _first_selectable()
 	ui_state = "menu"
-	_redraw_menu()
+	menu_scroll_c.scroll_vertical = 0
+	_build_menu_rows()
+	_refresh_menu_highlight()
 	# Sanftes Einblenden des Menüs
 	menu_box.modulate.a = 0.0
 	var fade := menu_box.create_tween()
@@ -1762,6 +1792,23 @@ func _menu(entries: Array, h: Dictionary, dim_indices: Array = []) -> int:
 	_clear_menu()
 	_highlight_hero(h, false)
 	return choice
+
+## Erster nicht gesperrter (aktiver) Menüeintrag — die Standard-Vorauswahl.
+func _first_selectable() -> int:
+	for i in current_menu.size():
+		if not menu_dim.has(i):
+			return i
+	return 0
+
+## Nächster aktiver Eintrag ab `from` in Richtung `delta` (überspringt gesperrte).
+## Gibt `from` zurück, wenn in dieser Richtung nichts Aktives mehr kommt.
+func _next_selectable(from: int, delta: int) -> int:
+	var i := from + delta
+	while i >= 0 and i < current_menu.size():
+		if not menu_dim.has(i):
+			return i
+		i += delta
+	return from
 
 func _highlight_hero(h: Dictionary, on: bool) -> void:
 	var s: Sprite2D = h["sprite"]
@@ -1811,26 +1858,31 @@ func _ready_pose(h: Dictionary, on: bool) -> void:
 			var rest: float = wp.get_meta("rest", WEAPON_REST)
 			wp.create_tween().tween_property(wp, "rotation", rest, 0.2).set_trans(Tween.TRANS_SINE)
 
-func _redraw_menu() -> void:
+## Baut die Menü-Zeilen EINMAL beim Öffnen auf. (Bei jeder Navigation nur den
+## Highlight ändern statt alles neu zu erzeugen — sonst geraten Layout und
+## Auto-Scroll durcheinander, und man kann z. B. nicht mehr nach oben rollen.)
+func _build_menu_rows() -> void:
 	for c in menu_box.get_children():
 		c.queue_free()
 	menu_rows = []
-	var sel: Label = null
 	for i in current_menu.size():
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", 19)
+		menu_box.add_child(l)
+		menu_rows.append(l)
+
+## Aktualisiert Text/Farbe je Zeile und rollt zur aktiven Auswahl.
+func _refresh_menu_highlight() -> void:
+	for i in menu_rows.size():
+		var l: Label = menu_rows[i]
 		l.text = ("> " if i == menu_index else "  ") + str(current_menu[i])
 		var col := Color.WHITE if i == menu_index else Color(0.65, 0.65, 0.72)
 		if menu_dim.has(i):
-			col = Color(0.62, 0.62, 0.68) if i == menu_index else Color(0.42, 0.42, 0.5)
+			# Gesperrte Einträge bleiben durchgängig gedämpft (nie vorgewählt).
+			col = Color(0.42, 0.42, 0.5)
 		l.add_theme_color_override("font_color", col)
-		menu_box.add_child(l)
-		menu_rows.append(l)
-		if i == menu_index:
-			sel = l
-	# Nach dem Layout an die Auswahl scrollen, damit sie stets im Rahmen liegt.
-	if sel != null and is_instance_valid(menu_scroll_c):
-		_scroll_to_selection.call_deferred(sel)
+	if menu_index >= 0 and menu_index < menu_rows.size():
+		_scroll_to_selection.call_deferred(menu_rows[menu_index])
 
 ## Rollt den Menü-Rahmen so, dass das gewählte Label sichtbar bleibt.
 func _scroll_to_selection(sel: Control) -> void:
@@ -1841,6 +1893,7 @@ func _clear_menu() -> void:
 	ui_state = "none"
 	for c in menu_box.get_children():
 		c.queue_free()
+	menu_rows = []
 	cursor.visible = false
 
 func _pick_enemy() -> int:
@@ -1931,9 +1984,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_choice_made.emit()
 
 func _menu_move(delta: int) -> void:
-	menu_index = clampi(menu_index + delta, 0, current_menu.size() - 1)
+	var ni := _next_selectable(menu_index, delta)
+	if ni == menu_index:
+		return  # kein weiterer aktiver Eintrag in dieser Richtung
+	menu_index = ni
 	AudioManager.play_sfx("menu")
-	_redraw_menu()
+	_refresh_menu_highlight()
 
 ## ---------- Aktionen & Effekte ----------
 
