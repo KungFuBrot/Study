@@ -1784,8 +1784,14 @@ func _menu(entries: Array, h: Dictionary, dim_indices: Array = []) -> int:
 	menu_scroll_c.scroll_vertical = 0
 	_build_menu_rows()
 	_refresh_menu_highlight()
-	# Sanftes Einblenden des Menüs
+	# Erst nach dem Layout der frisch erzeugten Labels lässt sich die
+	# Scrollposition sauber setzen — sonst landet ensure_control_visible daneben
+	# (der aktive Eintrag rutschte oben aus dem Rahmen). Zwei Frames warten,
+	# dann den aktiven Eintrag exakt an den oberen Rand rollen.
 	menu_box.modulate.a = 0.0
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_scroll_active_to_top()
 	var fade := menu_box.create_tween()
 	fade.tween_property(menu_box, "modulate:a", 1.0, 0.15)
 	await _choice_made
@@ -1871,7 +1877,7 @@ func _build_menu_rows() -> void:
 		menu_box.add_child(l)
 		menu_rows.append(l)
 
-## Aktualisiert Text/Farbe je Zeile und rollt zur aktiven Auswahl.
+## Aktualisiert nur Text/Farbe je Zeile (das Scrollen erledigen die Aufrufer).
 func _refresh_menu_highlight() -> void:
 	for i in menu_rows.size():
 		var l: Label = menu_rows[i]
@@ -1881,13 +1887,26 @@ func _refresh_menu_highlight() -> void:
 			# Gesperrte Einträge bleiben durchgängig gedämpft (nie vorgewählt).
 			col = Color(0.42, 0.42, 0.5)
 		l.add_theme_color_override("font_color", col)
-	if menu_index >= 0 and menu_index < menu_rows.size():
-		_scroll_to_selection.call_deferred(menu_rows[menu_index])
 
-## Rollt den Menü-Rahmen so, dass das gewählte Label sichtbar bleibt.
-func _scroll_to_selection(sel: Control) -> void:
-	if is_instance_valid(menu_scroll_c) and is_instance_valid(sel):
-		menu_scroll_c.ensure_control_visible(sel)
+## Rollt den aktiven Eintrag exakt an den OBEREN Rand (beim Öffnen des Menüs).
+func _scroll_active_to_top() -> void:
+	if not is_instance_valid(menu_scroll_c):
+		return
+	if menu_index < 0 or menu_index >= menu_rows.size():
+		return
+	var row: Control = menu_rows[menu_index]
+	if is_instance_valid(row):
+		menu_scroll_c.scroll_vertical = int(row.position.y)
+
+## Rollt minimal, damit der aktive Eintrag sichtbar bleibt (bei Navigation).
+func _scroll_keep_visible() -> void:
+	if not is_instance_valid(menu_scroll_c):
+		return
+	if menu_index < 0 or menu_index >= menu_rows.size():
+		return
+	var row: Control = menu_rows[menu_index]
+	if is_instance_valid(row):
+		menu_scroll_c.ensure_control_visible(row)
 
 func _clear_menu() -> void:
 	ui_state = "none"
@@ -1990,6 +2009,7 @@ func _menu_move(delta: int) -> void:
 	menu_index = ni
 	AudioManager.play_sfx("menu")
 	_refresh_menu_highlight()
+	_scroll_keep_visible()
 
 ## ---------- Aktionen & Effekte ----------
 
