@@ -71,6 +71,8 @@ var menu_dim: Array = []  # Indizes gesperrter (grauer) Menüeinträge
 
 var msg_label: Label
 var menu_box: VBoxContainer
+var menu_scroll_c: ScrollContainer   # scrollbarer Rahmen um das Auswahlmenü
+var menu_rows: Array = []            # aktuelle Zeilen-Labels (für Auto-Scroll)
 var party_box: VBoxContainer
 var cursor: Polygon2D
 var cam: Camera2D
@@ -159,20 +161,30 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.42).timeout
 	_snap(dir, "show_attack")
 	await get_tree().create_timer(1.2).timeout
+	# Serena Sturmschnitt (einzelner Iaido-Durchzug)
+	_storm_cut(heroes[0], heroes[0]["data"]["abilities"][1], enemies[1])
+	await get_tree().create_timer(0.55).timeout
+	_snap(dir, "show_stormcut")
+	await get_tree().create_timer(1.1).timeout
 	# Serena Fokusstoß (Durchstöße + Kreuzschnitt)
-	_pierce(heroes[0], heroes[0]["data"]["abilities"][1], enemies[1])
+	_pierce(heroes[0], heroes[0]["data"]["abilities"][2], enemies[1])
 	await get_tree().create_timer(1.25).timeout
 	_snap(dir, "show_pierce_1")
 	await get_tree().create_timer(0.5).timeout
 	_snap(dir, "show_pierce_2")
 	await get_tree().create_timer(1.3).timeout
 	# Serena Klingentanz (Sternschritte + Fallstreich)
-	_blade_dance(heroes[0], heroes[0]["data"]["abilities"][2], enemies[1])
+	_blade_dance(heroes[0], heroes[0]["data"]["abilities"][3], enemies[1])
 	await get_tree().create_timer(1.6).timeout
 	_snap(dir, "show_dance_1")
 	await get_tree().create_timer(1.15).timeout
 	_snap(dir, "show_dance_2")
 	await get_tree().create_timer(1.0).timeout
+	# Serena Klingensturm (wandernder Klingen-Tornado über allen Gegnern)
+	_blade_storm(heroes[0], heroes[0]["data"]["abilities"][4])
+	await get_tree().create_timer(0.9).timeout
+	_snap(dir, "show_bladestorm")
+	await get_tree().create_timer(1.6).timeout
 	# Milo Feuerball (Explosion einfangen)
 	_fireball(heroes[1], heroes[1]["data"]["abilities"][0], enemies[0])
 	await get_tree().create_timer(1.85).timeout
@@ -183,13 +195,23 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.9).timeout
 	_snap(dir, "show_mgun")
 	await get_tree().create_timer(1.6).timeout
+	# Rax Reparatur (Naniten + Tech-Ring, heilt Milo)
+	_repair_ally(heroes[2], heroes[2]["data"]["abilities"][1], heroes[1])
+	await get_tree().create_timer(0.85).timeout
+	_snap(dir, "show_repair")
+	await get_tree().create_timer(1.2).timeout
 	# Rax Laser
 	_laser(heroes[2], heroes[2]["data"]["abilities"][0], enemies[1])
 	await get_tree().create_timer(0.55).timeout
 	_snap(dir, "show_laser")
 	await get_tree().create_timer(1.2).timeout
+	# Rax Plasmalanze (fliegender Plasmaspeer)
+	_plasma_lance(heroes[2], heroes[2]["data"]["abilities"][4], enemies[1])
+	await get_tree().create_timer(0.65).timeout
+	_snap(dir, "show_lance")
+	await get_tree().create_timer(1.2).timeout
 	# Rax Raketensalve
-	_rocket_all(heroes[2], heroes[2]["data"]["abilities"][1])
+	_rocket_all(heroes[2], heroes[2]["data"]["abilities"][2])
 	await get_tree().create_timer(1.55).timeout
 	_snap(dir, "show_rockets")
 	await get_tree().create_timer(2.0).timeout
@@ -243,7 +265,7 @@ func _spell_showcase() -> void:
 		esp.material = null
 		esp.modulate = Color.WHITE
 	# Rax Atombombe zuletzt — sie reißt vermutlich alle Übungsgegner um.
-	_nuke(heroes[2], heroes[2]["data"]["abilities"][2])
+	_nuke(heroes[2], heroes[2]["data"]["abilities"][3])
 	await get_tree().create_timer(1.3).timeout
 	_snap(dir, "show_nuke_1")
 	await get_tree().create_timer(0.75).timeout
@@ -1284,9 +1306,17 @@ func _build_ui() -> void:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 40)
 	panel.add_child(hb)
+	# Menü in einem ScrollContainer: bei vielen Einträgen (z. B. Milos volle
+	# Fähigkeitenliste) rollt der Ausschnitt mit, damit die Auswahl immer
+	# sichtbar bleibt statt unten aus dem Panel zu laufen.
+	menu_scroll_c = ScrollContainer.new()
+	menu_scroll_c.custom_minimum_size = Vector2(300, 126)
+	menu_scroll_c.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	menu_scroll_c.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	hb.add_child(menu_scroll_c)
 	menu_box = VBoxContainer.new()
 	menu_box.custom_minimum_size = Vector2(280, 0)
-	hb.add_child(menu_box)
+	menu_scroll_c.add_child(menu_box)
 	party_box = VBoxContainer.new()
 	party_box.add_theme_constant_override("separation", 5)
 	hb.add_child(party_box)
@@ -1507,8 +1537,11 @@ func _run_battle() -> void:
 
 func _hero_turn(h: Dictionary) -> bool:
 	var d: Dictionary = h["data"]
+	# Zu Beginn des eigenen Zuges verfällt die Deckung des letzten Zuges.
+	_end_defend(h)
 	while true:
-		var cmd: int = await _menu([d["name"] + ":  Angriff", "Fähigkeit", "Item", "Fliehen"], h)
+		var cmd: int = await _menu([d["name"] + ":  Angriff", "Fähigkeit",
+			"Verteidigen", "Item", "Fliehen"], h)
 		match cmd:
 			0:
 				var t := await _pick_enemy()
@@ -1525,9 +1558,12 @@ func _hero_turn(h: Dictionary) -> bool:
 				var used_ab: bool = await _ability_menu(h)
 				if used_ab: return false
 			2:
+				await _defend(h)
+				return false
+			3:
 				var used: bool = await _item_menu(h)
 				if used: return false
-			3:
+			4:
 				_say("Fluchtversuch ...")
 				await get_tree().create_timer(0.6).timeout
 				if randf() < 0.6:
@@ -1539,6 +1575,63 @@ func _hero_turn(h: Dictionary) -> bool:
 				await get_tree().create_timer(0.7).timeout
 				return false
 	return false
+
+## Verteidigen: Der Held greift diesen Zug nicht an, geht in Deckung und nimmt
+## bis zum nächsten eigenen Zug deutlich weniger Schaden. Ein schimmerndes
+## Schild bleibt als Anzeige vor ihm stehen.
+func _defend(h: Dictionary) -> void:
+	h["defending"] = true
+	_say("%s geht in Deckung — der nächste Treffer wird abgefedert." % h["data"]["name"])
+	AudioManager.play_sfx("charge")
+	var s: Sprite2D = h["sprite"]
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	# Kurze Brems-/Duck-Pose: leicht zurück, breiter Stand.
+	var tw := create_tween()
+	tw.tween_property(s, "scale", base * Vector2(1.1, 0.9), 0.15).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(s, "scale", base, 0.2).set_trans(Tween.TRANS_SINE)
+	# Schild vor dem Helden (zur Gegnerseite = links) — additives Wappenschild.
+	_end_defend_node(h)
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var shield := Node2D.new()
+	var pts := PackedVector2Array([Vector2(-11, -14), Vector2(11, -14),
+		Vector2(11, 4), Vector2(0, 16), Vector2(-11, 4)])
+	var body := Polygon2D.new()
+	body.polygon = pts
+	body.color = Color(0.35, 0.65, 1.0, 0.45)
+	shield.add_child(body)
+	var edge := Line2D.new()
+	edge.points = pts
+	edge.closed = true
+	edge.width = 2.0
+	edge.default_color = Color(0.75, 0.9, 1.0)
+	shield.add_child(edge)
+	shield.material = mat
+	shield.scale = Vector2(2.3, 2.3)
+	shield.modulate = Color(1, 1, 1, 0.0)
+	var fh := s.texture.get_height() * s.scale.y * 0.5
+	shield.position = s.position + Vector2(-fh * 0.55, -fh * 0.3)
+	shield.z_index = 3
+	add_child(shield)
+	h["guard"] = shield
+	var st := shield.create_tween().set_loops()
+	st.tween_property(shield, "modulate:a", 0.9, 0.5).set_trans(Tween.TRANS_SINE)
+	st.tween_property(shield, "modulate:a", 0.5, 0.5).set_trans(Tween.TRANS_SINE)
+	_burst(shield.position, Color(0.6, 0.85, 1.0), 10, 90)
+	await get_tree().create_timer(0.6).timeout
+
+## Beendet die Deckung (verfällt zu Beginn des nächsten eigenen Zuges).
+func _end_defend(h: Dictionary) -> void:
+	h["defending"] = false
+	_end_defend_node(h)
+
+func _end_defend_node(h: Dictionary) -> void:
+	if h.get("guard") != null and is_instance_valid(h["guard"]):
+		var g: Node = h["guard"]
+		var ft := g.create_tween()
+		ft.tween_property(g, "modulate:a", 0.0, 0.2)
+		ft.tween_callback(g.queue_free)
+	h["guard"] = null
 
 ## Untermenü: Fähigkeiten, Beschwörungen (Milo) oder die Ultimative wählen.
 func _ability_menu(h: Dictionary) -> bool:
@@ -1564,6 +1657,8 @@ func _ability_menu(h: Dictionary) -> bool:
 		"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
 	entries.append("Zurück")
 	var pick: int = await _menu(entries, h, dim)
+	if pick < 0:  # B/X = Zurück
+		return false
 	if pick >= abilities.size() and pick < abilities.size() + summons.size():
 		var sm: Dictionary = summons[pick - abilities.size()]
 		if not GameState.skill_unlocked(d, sm):
@@ -1611,6 +1706,7 @@ func _ability_menu(h: Dictionary) -> bool:
 			match ab["kind"]:
 				"rocket": await _rocket_all(h, ab)
 				"nuke": await _nuke(h, ab)
+				"bladestorm": await _blade_storm(h, ab)
 				_: await _whirl_all(h, ab)
 			_resume_bob(h, 2.0)
 		"one":
@@ -1623,14 +1719,21 @@ func _ability_menu(h: Dictionary) -> bool:
 				"magic": await _fireball(h, ab, enemies[t])
 				"beam": await _laser(h, ab, enemies[t])
 				"dance": await _blade_dance(h, ab, enemies[t])
+				"stormcut": await _storm_cut(h, ab, enemies[t])
+				"lance": await _plasma_lance(h, ab, enemies[t])
 				_: await _pierce(h, ab, enemies[t])
 			_resume_bob(h, 2.0)
 		"ally":
 			var a: int = await _menu(_ally_entries(), h)
+			if a < 0:  # B/X = Zurück, ohne MP zu verbrauchen
+				return false
 			d["mp"] -= ab["cost"]
 			_refresh_party()
 			_pause_bob(h)
-			await _heal_ally(h, ab, heroes[a])
+			if ab["kind"] == "repair":
+				await _repair_ally(h, ab, heroes[a])
+			else:
+				await _heal_ally(h, ab, heroes[a])
 			_resume_bob(h, 2.0)
 			_restore_if_revived(heroes[a])
 	return true
@@ -1711,6 +1814,8 @@ func _ready_pose(h: Dictionary, on: bool) -> void:
 func _redraw_menu() -> void:
 	for c in menu_box.get_children():
 		c.queue_free()
+	menu_rows = []
+	var sel: Label = null
 	for i in current_menu.size():
 		var l := Label.new()
 		l.add_theme_font_size_override("font_size", 19)
@@ -1720,6 +1825,17 @@ func _redraw_menu() -> void:
 			col = Color(0.62, 0.62, 0.68) if i == menu_index else Color(0.42, 0.42, 0.5)
 		l.add_theme_color_override("font_color", col)
 		menu_box.add_child(l)
+		menu_rows.append(l)
+		if i == menu_index:
+			sel = l
+	# Nach dem Layout an die Auswahl scrollen, damit sie stets im Rahmen liegt.
+	if sel != null and is_instance_valid(menu_scroll_c):
+		_scroll_to_selection.call_deferred(sel)
+
+## Rollt den Menü-Rahmen so, dass das gewählte Label sichtbar bleibt.
+func _scroll_to_selection(sel: Control) -> void:
+	if is_instance_valid(menu_scroll_c) and is_instance_valid(sel):
+		menu_scroll_c.ensure_control_visible(sel)
 
 func _clear_menu() -> void:
 	ui_state = "none"
@@ -1763,9 +1879,11 @@ func _item_menu(h: Dictionary) -> bool:
 		entries.append("%s x%d" % [n, GameState.inventory[n]])
 	entries.append("Zurück")
 	var pick: int = await _menu(entries, h)
-	if pick >= names.size():
+	if pick < 0 or pick >= names.size():
 		return false
 	var target: int = await _menu(_ally_entries(), h)
+	if target < 0:  # B/X = Zurück
+		return false
 	var item_name: String = names[pick]
 	var item: Dictionary = GameState.ITEMS[item_name]
 	var td: Dictionary = heroes[target]["data"]
@@ -1788,6 +1906,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.is_action_pressed("move_down"): _menu_move(1)
 		elif event.is_action_pressed("confirm"):
 			choice = menu_index
+			AudioManager.play_sfx("menu")
+			_choice_made.emit()
+		elif event.is_action_pressed("cancel"):
+			# B / X ist immer Zurück bzw. Überspringen.
+			choice = -1
 			AudioManager.play_sfx("menu")
 			_choice_made.emit()
 	elif ui_state == "target":
@@ -3893,6 +4016,296 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	await get_tree().create_timer(0.7).timeout
 	await _sprint(h, h["home"], 0.2)
 
+## Sturmschnitt (Serena, Basis-Einzelziel): EIN einziger blitzschneller
+## Iaido-Durchzug mit einem waagerechten Schnittstrahl — bewusst anders als der
+## dreifache Durchstoß + Kreuzschnitt des Fokusstoßes.
+func _storm_cut(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var wp: Sprite2D = h.get("weapon")
+	var es: Sprite2D = e["sprite"]
+	_say("%s zieht %s!" % [d["name"], ab["name"]])
+	var center: Vector2 = es.position
+	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
+	# Blitz auf die rechte Seite, Klinge in Ausgangsstellung.
+	s.position = center + Vector2(122, -6)
+	s.flip_h = false
+	if wp != null:
+		wp.position.x = -grip_x
+		wp.rotation = 1.2
+	_burst(s.position, Color(0.9, 0.97, 1.0, 0.7), 6, 70)
+	await get_tree().create_timer(0.14).timeout
+	AudioManager.play_sfx("slash")
+	var dash := create_tween()
+	dash.tween_property(s, "position", center + Vector2(-122, 6), 0.13) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_ghost_trail(s, 0.13)
+	if wp != null:
+		_weapon_trail(wp, 0.13)
+	# Ein einzelner, breiter waagerechter Schnittstrahl quer durchs Ziel.
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var blade := Polygon2D.new()
+	blade.polygon = PackedVector2Array([Vector2(-95, -3), Vector2(95, -3),
+		Vector2(95, 3), Vector2(-95, 3)])
+	blade.color = Color(1, 1, 1, 0.95)
+	blade.material = mat
+	blade.position = center
+	blade.scale = Vector2(0.1, 1.0)
+	blade.z_index = 4
+	add_child(blade)
+	var bt := blade.create_tween()
+	bt.tween_property(blade, "scale", Vector2(1.35, 1.0), 0.08) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	bt.tween_property(blade, "modulate:a", 0.0, 0.2)
+	bt.tween_callback(blade.queue_free)
+	await dash.finished
+	_burst(center, Color(0.9, 0.97, 1.0), 12, 150)
+	_shake_camera(1.2)
+	await _hitstop(0.07)
+	s.flip_h = true
+	if wp != null:
+		wp.position.x = grip_x
+		wp.rotation = wp.get_meta("rest", WEAPON_REST)
+	var dmg: int = int((ab["power"] + d["atk"] * 0.5) * randf_range(0.9, 1.1)) - e["def"]
+	await _damage_enemy(e, maxi(dmg, 1))
+	await _sprint(h, h["home"], 0.2)
+
+## Klingensturm (Serena, alle): kein Wirbel auf der Stelle wie Klingenwirbel,
+## sondern eine Windböe quer übers Feld, aus der über jedem Gegner nacheinander
+## ein kleiner rotierender Klingen-Tornado aufreißt.
+func _blade_storm(h: Dictionary, ab: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	var wp: Sprite2D = h.get("weapon")
+	_say("%s entfesselt %s!" % [d["name"], ab["name"]])
+	await _stance(h, Color(0.75, 0.92, 1.0))
+	# Klinge senkrecht hochreißen — Startsignal des Sturms.
+	var raise := create_tween()
+	raise.tween_property(s, "position:y", s.position.y - 18.0, 0.18).set_trans(Tween.TRANS_SINE)
+	if wp != null and is_instance_valid(wp):
+		wp.create_tween().tween_property(wp, "rotation", -1.9, 0.18) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await raise.finished
+	AudioManager.play_sfx("whirl")
+	_flash_screen(Color(0.7, 0.9, 1.0, 0.18))
+	var alive := []
+	for e in enemies:
+		if e["alive"]:
+			alive.append(e)
+	# Windböe quer übers Gegnerfeld.
+	var wind := CPUParticles2D.new()
+	wind.position = Vector2(500, 235)
+	wind.amount = 40
+	wind.lifetime = 0.6
+	wind.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	wind.emission_rect_extents = Vector2(30, 130)
+	wind.direction = Vector2(-1, 0)
+	wind.spread = 12.0
+	wind.gravity = Vector2.ZERO
+	wind.initial_velocity_min = 260.0
+	wind.initial_velocity_max = 470.0
+	wind.scale_amount_min = 0.3
+	wind.scale_amount_max = 0.7
+	wind.color = Color(0.8, 0.92, 1.0, 0.6)
+	wind.texture = SpriteFactory.particle("spark_04")
+	wind.z_index = 5
+	add_child(wind)
+	get_tree().create_timer(0.7).timeout.connect(func(): if is_instance_valid(wind): wind.emitting = false)
+	get_tree().create_timer(1.7).timeout.connect(func(): if is_instance_valid(wind): wind.queue_free())
+	for i in alive.size():
+		_blade_tornado(alive[i]["sprite"].position, i * 0.12)
+	await get_tree().create_timer(0.12 * alive.size() + 0.5).timeout
+	_shake_camera(1.8)
+	for e in alive:
+		if e["alive"]:
+			var dmg: int = int((ab["power"] + d["atk"] * 0.6) * randf_range(0.9, 1.1)) - e["def"]
+			await _damage_enemy(e, maxi(dmg, 1))
+	await _sprint(h, h["home"], 0.22)
+
+## Kurzlebiger, rotierender Klingen-Tornado über einem Gegner (für Klingensturm).
+func _blade_tornado(pos: Vector2, delay: float) -> void:
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var t := Node2D.new()
+	t.position = pos
+	t.scale = Vector2(0.2, 0.2)
+	t.modulate.a = 0.0
+	t.z_index = 4
+	for k in 3:
+		var blade := Polygon2D.new()
+		blade.polygon = PackedVector2Array([Vector2(-4, -46), Vector2(4, -46),
+			Vector2(2, 46), Vector2(-2, 46)])
+		blade.color = Color(0.85, 0.95, 1.0, 0.9)
+		blade.material = mat
+		blade.rotation = k * TAU / 3.0
+		t.add_child(blade)
+	add_child(t)
+	var tw := t.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_property(t, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(t, "scale", Vector2(1.1, 1.45), 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(t, "rotation", TAU * 2.5, 0.42)
+	tw.tween_callback(_tornado_hit.bind(pos))
+	tw.tween_property(t, "modulate:a", 0.0, 0.18)
+	tw.tween_callback(t.queue_free)
+
+func _tornado_hit(pos: Vector2) -> void:
+	AudioManager.play_sfx("slash")
+	_burst(pos, Color(0.85, 0.95, 1.0), 12, 160)
+
+## Plasmalanze (Rax, Einzelziel): ein KÖRPERLICHER Plasmaspeer (kein Strahl wie
+## der Laserstoß) formt sich an der Mündung und rast rotierend durch das Ziel.
+func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s schleudert die %s!" % [d["name"], ab["name"]])
+	var fire_pos: Vector2 = h["home"] + Vector2(-64, 6)
+	await _sprint(h, fire_pos, 0.2)
+	h["anim"] = "aim"
+	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	var muzzle: Vector2 = _cannon_muzzle(s)
+	var target: Vector2 = e["sprite"].position
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var lance := Node2D.new()
+	var lbody := Polygon2D.new()
+	lbody.polygon = PackedVector2Array([Vector2(-48, 0), Vector2(6, -7),
+		Vector2(42, 0), Vector2(6, 7)])
+	lbody.color = Color(0.7, 0.5, 1.0, 0.95)
+	lance.add_child(lbody)
+	var lcore := Polygon2D.new()
+	lcore.polygon = PackedVector2Array([Vector2(-32, 0), Vector2(4, -3),
+		Vector2(32, 0), Vector2(4, 3)])
+	lcore.color = Color(1, 1, 1, 0.95)
+	lance.add_child(lcore)
+	lance.material = mat
+	lance.position = muzzle
+	lance.rotation = (target - muzzle).angle()
+	lance.scale = Vector2(0.3, 0.3)
+	lance.z_index = 6
+	add_child(lance)
+	AudioManager.play_sfx("charge")
+	_spell_light(muzzle, Color(0.7, 0.5, 1.0), 140.0, 0.6)
+	var form := lance.create_tween()
+	form.tween_property(lance, "scale", Vector2(1.0, 1.0), 0.3) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await form.finished
+	AudioManager.play_sfx("laser")
+	var recoil := create_tween()
+	recoil.tween_property(s, "position:x", fire_pos.x + 18.0, 0.06)
+	recoil.tween_property(s, "position:x", fire_pos.x, 0.24).set_trans(Tween.TRANS_SINE)
+	var fly := lance.create_tween()
+	fly.tween_property(lance, "position", target, 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	fly.parallel().tween_property(lance, "rotation", lance.rotation + TAU, 0.16)
+	_lance_trail(lance, 0.16)
+	await fly.finished
+	# Durchstoß: die Lanze schießt hinter das Ziel und verpufft.
+	var dirv: Vector2 = (target - muzzle).normalized()
+	var through := lance.create_tween()
+	through.tween_property(lance, "position", target + dirv * 95.0, 0.1)
+	through.parallel().tween_property(lance, "modulate:a", 0.0, 0.13)
+	through.tween_callback(lance.queue_free)
+	_impact_ring(target, Color(0.78, 0.55, 1.0, 0.85))
+	_burst(target, Color(0.82, 0.62, 1.0), 20, 200)
+	_flash_screen(Color(0.6, 0.4, 1.0, 0.22))
+	_shake_camera(1.9)
+	await _hitstop(0.11)
+	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
+	await _damage_enemy(e, maxi(dmg, 1))
+	h["anim"] = "idle"
+	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	await _sprint(h, h["home"], 0.2)
+
+## Violette Nachbild-Spur der fliegenden Plasmalanze.
+func _lance_trail(lance: Node2D, dur: float) -> void:
+	var steps := maxi(int(dur / 0.025), 2)
+	for i in steps:
+		await get_tree().create_timer(0.025).timeout
+		if not is_instance_valid(lance):
+			return
+		var mat := CanvasItemMaterial.new()
+		mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		var g := Sprite2D.new()
+		g.texture = SpriteFactory.particle("light_01")
+		g.material = mat
+		g.modulate = Color(0.7, 0.5, 1.0, 0.5)
+		g.scale = Vector2(0.35, 0.2)
+		g.rotation = lance.rotation
+		g.position = lance.position
+		g.z_index = 5
+		add_child(g)
+		var gt := g.create_tween()
+		gt.tween_property(g, "modulate:a", 0.0, 0.16)
+		gt.tween_callback(g.queue_free)
+
+## Reparatur (Rax, Verbündeten-Heilung): technisch statt magisch — ein Strom
+## cyanfarbener Naniten fliegt zum Ziel, ein hexagonaler Tech-Ring und
+## Schweißfunken schließen die Schäden. Klar anders als Milos grünes Heillicht.
+func _repair_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
+	var d: Dictionary = h["data"]
+	var td: Dictionary = target["data"]
+	var s: Sprite2D = h["sprite"]
+	_say("%s startet %s an %s." % [d["name"], ab["name"], td["name"]])
+	# Kurzer technischer „Impuls" statt Zauberpose.
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var pulse := create_tween()
+	pulse.tween_property(s, "scale", base * Vector2(0.94, 1.08), 0.12)
+	pulse.tween_property(s, "scale", base, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	AudioManager.play_sfx("charge")
+	var tp: Vector2 = target["sprite"].position
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for i in 16:
+		var nan := Sprite2D.new()
+		nan.texture = SpriteFactory.circle(2, Color(0.5, 0.9, 1.0))
+		nan.material = mat
+		nan.position = s.position + Vector2(-30, -10) \
+			+ Vector2(randf_range(-10, 10), randf_range(-10, 10))
+		nan.z_index = 5
+		add_child(nan)
+		var fly := nan.create_tween()
+		fly.tween_interval(i * 0.03)
+		fly.tween_property(nan, "position",
+			tp + Vector2(randf_range(-24, 24), randf_range(-30, 20)), 0.35) \
+			.set_trans(Tween.TRANS_SINE)
+		fly.tween_property(nan, "modulate:a", 0.0, 0.3)
+		fly.tween_callback(nan.queue_free)
+	await get_tree().create_timer(0.52).timeout
+	AudioManager.play_sfx("heal")
+	# Hexagonaler Tech-Ring dreht sich auf.
+	var hexpts := PackedVector2Array()
+	for k in 6:
+		var a := k * TAU / 6.0
+		hexpts.append(Vector2(cos(a), sin(a)) * 28.0)
+	var hex := Line2D.new()
+	hex.points = hexpts
+	hex.closed = true
+	hex.width = 3.0
+	hex.default_color = Color(0.5, 0.9, 1.0)
+	hex.material = mat
+	var hn := Node2D.new()
+	hn.position = tp
+	hn.scale = Vector2(0.3, 0.3)
+	hn.z_index = 5
+	hn.add_child(hex)
+	add_child(hn)
+	var ht := hn.create_tween()
+	ht.tween_property(hn, "scale", Vector2(1.7, 1.7), 0.45) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ht.parallel().tween_property(hn, "rotation", TAU * 0.5, 0.45)
+	ht.parallel().tween_property(hn, "modulate:a", 0.0, 0.45)
+	ht.tween_callback(hn.queue_free)
+	# Schweißfunken (warm) — technisch, nicht magisch-grün.
+	_burst(tp, Color(1.0, 0.8, 0.4), 12, 130)
+	var amount := int(ab["power"] + d["mag"] * 0.5)
+	td["hp"] = mini(td["hp"] + amount, td["max_hp"])
+	_float_text(tp, "+%d" % amount, Color(0.5, 0.9, 1.0))
+	_refresh_party()
+	await get_tree().create_timer(0.7).timeout
+
 func _enemy_turn(e: Dictionary) -> void:
 	var alive_heroes := []
 	for h in heroes:
@@ -4574,6 +4987,16 @@ func _ult_mauer(targets: Array) -> void:
 	await get_tree().create_timer(0.5).timeout
 
 func _damage_hero(target: Dictionary, dmg: int) -> void:
+	# In Deckung: der Treffer wird stark abgefedert; das Schild blitzt auf.
+	if target.get("defending", false):
+		dmg = maxi(int(round(dmg * 0.4)), 1)
+		_float_text(target["sprite"].position + Vector2(0, -22), "Block!", Color(0.6, 0.85, 1.0))
+		_burst(target["sprite"].position + Vector2(-18, -8), Color(0.65, 0.88, 1.0), 10, 100)
+		if target.get("guard") != null and is_instance_valid(target["guard"]):
+			var g: Node2D = target["guard"]
+			var ft := g.create_tween()
+			ft.tween_property(g, "modulate:a", 1.0, 0.05)
+			ft.tween_property(g, "modulate:a", 0.6, 0.25)
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)
 	_float_text(target["sprite"].position, str(dmg), Color(1.0, 0.45, 0.35))
 	_shake(target["sprite"], 1.0)  # Held wird nach rechts (von den Gegnern weg) geworfen
@@ -4582,6 +5005,7 @@ func _damage_hero(target: Dictionary, dmg: int) -> void:
 	if target["data"]["hp"] <= 0:
 		# Gefallene wippen nicht mehr — sonst „atmet" der Ohnmächtige weiter.
 		_pause_bob(target)
+		_end_defend(target)  # Schild verschwindet mit dem Ohnmächtigen
 		var faint := create_tween()
 		faint.tween_property(target["sprite"], "modulate", Color(0.4, 0.4, 0.55, 0.6), 0.4)
 		faint.parallel().tween_property(target["sprite"], "rotation", -PI / 2, 0.4)
