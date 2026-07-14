@@ -23,9 +23,9 @@ const PAGES := [
 	[
 		"Drei Gefährten brechen auf, das Tal zu befreien:",
 		"",
-		"Serena, die Klinge des Lichts.",
-		"Milo, der Meister der Flammen.",
-		"Rax, das Herz aus Stahl.",
+		"Helen, die Klinge des Lichts.",
+		"Janosch, der Meister der Flammen.",
+		"Wally, das Herz aus Stahl.",
 		"",
 		"Ihre Reise beginnt am rauchenden Schlotwerk ...",
 	],

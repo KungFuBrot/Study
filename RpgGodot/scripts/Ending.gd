@@ -78,9 +78,9 @@ func _build_text() -> void:
 		["und selbst Die Leere, die nichts mehr fühlte,", 22, Color.WHITE, 152],
 		["zerfiel — weil ihr nicht aufhörtet zu fühlen.", 22, Color.WHITE, 182],
 		["Der Fluss glitzert, der Turm gehört allen, Gras wächst.", 22, Color.WHITE, 218],
-		["Serena  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 262],
-		["Milo  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 288],
-		["Rax  —  das Herz aus Stahl", 19, Color(0.75, 0.9, 0.85), 314],
+		["Helen  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 262],
+		["Janosch  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 288],
+		["Wally  —  das Herz aus Stahl", 19, Color(0.75, 0.9, 0.85), 314],
 		["Erbeutetes Gold: %d — gespendet an Lindenhain" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 346],
 		["— DANKE FÜRS SPIELEN —", 26, Color(1.0, 0.85, 0.3), 480],
 	]

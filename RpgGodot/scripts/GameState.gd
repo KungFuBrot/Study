@@ -36,7 +36,7 @@ const ENEMIES := {
 		"entrance_line": "Der Schlamm brodelt — etwas Riesiges wälzt sich empor!",
 		"intro": [
 			["Schlotbaron", "Wer wagt es, meine Produktion zu stören?!"],
-			["Serena", "Euer Gift verseucht den Fluss von Lindenhain!"],
+			["Helen", "Euer Gift verseucht den Fluss von Lindenhain!"],
 			["Schlotbaron", "Gift? Man nennt das FORTSCHRITT. Und jetzt: versinkt im Schlamm!"],
 		],
 		"aoe_name": "Giftflut", "ultimate_name": "Schwarzer Himmel"},
@@ -56,7 +56,7 @@ const ENEMIES := {
 		"entrance_line": "Goldstaub rieselt — die Chefetage fährt persönlich herab!",
 		"intro": [
 			["Monopolfürst", "Besucher! Habt ihr einen Termin? Der kostet extra."],
-			["Rax", "Berechnung abgeschlossen: Eure Bilanz ist ein Verbrechen."],
+			["Wally", "Berechnung abgeschlossen: Eure Bilanz ist ein Verbrechen."],
 			["Monopolfürst", "Alles hier gehört MIR. Auch eure Niederlage — Zeit ist Geld!"],
 		],
 		"aoe_name": "Münzhagel", "ultimate_name": "Feindliche Übernahme"},
@@ -79,7 +79,7 @@ const ENEMIES := {
 		"entrance_line": "Die Glut verdichtet sich zu einem Schatten — er nimmt Gestalt an!",
 		"intro": [
 			["Der Spalter", "Ihr?! IHR gehört nicht hierher. NIEMAND gehört zu NIEMANDEM!"],
-			["Milo", "Dein Hass endet heute. Lindenhain steht zusammen — alle."],
+			["Janosch", "Dein Hass endet heute. Lindenhain steht zusammen — alle."],
 			["Der Spalter", "Zusammen?! Ich SPALTE euch wie morsches Holz!"],
 		],
 		"aoe_name": "Hasstirade", "ultimate_name": "Mauer des Hasses"},
@@ -100,7 +100,7 @@ const ENEMIES := {
 		"entrance_line": "Jedes Geräusch erlischt. Eine hohe graue Gestalt steht einfach da — und sieht durch euch hindurch.",
 		"intro": [
 			["Die Stille", "..."],
-			["Serena", "So sag doch etwas! Wüte, hasse — IRGENDwas!"],
+			["Helen", "So sag doch etwas! Wüte, hasse — IRGENDwas!"],
 			["Die Stille", "Wozu. Nichts davon bedeutet etwas. Ihr auch nicht."],
 		],
 		"aoe_name": "Grauschleier", "ultimate_name": "Das große Vergessen"},
@@ -180,7 +180,7 @@ func reset_party() -> void:
 	inventory = {"Trank": 3, "Äther": 1}
 	party = [
 		{
-			"id": "serena", "name": "Serena", "class": "Schwertkämpferin",
+			"id": "serena", "name": "Helen", "class": "Schwertkämpferin",
 			"level": 1, "xp": 0,
 			"hp": 60, "max_hp": 60, "mp": 10, "max_mp": 10,
 			"atk": 14, "mag": 4, "def": 6,
@@ -205,7 +205,7 @@ func reset_party() -> void:
 				"desc": "Lichtklingen zerreißen alle Feinde. (1x pro Kampf)"},
 		},
 		{
-			"id": "milo", "name": "Milo", "class": "Zauberer",
+			"id": "milo", "name": "Janosch", "class": "Zauberer",
 			"level": 1, "xp": 0,
 			"hp": 42, "max_hp": 42, "mp": 24, "max_mp": 24,
 			"atk": 6, "mag": 16, "def": 4,
@@ -235,7 +235,7 @@ func reset_party() -> void:
 			],
 		},
 		{
-			"id": "rax", "name": "Rax", "class": "Kampfroboter",
+			"id": "rax", "name": "Wally", "class": "Kampfroboter",
 			"level": 1, "xp": 0,
 			"hp": 72, "max_hp": 72, "mp": 16, "max_mp": 16,
 			"atk": 12, "mag": 12, "def": 10,
