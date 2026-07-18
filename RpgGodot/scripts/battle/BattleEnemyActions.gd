@@ -23,6 +23,14 @@ func _enemy_turn(e: Dictionary) -> void:
 		await _boss_ultimate(e, alive_heroes)
 		_resume_bob(e, bob_period)
 		return
+	# Normale Monster entfesseln alle 3 Züge ihre benannte Spezialattacke —
+	# mit eigener Inszenierung (Banner + Ladephase) statt des Standard-Windups.
+	var sp: Dictionary = e.get("special", {})
+	if not e["is_boss"] and not sp.is_empty() and e["acts"] % 3 == 0:
+		await _enemy_special(e, alive_heroes)
+		_resume_bob(e, bob_period)
+		await get_tree().create_timer(0.25).timeout
+		return
 	# In Stellung gehen: zurückweichen, ducken, bedrohlich aufglühen —
 	# erst dann folgt der Sturmangriff (Anticipation wie bei den Helden).
 	var es: Sprite2D = e["sprite"]
@@ -257,16 +265,39 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 	var st := _style()
 	var theme: String = boss_def.get("theme", "toxic")
 	_say("%s winds up — %s!" % [e["name"], boss_def["aoe_name"]])
+	# Große Bühne wie bei den Ultimates: Welt abdunkeln, Namensbanner,
+	# Themen-Funken laufen in den Boss ein, dann Entfesselung mit Stoßwelle.
+	var dim := _dim_world(0.4)
+	_attack_banner("◆ %s ◆" % String(boss_def["aoe_name"]).to_upper(), st["banner"])
 	AudioManager.play_sfx("roar")
 	var es: Sprite2D = e["sprite"]
 	var ebase: Vector2 = es.get_meta("base_scale", es.scale)
+	var cmat := CanvasItemMaterial.new()
+	cmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	for i in 8:
+		var spark := Sprite2D.new()
+		spark.texture = SpriteFactory.circle(3, Color.WHITE)
+		spark.material = cmat
+		spark.modulate = (st["burst"] as Color).lightened(0.3)
+		spark.position = es.position + Vector2(randf_range(-110, 110), randf_range(-100, 100))
+		spark.z_index = 5
+		add_child(spark)
+		var stw := spark.create_tween()
+		stw.tween_interval(i * 0.045)
+		stw.tween_property(spark, "position", es.position + Vector2(0, -20), 0.3) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		stw.parallel().tween_property(spark, "scale", Vector2(0.4, 0.4), 0.3)
+		stw.tween_callback(spark.queue_free)
+	_spell_light(es.position, st["burst"], 240.0, 0.9)
 	var pump := create_tween()
-	pump.tween_property(es, "scale", ebase * 1.25, 0.35).set_trans(Tween.TRANS_QUAD)
+	pump.tween_property(es, "scale", ebase * 1.25, 0.55).set_trans(Tween.TRANS_QUAD)
 	pump.tween_property(es, "scale", ebase, 0.15)
 	await pump.finished
 	_flash_screen(st["flash"])
 	AudioManager.play_sfx("bigboom")
-	_shake_camera(2.0)
+	_shake_camera(2.4)
+	_shockwave(es.position + Vector2(30, -30))
+	_punch_zoom(0.09, es.position)
 	match theme:
 		"gold":
 			# Münzhagel: Goldstücke prasseln klimpernd aufs Heldenfeld
@@ -367,6 +398,7 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 		var dmg := maxi(int(e["atk"] * randf_range(0.7, 0.9)) - t["data"]["def"], 1)
 		_burst(t["sprite"].position, st["burst"], 8, 110)
 		_damage_hero(t, dmg)
+	_undim(dim)
 	await get_tree().create_timer(0.7).timeout
 
 ## Hassblitz schlägt ein.
@@ -711,3 +743,274 @@ func _void_grasp(e: Dictionary, target: Dictionary) -> void:
 	close.tween_property(rift, "scale", Vector2(0.1, 0.03), 0.3)
 	close.parallel().tween_property(rift, "modulate:a", 0.0, 0.25)
 	close.tween_callback(rift.queue_free)
+
+## Signalfarbe einer Monster-Spezialattacke (Banner, Aura, Funken).
+func _special_color(kind: String, proj: String) -> Color:
+	match kind:
+		"frenzy": return Color(1.0, 0.45, 0.30)
+		"slam": return Color(0.95, 0.70, 0.35)
+		"drain": return Color(0.72, 0.78, 0.90)
+		_:
+			match proj:
+				"sludge": return Color(0.55, 1.0, 0.30)
+				"smog": return Color(0.60, 0.75, 0.50)
+				"coin": return Color(1.0, 0.85, 0.35)
+				"page": return Color(0.95, 0.95, 0.90)
+				_: return Color(1.0, 0.40, 0.30)  # hate
+	return Color.WHITE
+
+## Benannte Monster-Spezialattacke (alle 3 Züge): Name als Banner, Ladephase
+## mit Aura und einlaufenden Funken, dann die Wirkung je nach "kind".
+func _enemy_special(e: Dictionary, targets: Array) -> void:
+	var sp: Dictionary = e["special"]
+	var col := _special_color(sp["kind"], e.get("proj", ""))
+	_say("%s unleashes %s!" % [e["name"], sp["name"]])
+	_attack_banner("— %s —" % sp["name"], col)
+	AudioManager.play_sfx("charge")
+	var es: Sprite2D = e["sprite"]
+	var base: Vector2 = es.get_meta("base_scale", es.scale)
+	var amat := CanvasItemMaterial.new()
+	amat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Aura glüht hinter dem Monster auf, Funken laufen von außen ein.
+	var aura := Sprite2D.new()
+	aura.texture = SpriteFactory.particle("light_01")
+	aura.material = amat
+	aura.modulate = Color(col, 0.0)
+	aura.position = es.position
+	aura.scale = Vector2(0.55, 0.55)
+	aura.show_behind_parent = true
+	add_child(aura)
+	var at := create_tween()
+	at.tween_property(aura, "modulate:a", 0.8, 0.3)
+	at.parallel().tween_property(aura, "scale", Vector2(1.1, 1.1), 0.5) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	at.tween_property(aura, "modulate:a", 0.0, 0.25)
+	at.tween_callback(aura.queue_free)
+	for i in 6:
+		var spark := Sprite2D.new()
+		spark.texture = SpriteFactory.circle(3, Color.WHITE)
+		spark.material = amat
+		spark.modulate = col.lightened(0.4)
+		spark.position = es.position + Vector2(randf_range(-60, 60), randf_range(-55, 55))
+		add_child(spark)
+		var stw := spark.create_tween()
+		stw.tween_interval(i * 0.04)
+		stw.tween_property(spark, "position", es.position, 0.26) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		stw.tween_callback(spark.queue_free)
+	_spell_light(es.position, col, 170.0, 0.7)
+	var pump := create_tween()
+	pump.tween_property(es, "scale", base * 1.16, 0.4).set_trans(Tween.TRANS_QUAD)
+	pump.tween_property(es, "scale", base, 0.14)
+	await pump.finished
+	match sp["kind"]:
+		"barrage": await _special_barrage(e, targets)
+		"frenzy": await _special_frenzy(e, targets[randi() % targets.size()])
+		"slam": await _special_slam(e, targets)
+		"drain": await _special_drain(e, targets[randi() % targets.size()])
+
+## Salven-Geschoss schlägt ein: Funkenstoß in der Signalfarbe.
+func _barrage_impact(glob: Sprite2D, col: Color) -> void:
+	AudioManager.play_sfx("hit")
+	_burst(glob.position, col, 8, 110)
+	glob.queue_free()
+
+## Spezial „Salve": das Fraktionsgeschoss prasselt in Bögen auf ALLE Helden
+## nieder — zwei Geschosse pro Held, zeitversetzt abgefeuert.
+func _special_barrage(e: Dictionary, targets: Array) -> void:
+	var es: Sprite2D = e["sprite"]
+	var from: Vector2 = es.position + Vector2(30, -10)
+	var col := _special_color("barrage", e.get("proj", ""))
+	AudioManager.play_sfx("wave")
+	var shots := targets.size() * 2
+	for k in shots:
+		var t: Dictionary = targets[k % targets.size()]
+		var to: Vector2 = (t["sprite"] as Sprite2D).position \
+			+ Vector2(randf_range(-18, 18), randf_range(-14, 14))
+		var glob := Sprite2D.new()
+		match e.get("proj", ""):
+			"coin":
+				glob.texture = SpriteFactory.dtii("coin_anim_f%d" % (k % 4))
+				glob.scale = Vector2(2.6, 2.6)
+			"page":
+				glob.texture = _paper_texture()
+				glob.scale = Vector2(3.0, 3.0)
+			"smog":
+				glob.texture = SpriteFactory.particle("smoke_04")
+				glob.scale = Vector2(0.28, 0.28)
+				glob.modulate = Color(0.55, 0.70, 0.45)
+			"hate":
+				glob.texture = SpriteFactory.particle("spark_04")
+				glob.scale = Vector2(0.45, 0.26)
+				glob.modulate = Color(1.0, 0.30, 0.20)
+				var hmat := CanvasItemMaterial.new()
+				hmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+				glob.material = hmat
+			_:
+				glob.texture = SpriteFactory.circle(6, Color(0.45, 0.85, 0.20))
+		glob.position = from
+		glob.z_index = 5
+		add_child(glob)
+		var mid := (from + to) * 0.5 + Vector2(0, -randf_range(60, 130))
+		var fly := create_tween()
+		fly.tween_interval(k * 0.09)
+		fly.tween_method(_arc_step.bind(glob, from, mid, to), 0.0, 1.0, 0.34)
+		fly.parallel().tween_property(glob, "rotation", randf_range(2.0, 5.0), 0.34)
+		fly.tween_callback(_barrage_impact.bind(glob, col))
+	await get_tree().create_timer(shots * 0.09 + 0.45).timeout
+	_shake_camera(1.6)
+	for t in targets:
+		var dmg := maxi(int(e["atk"] * randf_range(0.65, 0.85)) - t["data"]["def"], 1)
+		_damage_hero(t, dmg)
+	await get_tree().create_timer(0.3).timeout
+
+## Spezial „Raserei": drei blitzschnelle Sturmdurchgänge quer durch EIN Ziel,
+## Seiten im Wechsel, mit Geistertrail und Hiebspuren.
+func _special_frenzy(e: Dictionary, target: Dictionary) -> void:
+	var es: Sprite2D = e["sprite"]
+	var center: Vector2 = (target["sprite"] as Sprite2D).position
+	AudioManager.play_sfx("roar")
+	for i in 3:
+		if target["data"]["hp"] <= 0:
+			break
+		var side := 1.0 if i % 2 == 0 else -1.0
+		var from := center + Vector2(-side * randf_range(120, 160), randf_range(-30, 30))
+		var to := center + Vector2(side * randf_range(120, 160), randf_range(-30, 30))
+		es.position = from
+		var dash := create_tween()
+		dash.tween_property(es, "position", to, 0.12) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		_ghost_trail(es, 0.12)
+		AudioManager.play_sfx("slash")
+		_slash_arc(center + Vector2(randf_range(-12, 12), randf_range(-12, 12)))
+		_burst(center, Color(1.0, 0.5, 0.35), 7, 110)
+		await dash.finished
+		var dmg := maxi(int(e["atk"] * randf_range(0.4, 0.5)) - target["data"]["def"], 1)
+		_damage_hero(target, dmg)
+		await get_tree().create_timer(0.06).timeout
+	_shake_camera(1.5)
+	var back := create_tween()
+	back.tween_property(es, "position", e["home"], 0.3).set_trans(Tween.TRANS_QUAD)
+	await back.finished
+
+## Spezial „Bodenschlag": hoch aufspringen, ein Atemzug in der Luft — dann
+## krachend vor der Heldenreihe einschlagen: Stoßwelle, Staub, Trümmer, AoE.
+func _special_slam(e: Dictionary, targets: Array) -> void:
+	var es: Sprite2D = e["sprite"]
+	var base: Vector2 = es.get_meta("base_scale", es.scale)
+	var center := Vector2.ZERO
+	for t in targets:
+		center += (t["sprite"] as Sprite2D).position
+	center /= targets.size()
+	center += Vector2(-70, 10)  # vor der Heldenreihe aufschlagen
+	AudioManager.play_sfx("stomp")
+	# Absprung: ducken, dann hoch übers Feld.
+	var crouch := create_tween()
+	crouch.tween_property(es, "scale", base * Vector2(1.15, 0.8), 0.16)
+	await crouch.finished
+	var leap := create_tween()
+	leap.tween_property(es, "position", Vector2(center.x, -90.0), 0.34) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	leap.parallel().tween_property(es, "scale", base * Vector2(0.9, 1.12), 0.34)
+	_ghost_trail(es, 0.34)
+	await leap.finished
+	await get_tree().create_timer(0.22).timeout
+	AudioManager.play_sfx("whistle")
+	var drop := create_tween()
+	drop.tween_property(es, "position", center, 0.18) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await drop.finished
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1, 1, 1, 0.4))
+	_shockwave(center)
+	_shake_camera(2.6)
+	_punch_zoom(0.08, center)
+	_impact_ring(center + Vector2(0, 26), Color(0.95, 0.75, 0.45, 0.8))
+	var foot := es.texture.get_height() * es.scale.y * 0.5
+	_step_dust(center + Vector2(-20, foot * 0.5))
+	_step_dust(center + Vector2(20, foot * 0.5))
+	# Trümmer fliegen bogenförmig davon.
+	var debris := CPUParticles2D.new()
+	debris.position = center + Vector2(0, foot * 0.4)
+	debris.one_shot = true
+	debris.explosiveness = 1.0
+	debris.amount = 12
+	debris.lifetime = 0.7
+	debris.direction = Vector2(0, -1)
+	debris.spread = 70.0
+	debris.gravity = Vector2(0, 420)
+	debris.initial_velocity_min = 90.0
+	debris.initial_velocity_max = 210.0
+	debris.scale_amount_min = 0.05
+	debris.scale_amount_max = 0.12
+	debris.color = Color(0.55, 0.42, 0.34)
+	debris.texture = SpriteFactory.particle("dirt_02")
+	debris.emitting = true
+	add_child(debris)
+	get_tree().create_timer(1.4).timeout.connect(debris.queue_free)
+	es.scale = base * Vector2(1.2, 0.8)
+	var unsquash := create_tween()
+	unsquash.tween_property(es, "scale", base, 0.25) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await _hitstop(0.09)
+	for t in targets:
+		var dmg := maxi(int(e["atk"] * randf_range(0.7, 0.9)) - t["data"]["def"], 1)
+		_burst((t["sprite"] as Sprite2D).position, Color(0.9, 0.7, 0.4), 8, 120)
+		_damage_hero(t, dmg)
+	await get_tree().create_timer(0.3).timeout
+	# Zurück auf die eigene Seite springen.
+	var ret := create_tween()
+	ret.tween_property(es, "position", e["home"], 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	_ghost_trail(es, 0.4)
+	await ret.finished
+
+## Spezial „Lebensentzug": fahle Lebensfäden fließen im Bogen vom Ziel zum
+## Monster, das sich sichtbar daran labt (Selbstheilung).
+func _special_drain(e: Dictionary, target: Dictionary) -> void:
+	var es: Sprite2D = e["sprite"]
+	var ts: Sprite2D = target["sprite"]
+	AudioManager.play_sfx("sizzle")
+	var vmat := CanvasItemMaterial.new()
+	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# Kalter Schein legt sich ums Ziel.
+	var halo := Sprite2D.new()
+	halo.texture = SpriteFactory.particle("light_01")
+	halo.material = vmat
+	halo.modulate = Color(0.72, 0.78, 0.92, 0.0)
+	halo.position = ts.position
+	halo.scale = Vector2(0.5, 0.5)
+	add_child(halo)
+	var ht := create_tween()
+	ht.tween_property(halo, "modulate:a", 0.7, 0.25)
+	ht.tween_interval(0.7)
+	ht.tween_property(halo, "modulate:a", 0.0, 0.3)
+	ht.tween_callback(halo.queue_free)
+	# Lebensfäden lösen sich vom Helden und fließen zum Monster.
+	for i in 14:
+		var wisp := Sprite2D.new()
+		wisp.texture = SpriteFactory.circle(3, Color(0.80, 0.86, 1.0))
+		wisp.material = vmat
+		wisp.position = ts.position + Vector2(randf_range(-24, 24), randf_range(-34, 20))
+		wisp.z_index = 5
+		add_child(wisp)
+		var mid := (wisp.position + es.position) * 0.5 + Vector2(0, -randf_range(30, 90))
+		var wt := create_tween()
+		wt.tween_interval(i * 0.05)
+		wt.tween_method(_arc_step.bind(wisp, wisp.position, mid,
+			es.position + Vector2(10, -6)), 0.0, 1.0, 0.4)
+		wt.parallel().tween_property(wisp, "scale", Vector2(0.5, 0.5), 0.4)
+		wt.tween_callback(wisp.queue_free)
+	await get_tree().create_timer(0.55).timeout
+	AudioManager.play_sfx("hit")
+	var dmg := maxi(int(e["atk"] * randf_range(0.85, 1.05)) - target["data"]["def"], 1)
+	_damage_hero(target, dmg)
+	# Das Monster labt sich: Selbstheilung + kaltes Aufglimmen.
+	var heal := maxi(int(dmg * 0.6), 1)
+	e["hp"] = mini(e["hp"] + heal, e["max_hp"])
+	_float_text(es.position, "+%d" % heal, Color(0.55, 1.0, 0.6))
+	_sparkle(es.position, Color(0.75, 0.85, 1.0))
+	var glow := create_tween()
+	glow.tween_property(es, "modulate", Color(1.2, 1.3, 1.45), 0.2)
+	glow.tween_property(es, "modulate", e.get("tint", Color.WHITE), 0.35)
+	await get_tree().create_timer(0.5).timeout

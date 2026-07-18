@@ -218,6 +218,26 @@ func _spell_showcase() -> void:
 	await get_tree().create_timer(0.75).timeout
 	_snap(dir, "show_nuke_2")
 	await get_tree().create_timer(1.8).timeout
+	# Monster-Spezialattacken: alle 4 Arten am wiederbelebten Übungsgegner prüfen.
+	for h in heroes:
+		h["data"]["hp"] = 999
+		h["data"]["max_hp"] = 999
+	var se: Dictionary = enemies[0]
+	se["alive"] = true
+	se["hp"] = 999
+	se["max_hp"] = 999
+	var ses: Sprite2D = se["sprite"]
+	ses.visible = true
+	ses.material = null
+	ses.modulate = se.get("tint", Color.WHITE)
+	ses.position = se["home"]
+	var kinds := [["Sludge Flood", "barrage"], ["Blind Fury", "frenzy"],
+		["Scrap Avalanche", "slam"], ["Soul Siphon", "drain"]]
+	for i in kinds.size():
+		se["special"] = {"name": kinds[i][0], "kind": kinds[i][1]}
+		await _enemy_special(se, heroes)
+		_snap(dir, "show_special_%s" % kinds[i][1])
+		await get_tree().create_timer(0.4).timeout
 	get_tree().quit()
 
 func _snap(dir: String, shot_name: String) -> void:

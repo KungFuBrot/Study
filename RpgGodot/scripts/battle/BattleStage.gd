@@ -273,7 +273,8 @@ func _build_scene() -> void:
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl,
 			"tint": tint, "proj": def.get("proj", ""), "mist": mist,
-			"attack_line": def.get("attack_line", "")})
+			"attack_line": def.get("attack_line", ""),
+			"special": def.get("special", {})})
 
 ## Lebendiger Himmel über der Arena: pulsierende Glut in der Höhle,
 ## wogende Aurora-Bänder in der Frostgrotte.

@@ -351,6 +351,53 @@ func _ult_banner(text: String, color: Color) -> void:
 	tw.tween_property(banner, "modulate:a", 0.0, 0.35)
 	tw.tween_callback(banner.queue_free)
 
+## Kleineres Namensbanner für Spezialattacken (Monster-Spezials, Boss-AoE):
+## ploppt mittig auf und verschwindet schnell wieder — die kleine Schwester
+## des Ult-Banners.
+func _attack_banner(text: String, color: Color) -> void:
+	var banner := Label.new()
+	banner.text = text
+	banner.add_theme_font_size_override("font_size", 30)
+	banner.add_theme_color_override("font_color", color)
+	banner.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.10))
+	banner.add_theme_constant_override("outline_size", 8)
+	banner.custom_minimum_size = Vector2(960, 0)
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.position = Vector2(0, 96)
+	banner.pivot_offset = Vector2(480, 18)
+	banner.scale = Vector2(1.8, 1.8)
+	banner.modulate.a = 0.0
+	ui_layer.add_child(banner)
+	var tw := create_tween()
+	tw.tween_property(banner, "modulate:a", 1.0, 0.14)
+	tw.parallel().tween_property(banner, "scale", Vector2.ONE, 0.24) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.75)
+	tw.tween_property(banner, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(banner.queue_free)
+
+## Kurzer weißer Glanzblitz an der Waffe (Anticipation vor dem Schlag).
+func _weapon_glint(wp: Sprite2D) -> void:
+	if wp == null or not is_instance_valid(wp):
+		return
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var g := Sprite2D.new()
+	g.texture = SpriteFactory.particle("star_07")
+	g.modulate = Color(1.0, 1.0, 0.92, 0.0)
+	g.material = mat
+	g.scale = Vector2(0.06, 0.06)
+	g.position = Vector2(0, -26)  # nahe der Klingenspitze
+	g.z_index = 2
+	wp.add_child(g)
+	var tw := g.create_tween()
+	tw.tween_property(g, "modulate:a", 1.0, 0.08)
+	tw.parallel().tween_property(g, "scale", Vector2(0.22, 0.22), 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(g, "rotation", 1.2, 0.2)
+	tw.tween_property(g, "modulate:a", 0.0, 0.1)
+	tw.tween_callback(g.queue_free)
+
 ## Träge Idle-Kamera: minimales Atmen in Zoom und Position, wirkt „gefilmt".
 func _camera_idle() -> void:
 	if cam_idle != null:

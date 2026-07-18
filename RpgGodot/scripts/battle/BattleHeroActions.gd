@@ -12,7 +12,9 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	var wp: Sprite2D = h["weapon"]
 	_say("%s attacks!" % h["data"]["name"])
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
-	# 1) Ausholen: zurücklehnen, Waffe über die Schulter reißen (Anticipation).
+	# 1) Ausholen: zurücklehnen, Waffe über die Schulter reißen (Anticipation),
+	# dazu ein kurzer Glanzblitz auf der Klinge.
+	_weapon_glint(wp)
 	var wind := create_tween()
 	wind.tween_property(s, "rotation", 0.16, 0.13) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -27,7 +29,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	lean.tween_property(s, "rotation", -0.10, 0.16)
 	lean.parallel().tween_property(s, "scale", base, 0.16)
 	await _sprint(h, strike_pos, 0.16)
-	# 3) Durchziehen: Waffe schwingt in einem Ruck durch den Gegner (mit
+	# 3) Kombo, Schlag 1: Waffe schwingt in einem Ruck durch den Gegner (mit
 	# Nachbildern), der Körper macht einen Ausfallschritt hinterher.
 	if wp != null:
 		_weapon_trail(wp, 0.12)
@@ -41,13 +43,35 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	AudioManager.play_sfx("slash")
 	_slash_arc(es.position)
 	_burst(es.position, Color(1.0, 0.9, 0.5), 10, 120)
-	_impact_ring(es.position, Color(1, 1, 1, 0.7))
-	var crit := randf() < 0.12
-	await _hitstop(0.11 if crit else 0.06)
-	var dmg: int = int(h["data"]["atk"] * randf_range(0.9, 1.2) * (1.6 if crit else 1.0)) - e["def"]
-	if crit:
-		_crit_fx(es.position)
-	await _damage_enemy(e, maxi(dmg, 1))
+	# Gesamtschaden wird auf beide Schläge verteilt; die Wucht (und die
+	# Crit-Chance) trägt der zweite Treffer.
+	var total: int = maxi(int(h["data"]["atk"] * randf_range(0.9, 1.2)) - e["def"], 2)
+	await _hitstop(0.05)
+	await _damage_enemy(e, maxi(int(total * 0.45), 1))
+	# Schlag 2: Rückhand — sofern der Gegner noch steht. Kurzer Rücksprung,
+	# dann reißt die Klinge in der Gegenrichtung durch.
+	if e["alive"]:
+		var hop := create_tween()
+		hop.tween_property(s, "position:x", strike_pos.x + 26.0, 0.10) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		hop.parallel().tween_property(s, "rotation", 0.14, 0.10)
+		if wp != null:
+			_weapon_trail(wp, 0.10)
+			var back_swing := create_tween()
+			back_swing.tween_property(wp, "rotation", 1.6, 0.09) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		await hop.finished
+		AudioManager.play_sfx("slash")
+		_slash_arc(es.position + Vector2(6, -8))
+		_burst(es.position, Color(1.0, 0.95, 0.7), 12, 150)
+		_impact_ring(es.position, Color(1, 1, 1, 0.7))
+		var crit := randf() < 0.12
+		_shake_camera(1.2)
+		_punch_zoom(0.05, es.position)
+		await _hitstop(0.12 if crit else 0.07)
+		if crit:
+			_crit_fx(es.position)
+		await _damage_enemy(e, maxi(int(total * 0.55 * (2.0 if crit else 1.0)), 1))
 	# 4) Rückzug: aufrichten, Waffe zurück in Ruhehaltung, heimsprinten.
 	var settle := create_tween()
 	settle.tween_property(s, "rotation", 0.0, 0.18) \
