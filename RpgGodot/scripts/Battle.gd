@@ -71,8 +71,11 @@ func _boss_showcase() -> void:
 	await get_tree().create_timer(0.5).timeout
 	e["hp"] = int(e["max_hp"] * 0.3)
 	await _boss_enrage(e)
-	await _boss_ultimate(e, heroes)
+	await _boss_ultimate(e, heroes, 0)
 	_snap(dir, "boss_ult_" + suffix)
+	await get_tree().create_timer(1.0).timeout
+	await _boss_ultimate(e, heroes, 1)
+	_snap(dir, "boss_ult2_" + suffix)
 	await get_tree().create_timer(1.0).timeout
 	get_tree().quit()
 

@@ -46,7 +46,8 @@ const ENEMIES := {
 			["Smokestack Baron", "Touching. It's called PROGRESS — and progress demands sacrifices!"],
 			["Helen", "Agreed. Then let's start with you."],
 		],
-		"aoe_name": "Toxic Flood", "ultimate_name": "Black Sky"},
+		"aoe_name": "Toxic Flood", "ultimate_name": "Black Sky",
+		"ultimate2_name": "Core Meltdown"},
 	# --- Konzernturm: die Kapitalisten ---
 	"gierschlund": {"name": "Greedmaw", "hp": 55, "atk": 18, "def": 5, "tier": 1,
 		"gold": 30, "xp": 22, "sprite": "gierschlund", "proj": "coin",
@@ -70,7 +71,8 @@ const ENEMIES := {
 			["Monopoly Prince", "Ownership IS decency, tin can! Even your defeat goes on my books as profit."],
 			["Wally", "Objection. This entry is now being cancelled."],
 		],
-		"aoe_name": "Coin Hail", "ultimate_name": "Hostile Takeover"},
+		"aoe_name": "Coin Hail", "ultimate_name": "Hostile Takeover",
+		"ultimate2_name": "Market Crash"},
 	# --- Hassfestung: die Rassisten und Nationalisten ---
 	"hetzer": {"name": "Rabble-Rouser", "hp": 72, "atk": 25, "def": 6, "tier": 2,
 		"gold": 30, "xp": 34, "sprite": "hetzer", "proj": "hate",
@@ -98,7 +100,8 @@ const ENEMIES := {
 			["The Divider", "I divided them ALL! Village against village! Brother against brother!"],
 			["Janosch", "And yet today three strangers stand before you, side by side. It didn't work."],
 		],
-		"aoe_name": "Hate Tirade", "ultimate_name": "Wall of Hate"},
+		"aoe_name": "Hate Tirade", "ultimate_name": "Wall of Hate",
+		"ultimate2_name": "Fault Line"},
 	# --- Die Leere: keine Emotionen, Einsamkeit, Gleichgültigkeit ---
 	"hohlgaenger": {"name": "Hollow Walker", "hp": 96, "atk": 30, "def": 8, "tier": 3,
 		"gold": 40, "xp": 48, "sprite": "hohlgaenger", "tint": Color(0.72, 0.74, 0.80),
@@ -123,7 +126,8 @@ const ENEMIES := {
 			["The Silence", "Why. The Baron bellowed. The Prince counted. The Divider screamed. Now they are quiet. As everything soon will be."],
 			["Helen", "We are here because this valley matters to us. And that is louder than you will ever be."],
 		],
-		"aoe_name": "Gray Veil", "ultimate_name": "The Great Forgetting"},
+		"aoe_name": "Gray Veil", "ultimate_name": "The Great Forgetting",
+		"ultimate2_name": "Oblivion"},
 }
 
 # Zufalls-Begegnungen pro Dungeon (Gruppen von Gegner-IDs).

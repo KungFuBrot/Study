@@ -17,10 +17,19 @@ func _enemy_turn(e: Dictionary) -> void:
 	# gegen die Angriffs-Tweens um die Position).
 	_pause_bob(e)
 	var bob_period := 1.9 if e["is_boss"] else 1.6
-	# In der Wut-Phase entfesselt der Boss einmalig seine Ultimative.
+	# In der Wut-Phase entfesselt der Boss seine erste Ultimative; ein paar
+	# Züge später (oder wenn er fast fällt) folgt einmalig die zweite.
 	if e["is_boss"] and e["enraged"] and not e.get("ult_used", false):
 		e["ult_used"] = true
-		await _boss_ultimate(e, alive_heroes)
+		e["ult_act"] = e["acts"]
+		await _boss_ultimate(e, alive_heroes, 0)
+		_resume_bob(e, bob_period)
+		return
+	if e["is_boss"] and e["enraged"] and e.get("ult_used", false) \
+			and not e.get("ult2_used", false) \
+			and (e["acts"] - e.get("ult_act", 0) >= 3 or e["hp"] < e["max_hp"] * 0.2):
+		e["ult2_used"] = true
+		await _boss_ultimate(e, alive_heroes, 1)
 		_resume_bob(e, bob_period)
 		return
 	# Normale Monster entfesseln alle 3 Züge ihre benannte Spezialattacke —
@@ -416,13 +425,14 @@ func _grey_impact(shard: Sprite2D) -> void:
 	_burst(shard.position, Color(0.72, 0.76, 0.84), 6, 90)
 	shard.queue_free()
 
-## Boss-Ultimative: „Schwarzer Himmel“ (Smogdecke + Säureregen),
-## „Feindliche Übernahme“ (Münzstrudel + Riesenmünze) oder
-## „Mauer des Hasses“ (Backsteinmauer wächst und kippt auf die Helden).
-func _boss_ultimate(e: Dictionary, targets: Array) -> void:
+## Boss-Ultimative — jeder Boss hat zwei (idx 0/1). Erste: „Schwarzer Himmel",
+## „Feindliche Übernahme", „Mauer des Hasses", „Das große Vergessen". Zweite:
+## „Kernschmelze", „Börsencrash", „Verwerfungslinie", „Oblivion" (Weltabschaltung).
+func _boss_ultimate(e: Dictionary, targets: Array, idx := 0) -> void:
 	var st := _style()
 	var theme: String = boss_def.get("theme", "toxic")
-	var ult_name: String = boss_def["ultimate_name"]
+	var ult_name: String = boss_def["ultimate_name"] if idx == 0 \
+		else boss_def.get("ultimate2_name", boss_def["ultimate_name"])
 	_say("%s unleashes: %s!" % [e["name"], ult_name])
 	var dim := _dim_world(0.55)
 	var es: Sprite2D = e["sprite"]
@@ -436,12 +446,22 @@ func _boss_ultimate(e: Dictionary, targets: Array) -> void:
 	_ult_banner("☠ %s ☠" % ult_name.to_upper(), st["banner"])
 	await get_tree().create_timer(0.6).timeout
 	match theme:
-		"gold": await _ult_uebernahme()
-		"hate": await _ult_mauer(targets)
-		"void": await _ult_vergessen(es.position)
-		_: await _ult_schwarzer_himmel()
+		"gold":
+			if idx == 0: await _ult_uebernahme()
+			else: await _ult_crash(targets)
+		"hate":
+			if idx == 0: await _ult_mauer(targets)
+			else: await _ult_spalt(e, targets)
+		"void":
+			if idx == 0: await _ult_vergessen(es.position, targets)
+			else: await _ult_oblivion(targets)
+		_:
+			if idx == 0: await _ult_schwarzer_himmel()
+			else: await _ult_meltdown()
 	for t in targets:
-		var dmg := maxi(int(e["atk"] * randf_range(0.95, 1.15)) - t["data"]["def"], 1)
+		# Die zweite Ultimative ist der Verzweiflungsschlag — sie trifft härter.
+		var mul := randf_range(0.95, 1.15) if idx == 0 else randf_range(1.05, 1.25)
+		var dmg := maxi(int(e["atk"] * mul) - t["data"]["def"], 1)
 		_damage_hero(t, dmg)
 	var shrink := create_tween()
 	shrink.tween_property(es, "scale", base, 0.3).set_trans(Tween.TRANS_QUAD)
@@ -488,11 +508,47 @@ func _ult_schwarzer_himmel() -> void:
 		fade.tween_property(cl, "modulate:a", 0.0, 0.8)
 		fade.tween_callback(cl.queue_free)
 
+## Leiser Ascheregen über dem ganzen Feld (Leere-Ultimates).
+func _void_ash(dur: float) -> void:
+	var ash := CPUParticles2D.new()
+	ash.position = Vector2(480, -20)
+	ash.amount = 40
+	ash.lifetime = 2.2
+	ash.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	ash.emission_rect_extents = Vector2(480, 10)
+	ash.direction = Vector2(0, 1)
+	ash.spread = 12.0
+	ash.gravity = Vector2(0, 26)
+	ash.initial_velocity_min = 30.0
+	ash.initial_velocity_max = 70.0
+	ash.scale_amount_min = 0.5
+	ash.scale_amount_max = 1.1
+	ash.color = Color(0.72, 0.74, 0.80, 0.7)
+	ash.texture = SpriteFactory.circle(2, Color.WHITE)
+	ash.z_index = 6
+	ash.emitting = true
+	add_child(ash)
+	get_tree().create_timer(dur).timeout.connect(func():
+		if is_instance_valid(ash):
+			ash.emitting = false)
+	get_tree().create_timer(dur + 2.4).timeout.connect(func():
+		if is_instance_valid(ash):
+			ash.queue_free())
+
 ## „Die Stille": Das große Vergessen — alles Licht der Welt wird zur Gestalt
 ## gesogen, verdichtet sich zu einer wachsenden Leere-Kugel und kollabiert dann
-## in einer entfärbenden Druckwelle, die das ganze Schlachtfeld erfasst.
-func _ult_vergessen(center: Vector2) -> void:
+## in einer entfärbenden Druckwelle. Auch die Helden verlieren dabei sichtbar
+## ihre Farben, und stille Asche rieselt über das Feld.
+func _ult_vergessen(center: Vector2, targets: Array) -> void:
 	AudioManager.play_sfx("ult_charge")
+	_void_ash(2.6)
+	# Das Vergessen greift nach den Helden: ihre Farben laufen langsam aus.
+	var drained := []
+	for t in targets:
+		var ts: Sprite2D = t["sprite"]
+		drained.append([ts, ts.modulate])
+		var dt := ts.create_tween()
+		dt.tween_property(ts, "modulate", Color(0.52, 0.54, 0.60), 0.9)
 	var vmat := CanvasItemMaterial.new()
 	vmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	# Phase 1: das Licht wird eingesogen — Streifen konvergieren aufs Zentrum.
@@ -558,6 +614,12 @@ func _ult_vergessen(center: Vector2) -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	expand.parallel().tween_property(ring, "modulate:a", 0.0, 0.5)
 	expand.tween_callback(ring.queue_free)
+	# Mit der Druckwelle kehren die Farben der Helden zögernd zurück.
+	for pair: Array in drained:
+		if is_instance_valid(pair[0]):
+			var rt := (pair[0] as Sprite2D).create_tween()
+			rt.tween_interval(0.2)
+			rt.tween_property(pair[0], "modulate", pair[1], 0.6)
 	await get_tree().create_timer(0.5).timeout
 
 ## Kreisender Münzstrudel (tween_method-Helfer): zieht sich spiralig zusammen.
@@ -695,6 +757,352 @@ func _ult_mauer(targets: Array) -> void:
 	var df := create_tween()
 	df.tween_interval(1.2)
 	df.tween_callback(dust.queue_free)
+	await get_tree().create_timer(0.5).timeout
+
+## Gezackter Bodenriss-Streifen (Polygonpunkte), Ursprung links bei x=0 —
+## Grundform für die Riss-Ultimates (Kernschmelze, Verwerfungslinie).
+func _crack_polygon(length: float) -> PackedVector2Array:
+	var n := maxi(int(length / 50.0), 4)
+	var step := length / n
+	var top := PackedVector2Array()
+	for i in n + 1:
+		top.append(Vector2(i * step,
+			randf_range(-7.0, -2.0) if i % 2 == 0 else randf_range(2.0, 7.0)))
+	var poly := PackedVector2Array(top)
+	for i in range(n, -1, -1):
+		poly.append(Vector2(i * step, top[i].y + randf_range(6.0, 10.0)))
+	return poly
+
+## Schlotbaron Ult 2: „Core Meltdown" — der Fabrikkern geht durch: Warnblinken,
+## ein glühender Riss reißt quer über den Boden, Eruptionen wandern die Linie
+## entlang Richtung Helden, Hitzeflimmern — dann birst der Kern.
+func _ult_meltdown() -> void:
+	AudioManager.play_sfx("alarm")
+	for i in 3:
+		_flash_screen(Color(1.0, 0.15, 0.05, 0.20))
+		_shake_camera(0.6)
+		await get_tree().create_timer(0.26).timeout
+	# Glühender Riss reißt von der Bossseite zur Heldenseite auf.
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var crack := Polygon2D.new()
+	crack.polygon = _crack_polygon(800.0)
+	crack.color = Color(1.0, 0.45, 0.10)
+	crack.material = mat
+	crack.position = Vector2(90, 402)
+	crack.scale = Vector2(0.0, 1.0)
+	crack.z_index = -8
+	add_child(crack)
+	AudioManager.play_sfx("eruption")
+	var rip := create_tween()
+	rip.tween_property(crack, "scale:x", 1.0, 0.55) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_shake_camera(1.8)
+	await rip.finished
+	# Glutpuls im Riss, Hitzeflimmern überm Feld, solange der Kern kocht.
+	var pulse := crack.create_tween().set_loops(4)
+	pulse.tween_property(crack, "modulate", Color(1.4, 0.9, 0.5), 0.18)
+	pulse.tween_property(crack, "modulate", Color.WHITE, 0.18)
+	var haze := ColorRect.new()
+	haze.position = Vector2(60, 120)
+	haze.size = Vector2(840, 320)
+	haze.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	haze.material = Fx.heat_haze_material()
+	ui_layer.add_child(haze)
+	ui_layer.move_child(haze, 3)
+	get_tree().create_timer(2.6).timeout.connect(haze.queue_free)
+	# Eruptionen wandern den Riss entlang Richtung Helden.
+	for x: float in [200.0, 360.0, 520.0, 680.0, 820.0]:
+		AudioManager.play_sfx("boom")
+		_explosion(Vector2(x, 395), randf_range(1.0, 1.3))
+		_shake_camera(1.6)
+		await get_tree().create_timer(0.22).timeout
+	# Der Kern birst.
+	await get_tree().create_timer(0.25).timeout
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1.0, 0.6, 0.2, 0.6))
+	_shockwave(Vector2(520, 380))
+	_shake_camera(3.0)
+	_punch_zoom(0.12, Vector2(520, 370))
+	_explosion(Vector2(520, 385), 2.6)
+	# Riss verglüht.
+	var cool := create_tween()
+	cool.tween_interval(0.6)
+	cool.tween_property(crack, "modulate:a", 0.0, 0.9)
+	cool.tween_callback(crack.queue_free)
+	await get_tree().create_timer(0.8).timeout
+
+## Absturz-Schritt des Kurspfeils (tween_method-Helfer für den Börsencrash).
+func _crash_step(t: float, chart: Line2D, head: Polygon2D,
+		from: Vector2, to: Vector2, idx: int) -> void:
+	if not is_instance_valid(chart) or not is_instance_valid(head):
+		return
+	var p := from.lerp(to, t)
+	chart.set_point_position(idx, p)
+	head.position = p
+	head.rotation = (to - from).angle()
+
+## Monopolfürst Ult 2: „Market Crash" — eine glühend rote Chartlinie hackt
+## sich zackig über den Himmel abwärts und stürzt am Ende als Pfeil mitten in
+## die Heldenreihe; Münzen spritzen wie Schrapnell.
+func _ult_crash(targets: Array) -> void:
+	var hc := Vector2.ZERO
+	for t in targets:
+		hc += (t["sprite"] as Sprite2D).position
+	hc /= targets.size()
+	var mat := CanvasItemMaterial.new()
+	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var chart := Line2D.new()
+	chart.width = 7.0
+	chart.default_color = Color(1.0, 0.22, 0.15)
+	chart.material = mat
+	chart.z_index = 7
+	add_child(chart)
+	# Pfeilspitze, die dem Linienende folgt.
+	var head := Polygon2D.new()
+	head.polygon = PackedVector2Array([Vector2(18, 0), Vector2(-10, -11), Vector2(-10, 11)])
+	head.color = Color(1.0, 0.30, 0.20)
+	head.material = mat
+	head.z_index = 7
+	add_child(head)
+	# Zackenkurs: jede Erholung nur ein kurzes Aufbäumen vor dem nächsten Sturz.
+	var pts: Array = [Vector2(60, 150), Vector2(190, 190), Vector2(260, 140),
+		Vector2(400, 240), Vector2(470, 185), Vector2(610, 300)]
+	chart.add_point(pts[0])
+	head.position = pts[0]
+	for i in range(1, pts.size()):
+		chart.add_point(pts[i])
+		head.position = pts[i]
+		head.rotation = (pts[i] - pts[i - 1]).angle()
+		AudioManager.play_sfx("coin")
+		_shake_camera(0.5)
+		await get_tree().create_timer(0.16).timeout
+	# Der finale Absturz: steil hinab in die Heldenreihe.
+	AudioManager.play_sfx("whistle")
+	var last: Vector2 = pts[pts.size() - 1]
+	chart.add_point(last)
+	var pl := create_tween()
+	pl.tween_method(_crash_step.bind(chart, head, last, hc,
+		chart.get_point_count() - 1), 0.0, 1.0, 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await pl.finished
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1.0, 0.55, 0.25, 0.5))
+	_shockwave(hc)
+	_shake_camera(3.0)
+	_punch_zoom(0.12, hc)
+	_explosion(hc, 1.6)
+	_burst(hc, Color(1.0, 0.85, 0.35), 24, 220)
+	# Münz-Schrapnell fliegt in Bögen davon.
+	for i in 10:
+		var c := Sprite2D.new()
+		c.texture = SpriteFactory.dtii("coin_anim_f%d" % (i % 4))
+		c.scale = Vector2(2.4, 2.4)
+		c.position = hc
+		add_child(c)
+		var to := hc + Vector2(randf_range(-180, 180), randf_range(-40, 30))
+		var mid := (hc + to) * 0.5 + Vector2(0, -randf_range(60, 140))
+		var cf := create_tween()
+		cf.tween_method(_arc_step.bind(c, hc, mid, to), 0.0, 1.0, randf_range(0.4, 0.6))
+		cf.parallel().tween_property(c, "rotation", randf_range(3.0, 8.0), 0.6)
+		cf.tween_property(c, "modulate:a", 0.0, 0.2)
+		cf.tween_callback(c.queue_free)
+	# Der Chart verglüht.
+	var fade := create_tween()
+	fade.tween_property(chart, "modulate:a", 0.0, 0.5)
+	fade.parallel().tween_property(head, "modulate:a", 0.0, 0.5)
+	fade.tween_callback(chart.queue_free)
+	fade.tween_callback(head.queue_free)
+	await get_tree().create_timer(0.6).timeout
+
+## Der Spalter Ult 2: „Fault Line" — die Faust fährt in den Boden, ein dunkler
+## Riss mit glühender Kante rast unter die Helden, und aus ihm brechen
+## Glut-Geysire nacheinander unter jedem einzelnen hervor.
+func _ult_spalt(e: Dictionary, targets: Array) -> void:
+	var es: Sprite2D = e["sprite"]
+	var ehome: Vector2 = es.position
+	# Fausthieb: vorschnellen und in den Boden rammen.
+	AudioManager.play_sfx("stomp")
+	var punch := create_tween()
+	punch.tween_property(es, "position", ehome + Vector2(46, 26), 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await punch.finished
+	_shake_camera(2.2)
+	_burst(es.position + Vector2(40, 60), Color(0.9, 0.5, 0.35), 14, 150)
+	_step_dust(es.position + Vector2(40, 70))
+	# Dunkler Riss mit glühender Kante rast zur Heldenseite.
+	var start := Vector2(es.position.x + 60, 405)
+	var length := 880.0 - start.x
+	var gmat := CanvasItemMaterial.new()
+	gmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var glow := Polygon2D.new()
+	glow.polygon = _crack_polygon(length)
+	glow.color = Color(1.0, 0.30, 0.15, 0.8)
+	glow.material = gmat
+	glow.position = start
+	glow.scale = Vector2(0.0, 1.6)
+	glow.z_index = -8
+	add_child(glow)
+	var crack := Polygon2D.new()
+	crack.polygon = _crack_polygon(length)
+	crack.color = Color(0.08, 0.04, 0.05)
+	crack.position = start
+	crack.scale = Vector2(0.0, 1.0)
+	crack.z_index = -8
+	add_child(crack)
+	AudioManager.play_sfx("eruption")
+	var rip := create_tween()
+	rip.tween_property(crack, "scale:x", 1.0, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	rip.parallel().tween_property(glow, "scale:x", 1.0, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_shake_camera(1.8)
+	await rip.finished
+	# Glut-Geysire brechen nacheinander unter jedem Helden hervor.
+	for t in targets:
+		var ts: Sprite2D = t["sprite"]
+		AudioManager.play_sfx("boom")
+		_impact_ring(Vector2(ts.position.x, 400), Color(1.0, 0.4, 0.25, 0.8))
+		var gey := CPUParticles2D.new()
+		gey.position = Vector2(ts.position.x, 402)
+		gey.one_shot = true
+		gey.explosiveness = 0.9
+		gey.amount = 16
+		gey.lifetime = 0.6
+		gey.direction = Vector2(0, -1)
+		gey.spread = 14.0
+		gey.gravity = Vector2(0, 500)
+		gey.initial_velocity_min = 260.0
+		gey.initial_velocity_max = 420.0
+		gey.scale_amount_min = 0.8
+		gey.scale_amount_max = 1.8
+		gey.color = Color(1.0, 0.5, 0.2)
+		gey.texture = SpriteFactory.circle(3, Color.WHITE)
+		gey.emitting = true
+		add_child(gey)
+		get_tree().create_timer(1.4).timeout.connect(gey.queue_free)
+		_burst(ts.position, Color(1.0, 0.45, 0.30), 12, 150)
+		_shake_camera(1.8)
+		await get_tree().create_timer(0.24).timeout
+	# Finale: die Verwerfung entlädt sich unter der ganzen Reihe.
+	var hc := Vector2.ZERO
+	for t in targets:
+		hc += (t["sprite"] as Sprite2D).position
+	hc /= targets.size()
+	AudioManager.play_sfx("bigboom")
+	_flash_screen(Color(1.0, 0.25, 0.15, 0.45))
+	_shockwave(hc)
+	_shake_camera(2.8)
+	_punch_zoom(0.11, hc)
+	# Der Riss schließt sich, der Spalter weicht zurück.
+	var seal := create_tween()
+	seal.tween_interval(0.4)
+	seal.tween_property(crack, "modulate:a", 0.0, 0.7)
+	seal.parallel().tween_property(glow, "modulate:a", 0.0, 0.7)
+	seal.tween_callback(crack.queue_free)
+	seal.tween_callback(glow.queue_free)
+	var back := create_tween()
+	back.tween_property(es, "position", ehome, 0.3).set_trans(Tween.TRANS_QUAD)
+	await back.finished
+	await get_tree().create_timer(0.4).timeout
+
+## „Die Stille" Ult 2: „Oblivion" — die Welt wird abgeschaltet. Finsternis und
+## Ascheregen, ein toter Mond steigt hinter dem Feld auf und fegt graue
+## Strahlen über die Helden — dann kollabiert das Bild wie ein alter
+## Röhrenfernseher zu einer weißen Linie, einem Punkt, Stille ... und kehrt
+## mit dem Knall zurück.
+func _ult_oblivion(targets: Array) -> void:
+	# Phase 1: tiefe Finsternis legt sich über die Welt, stille Asche fällt.
+	AudioManager.play_sfx("wave")
+	var veil := ColorRect.new()
+	veil.color = Color(0.02, 0.02, 0.05, 0.0)
+	veil.size = Vector2(960, 540)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veil.z_index = -3
+	add_child(veil)
+	var vt := veil.create_tween()
+	vt.tween_property(veil, "color:a", 0.5, 0.8)
+	_void_ash(3.4)
+	await get_tree().create_timer(0.9).timeout
+	# Phase 2: ein toter Mond steigt hinter dem Schlachtfeld auf.
+	AudioManager.play_sfx("ult_charge")
+	var mmat := CanvasItemMaterial.new()
+	mmat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	var halo := Sprite2D.new()
+	halo.texture = SpriteFactory.circle(80, Color(0.55, 0.60, 0.72, 0.45))
+	halo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	halo.material = mmat
+	halo.position = Vector2(310, 640)
+	halo.scale = Vector2(1.5, 1.5)
+	halo.z_index = -2
+	add_child(halo)
+	var moon := Sprite2D.new()
+	moon.texture = SpriteFactory.circle(64, Color(0.16, 0.17, 0.22))
+	moon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	moon.position = Vector2(310, 640)
+	moon.z_index = -2
+	add_child(moon)
+	var rise := create_tween()
+	rise.tween_property(moon, "position:y", 130.0, 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	rise.parallel().tween_property(halo, "position:y", 130.0, 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await rise.finished
+	# Phase 3: graue Strahlen fegen nacheinander über jeden Helden.
+	for t in targets:
+		var ts: Sprite2D = t["sprite"]
+		AudioManager.play_sfx("sizzle")
+		_beam(moon.position, ts.position, Color(0.70, 0.75, 0.88), 3.0, 0.10)
+		_burst(ts.position, Color(0.78, 0.82, 0.92), 10, 120)
+		_shake_camera(1.2)
+		await get_tree().create_timer(0.28).timeout
+	await get_tree().create_timer(0.3).timeout
+	# Phase 4: die Welt wird abgeschaltet — Kollaps zur weißen Linie, zum Punkt.
+	var off := CanvasLayer.new()
+	off.layer = 25  # über Bühne UND UI — nichts bleibt sichtbar
+	add_child(off)
+	var black := ColorRect.new()
+	black.color = Color.BLACK
+	black.size = Vector2(960, 540)
+	off.add_child(black)
+	var white := ColorRect.new()
+	white.color = Color(0.96, 0.97, 1.0)
+	white.size = Vector2(960, 540)
+	white.pivot_offset = Vector2(480, 270)
+	white.modulate.a = 0.0
+	off.add_child(white)
+	AudioManager.play_sfx("bigboom")
+	var tv := create_tween()
+	tv.tween_property(white, "modulate:a", 1.0, 0.08)
+	tv.tween_property(white, "scale:y", 0.004, 0.4) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tv.tween_interval(0.15)
+	tv.tween_property(white, "scale:x", 0.002, 0.3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await tv.finished
+	# Einen Atemzug lang: nichts. Absolute Stille.
+	await get_tree().create_timer(0.7).timeout
+	# ... und die Welt kehrt mit dem Knall zurück.
+	off.queue_free()
+	AudioManager.play_sfx("nuke")
+	_flash_screen(Color(1, 1, 1, 0.9))
+	var hc := Vector2.ZERO
+	for t in targets:
+		hc += (t["sprite"] as Sprite2D).position
+	hc /= targets.size()
+	_shockwave(hc)
+	_shake_camera(3.4)
+	_punch_zoom(0.15, hc)
+	for t in targets:
+		_burst((t["sprite"] as Sprite2D).position, Color(0.82, 0.86, 0.96), 16, 190)
+	# Mond und Schleier vergehen.
+	var out := create_tween()
+	out.tween_property(moon, "modulate:a", 0.0, 0.6)
+	out.parallel().tween_property(halo, "modulate:a", 0.0, 0.6)
+	out.parallel().tween_property(veil, "color:a", 0.0, 0.6)
+	out.tween_callback(moon.queue_free)
+	out.tween_callback(halo.queue_free)
+	out.tween_callback(veil.queue_free)
 	await get_tree().create_timer(0.5).timeout
 
 ## „Die Stille"-Nahangriff: Unter dem Ziel reißt ein dunkler Riss auf, aus dem
