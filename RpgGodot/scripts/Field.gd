@@ -42,6 +42,7 @@ var follower2: Sprite2D       # zweiter Begleiter (Roboter Rax)
 var follower2_tile: Vector2i
 var camera: Camera2D
 var npc_nodes := {}  # Vector2i -> npc dict
+var water_tiles: Array = []  # Wasser-Sprites (für die Gift-Tönung der Plage 1)
 
 # UI
 var ui: CanvasLayer
@@ -303,8 +304,10 @@ func _build_tiles() -> void:
 			s.position = Vector2(x * TILE, y * TILE)
 			if kind == "water":
 				s.material = Fx.water_material()  # sanftes Wogen + Glanzlichter
+				water_tiles.append(s)
 			add_child(s)
 	_add_tile_details()
+	_add_plague_signs()
 
 ## Detailschicht über den Kacheln: Kontaktschatten unter massiven Kacheln
 ## (verankert Wände und Bäume am Boden) plus gestreute Requisiten.
@@ -391,6 +394,185 @@ func _place_mushroom(x: int, y: int) -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_property(halo, "modulate:a", 1.0, 1.3) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+## ---------- Plagen-Spuren (Story-Schicht) ----------
+## Sichtbare Zeichen der drei Plagen in Dorf und Überwelt: vergiftetes Wasser,
+## Geldeintreiber & verarmtes Volk, Krieg & Gewalt. Jede besiegte Plage nimmt
+## ihre Spuren mit — die Welt heilt sichtbar mit jedem Sieg.
+func _add_plague_signs() -> void:
+	if map_id == "town":
+		if not GameState.boss_defeated:
+			_plague_toxic_town()
+		if not GameState.boss2_defeated:
+			_plague_greed_town()
+		if not GameState.boss3_defeated:
+			_plague_war_town()
+	elif map_id == "world":
+		if not GameState.boss_defeated:
+			_plague_toxic_world()
+		if not GameState.boss2_defeated:
+			_plague_greed_world()
+		if not GameState.boss3_defeated:
+			_plague_war_world()
+
+## Träge aufsteigende Rauchsäule (Kriegszeichen am Horizont).
+func _smoke_plume(pos: Vector2, col: Color) -> void:
+	var p := CPUParticles2D.new()
+	p.position = pos
+	p.amount = 14
+	p.lifetime = 3.2
+	p.preprocess = 3.2
+	p.direction = Vector2(0.15, -1)
+	p.spread = 8.0
+	p.gravity = Vector2(2, -14)
+	p.initial_velocity_min = 6.0
+	p.initial_velocity_max = 12.0
+	p.scale_amount_min = 0.05
+	p.scale_amount_max = 0.12
+	p.color = col
+	p.texture = SpriteFactory.particle("smoke_07")
+	p.z_index = 6
+	add_child(p)
+
+## Giftblasen, die träge aus verseuchtem Wasser/Schlamm aufsteigen.
+func _toxic_bubbles(pos: Vector2) -> void:
+	var p := CPUParticles2D.new()
+	p.position = pos
+	p.amount = 6
+	p.lifetime = 1.6
+	p.preprocess = 1.6
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.emission_rect_extents = Vector2(7, 4)
+	p.direction = Vector2(0, -1)
+	p.gravity = Vector2(0, -4)
+	p.initial_velocity_min = 1.0
+	p.initial_velocity_max = 3.0
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.2
+	p.color = Color(0.55, 0.85, 0.30, 0.6)
+	p.texture = SpriteFactory.circle(1, Color.WHITE)
+	p.z_index = 2
+	add_child(p)
+
+## Plage 1 im Dorf: das Wasser ist vergiftet — Schlammpfützen, Giftfässer und
+## grüner Brodem im Süden, wo der braune Bach ins Dorf sickert.
+func _plague_toxic_town() -> void:
+	for t: Vector2i in [Vector2i(3, 10), Vector2i(2, 7), Vector2i(6, 11),
+			Vector2i(16, 10), Vector2i(13, 12), Vector2i(7, 12)]:
+		_place_prop("sludge", t.x, t.y, _tile_noise(t.x, t.y))
+	for t: Vector2i in [Vector2i(2, 12), Vector2i(17, 11)]:
+		_place_prop("barrel", t.x, t.y, _tile_noise(t.x, t.y))
+	_toxic_bubbles(Vector2(3 * TILE + 8, 10 * TILE + 10))
+	_toxic_bubbles(Vector2(16 * TILE + 8, 10 * TILE + 10))
+	var l := Fx.point_light(Color(0.55, 0.95, 0.35), 46.0, 0.55)
+	l.position = Vector2(4 * TILE, 11 * TILE)
+	add_child(l)
+	Fx.pulse(l, 0.55, 1.8)
+
+## Plage 2 im Dorf: Pfändungsbescheide kleben an den Haustüren, beschlagnahmter
+## Hausrat stapelt sich davor — die Eintreiber des Monopolfürsten waren hier.
+func _plague_greed_town() -> void:
+	for d: Vector2i in [Vector2i(4, 3), Vector2i(14, 3)]:
+		var s := Sprite2D.new()
+		s.texture = SpriteFactory.prop("notice")
+		s.centered = false
+		s.position = Vector2(d.x * TILE + 6, d.y * TILE + 5)
+		s.z_index = 2
+		add_child(s)
+	_place_prop("crate", 5, 4, 0.30)
+	_place_prop("coins", 6, 4, 0.55)
+	_place_prop("crate", 12, 4, 0.70)
+	_place_prop("coins", 13, 4, 0.20)
+
+## Plage 3 im Dorf: hinterm Südwestwald steht Kriegsrauch, roter Widerschein
+## flackert über den Bäumen, Glutasche weht herein — der Spalter rückt näher.
+func _plague_war_town() -> void:
+	_smoke_plume(Vector2(2 * TILE + 8, 13 * TILE), Color(0.25, 0.22, 0.24, 0.75))
+	_smoke_plume(Vector2(5 * TILE, 13 * TILE + 8), Color(0.32, 0.28, 0.28, 0.6))
+	var glow := Sprite2D.new()
+	glow.texture = SpriteFactory.circle(22, Color(1.0, 0.30, 0.12, 0.18))
+	glow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	glow.material = _additive()
+	glow.position = Vector2(3 * TILE, 13 * TILE + 4)
+	glow.scale = Vector2(2.2, 1.1)
+	glow.z_index = 6
+	add_child(glow)
+	var tw := glow.create_tween().set_loops()
+	tw.tween_property(glow, "modulate:a", 0.5, 1.4) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(glow, "modulate:a", 1.0, 1.4) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	for t: Vector2i in [Vector2i(4, 11), Vector2i(6, 12)]:
+		_place_prop("crack", t.x, t.y, _tile_noise(t.x, t.y))
+	_place_prop("bones", 3, 12, 0.4)
+	# Glutasche weht von Südwesten herein.
+	var p := CPUParticles2D.new()
+	p.position = Vector2(3 * TILE, 12 * TILE)
+	p.amount = 10
+	p.lifetime = 3.0
+	p.preprocess = 3.0
+	p.direction = Vector2(0.5, -0.4)
+	p.spread = 30.0
+	p.gravity = Vector2(6, -3)
+	p.initial_velocity_min = 4.0
+	p.initial_velocity_max = 10.0
+	p.color = Color(1.0, 0.45, 0.2, 0.5)
+	p.texture = SpriteFactory.circle(1, Color.WHITE)
+	p.z_index = 6
+	add_child(p)
+
+## Plage 1 auf der Überwelt: der Fluss führt Giftbrühe — trübes Wasser,
+## Blasen und Schlammränder an den Ufern. Nach dem Sieg glitzert er wieder.
+func _plague_toxic_world() -> void:
+	for s: Sprite2D in water_tiles:
+		s.modulate = Color(0.72, 0.68, 0.42)
+	for t: Vector2i in [Vector2i(10, 3), Vector2i(13, 7), Vector2i(10, 9), Vector2i(13, 12)]:
+		_place_prop("sludge", t.x, t.y, _tile_noise(t.x, t.y))
+	_toxic_bubbles(Vector2(11 * TILE + 12, 4 * TILE))
+	_toxic_bubbles(Vector2(11 * TILE + 12, 8 * TILE))
+	_toxic_bubbles(Vector2(11 * TILE + 12, 12 * TILE))
+
+## Plage 2 auf der Überwelt: die Tributstraße zum Konzernturm — Zollkisten und
+## eingetriebene Münzhaufen säumen den Pass, goldener Schein über dem Tor.
+func _plague_greed_world() -> void:
+	_place_prop("crate", 17, 3, 0.30)
+	_place_prop("coins", 19, 3, 0.60)
+	_place_prop("coins", 16, 4, 0.25)
+	_place_prop("crate", 19, 4, 0.75)
+	_place_prop("coins", 17, 6, 0.45)
+	var l := Fx.point_light(Color(1.0, 0.85, 0.45), 52.0, 0.7)
+	l.position = Vector2(18 * TILE + 8, 3 * TILE)
+	add_child(l)
+	Fx.pulse(l, 0.7, 1.6)
+
+## Plage 3 auf der Überwelt: über der Hassfestung steht Kriegsrauch, Glut
+## treibt übers Land, der Boden ringsum ist aufgerissen und voller Gebeine.
+func _plague_war_world() -> void:
+	_smoke_plume(Vector2(4 * TILE + 8, 13 * TILE + 2), Color(0.22, 0.20, 0.22, 0.8))
+	_smoke_plume(Vector2(3 * TILE + 4, 13 * TILE + 8), Color(0.30, 0.26, 0.26, 0.6))
+	var l := Fx.point_light(Color(1.0, 0.35, 0.15), 60.0, 0.8)
+	l.position = Vector2(4 * TILE + 8, 13 * TILE + 8)
+	add_child(l)
+	Fx.pulse(l, 0.8, 1.1)
+	for t: Vector2i in [Vector2i(5, 13), Vector2i(2, 12)]:
+		_place_prop("crack", t.x, t.y, _tile_noise(t.x, t.y))
+	_place_prop("bones", 6, 13, 0.5)
+	_place_prop("bones", 2, 13, 0.8)
+	# Glutflocken treiben über die Ebene vor der Festung.
+	var p := CPUParticles2D.new()
+	p.position = Vector2(4 * TILE, 12 * TILE)
+	p.amount = 12
+	p.lifetime = 3.0
+	p.preprocess = 3.0
+	p.direction = Vector2(0.4, -0.5)
+	p.spread = 30.0
+	p.gravity = Vector2(5, -4)
+	p.initial_velocity_min = 4.0
+	p.initial_velocity_max = 11.0
+	p.color = Color(1.0, 0.45, 0.2, 0.5)
+	p.texture = SpriteFactory.circle(1, Color.WHITE)
+	p.z_index = 6
+	add_child(p)
 
 func _spawn_npcs() -> void:
 	for npc in map["npcs"]:

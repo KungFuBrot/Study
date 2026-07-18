@@ -841,6 +841,21 @@ const PROP_ART := {
 			"....lv.",
 			"....s..",
 		]},
+	# Pfändungsbescheid: angenageltes Papier mit Textzeilen und rotem Siegel
+	# (klebt an den Haustüren, solange der Monopolfürst regiert).
+	"notice": {
+		"map": {"p": Color(0.93, 0.90, 0.80), "l": Color(0.35, 0.35, 0.45),
+			"r": Color(0.82, 0.18, 0.16), "n": Color(0.25, 0.22, 0.18)},
+		"rows": [
+			"..n...",
+			"pppppp",
+			"pllllp",
+			"pppppp",
+			"plllpp",
+			"pppppp",
+			"pprrpp",
+			"pppppp",
+		]},
 }
 
 ## Requisiten-Sprite; flower0..flower3, tuft, pebble, crack, bones
