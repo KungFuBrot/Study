@@ -10,3 +10,4 @@
 *.wasm binary
 *.wav binary
 *.ogg binary
+*.xlsx binary
