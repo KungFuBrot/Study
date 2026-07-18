@@ -1474,7 +1474,7 @@ func _build_boss_bar() -> void:
 func _refresh_party() -> void:
 	for h in heroes:
 		var d: Dictionary = h["data"]
-		h["hp_label"].text = "%-7s Lv%2d  LP %3d/%3d  MP %2d/%2d" % \
+		h["hp_label"].text = "%-7s Lv%2d  HP %3d/%3d  MP %2d/%2d" % \
 			[d["name"], d.get("level", 1), d["hp"], d["max_hp"], d["mp"], d["max_mp"]]
 		h["hp_label"].add_theme_color_override("font_color",
 			Color(1, 0.4, 0.4) if d["hp"] <= d["max_hp"] / 4 else Color.WHITE)
@@ -1543,7 +1543,7 @@ func _run_battle() -> void:
 	if not boss_def.is_empty():
 		await _boss_entrance()
 	else:
-		_say("Monster greifen an!")
+		_say("Monsters attack!")
 	await get_tree().create_timer(0.9).timeout
 	while true:
 		for h in heroes:
@@ -1571,8 +1571,8 @@ func _hero_turn(h: Dictionary) -> bool:
 	# Zu Beginn des eigenen Zuges verfällt die Deckung des letzten Zuges.
 	_end_defend(h)
 	while true:
-		var cmd: int = await _menu([d["name"] + ":  Angriff", "Fähigkeit",
-			"Verteidigen", "Item", "Fliehen"], h)
+		var cmd: int = await _menu([d["name"] + ":  Attack", "Ability",
+			"Defend", "Item", "Flee"], h)
 		match cmd:
 			0:
 				var t := await _pick_enemy()
@@ -1595,14 +1595,14 @@ func _hero_turn(h: Dictionary) -> bool:
 				var used: bool = await _item_menu(h)
 				if used: return false
 			4:
-				_say("Fluchtversuch ...")
+				_say("Trying to flee ...")
 				await get_tree().create_timer(0.6).timeout
 				if randf() < 0.6:
-					_say("Erfolgreich geflohen!")
+					_say("Got away safely!")
 					AudioManager.play_sfx("flee")
 					await get_tree().create_timer(0.8).timeout
 					return true
-				_say("Flucht gescheitert!")
+				_say("Couldn't escape!")
 				await get_tree().create_timer(0.7).timeout
 				return false
 	return false
@@ -1612,7 +1612,7 @@ func _hero_turn(h: Dictionary) -> bool:
 ## Schild bleibt als Anzeige vor ihm stehen.
 func _defend(h: Dictionary) -> void:
 	h["defending"] = true
-	_say("%s geht in Deckung — der nächste Treffer wird abgefedert." % h["data"]["name"])
+	_say("%s takes cover — the next hit will be softened." % h["data"]["name"])
 	AudioManager.play_sfx("charge")
 	var s: Sprite2D = h["sprite"]
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
@@ -1690,7 +1690,7 @@ func _ability_menu(h: Dictionary) -> bool:
 			entries.append("%s — %s" % [ab["name"], GameState.skill_lock_hint(d, ab)])
 		elif ab.get("once", false) and _once_used(h, ab):
 			dim.append(entries.size())
-			entries.append("%s — bereits eingesetzt" % ab["name"])
+			entries.append("%s — already used" % ab["name"])
 		else:
 			entries.append("%s (%d MP) — %s" % [ab["name"], ab["cost"], ab["desc"]])
 	for sm in summons:
@@ -1699,30 +1699,30 @@ func _ability_menu(h: Dictionary) -> bool:
 			entries.append("◈ %s — %s" % [sm["name"], GameState.skill_lock_hint(d, sm)])
 		elif sm.get("once", false) and _once_used(h, sm):
 			dim.append(entries.size())
-			entries.append("◈ %s — bereits beschworen" % sm["name"])
+			entries.append("◈ %s — already summoned" % sm["name"])
 		else:
 			entries.append("◈ %s (%d MP) — %s" % [sm["name"], sm["cost"], sm["desc"]])
 	var ult_idx := -1
 	if has_ult:
 		ult_idx = entries.size()
 		entries.append("★ %s — %s" % [ult["name"],
-			"bereits eingesetzt" if h["ult_used"] else ult["desc"]])
-	entries.append("Zurück")
+			"already used" if h["ult_used"] else ult["desc"]])
+	entries.append("Back")
 	var pick: int = await _menu(entries, h, dim)
 	if pick < 0:  # B/X = Zurück
 		return false
 	if pick >= abilities.size() and pick < abilities.size() + summons.size():
 		var sm: Dictionary = summons[pick - abilities.size()]
 		if not GameState.skill_unlocked(d, sm):
-			_say("%s ist noch %s!" % [sm["name"], GameState.skill_lock_hint(d, sm)])
+			_say("%s is still %s!" % [sm["name"], GameState.skill_lock_hint(d, sm)])
 			AudioManager.play_sfx("error")
 			return false
 		if sm.get("once", false) and _once_used(h, sm):
-			_say("%s ist in diesem Kampf bereits beschworen!" % sm["name"])
+			_say("%s has already been summoned this battle!" % sm["name"])
 			AudioManager.play_sfx("error")
 			return false
 		if d["mp"] < sm["cost"]:
-			_say("Nicht genug MP!")
+			_say("Not enough MP!")
 			AudioManager.play_sfx("error")
 			return false
 		d["mp"] -= sm["cost"]
@@ -1736,7 +1736,7 @@ func _ability_menu(h: Dictionary) -> bool:
 		return true
 	if has_ult and pick == ult_idx:
 		if h["ult_used"]:
-			_say("Die ultimative Kraft ist in diesem Kampf bereits verbraucht!")
+			_say("Your ultimate power is already spent this battle!")
 			AudioManager.play_sfx("error")
 			return false
 		h["ult_used"] = true
@@ -1748,15 +1748,15 @@ func _ability_menu(h: Dictionary) -> bool:
 		return false
 	var ab: Dictionary = abilities[pick]
 	if not GameState.skill_unlocked(d, ab):
-		_say("%s ist noch %s!" % [ab["name"], GameState.skill_lock_hint(d, ab)])
+		_say("%s is still %s!" % [ab["name"], GameState.skill_lock_hint(d, ab)])
 		AudioManager.play_sfx("error")
 		return false
 	if ab.get("once", false) and _once_used(h, ab):
-		_say("%s ist in diesem Kampf bereits verbraucht!" % ab["name"])
+		_say("%s is already spent this battle!" % ab["name"])
 		AudioManager.play_sfx("error")
 		return false
 	if d["mp"] < ab["cost"]:
-		_say("Nicht genug MP!")
+		_say("Not enough MP!")
 		AudioManager.play_sfx("error")
 		return false
 	if ab.get("once", false):
@@ -1806,7 +1806,7 @@ func _ability_menu(h: Dictionary) -> bool:
 func _ally_entries() -> Array:
 	var names := []
 	for hh in heroes:
-		names.append("Für " + hh["data"]["name"])
+		names.append("For " + hh["data"]["name"])
 	return names
 
 ## ---------- Menüs (await auf Spieler-Eingabe) ----------
@@ -1963,7 +1963,7 @@ func _pick_enemy() -> int:
 	menu_index = 0
 	ui_state = "target"
 	_update_cursor()
-	_say("Ziel wählen (Z: OK, X: Zurück)")
+	_say("Choose a target (Z: OK, X: Back)")
 	await _choice_made
 	cursor.visible = false
 	ui_state = "none"
@@ -1979,14 +1979,14 @@ func _update_cursor() -> void:
 
 func _item_menu(h: Dictionary) -> bool:
 	if GameState.inventory.is_empty():
-		_say("Keine Items!")
+		_say("No items!")
 		AudioManager.play_sfx("error")
 		return false
 	var names := GameState.inventory.keys()
 	var entries := []
 	for n in names:
 		entries.append("%s x%d" % [n, GameState.inventory[n]])
-	entries.append("Zurück")
+	entries.append("Back")
 	var pick: int = await _menu(entries, h)
 	if pick < 0 or pick >= names.size():
 		return false
@@ -2004,7 +2004,7 @@ func _item_menu(h: Dictionary) -> bool:
 	AudioManager.play_sfx("heal")
 	_sparkle(heroes[target]["sprite"].position, Color(0.4, 1.0, 0.5))
 	_float_text(heroes[target]["sprite"].position, "+" + item_name, Color(0.5, 1.0, 0.6))
-	_say("%s benutzt %s für %s." % [h["data"]["name"], item_name, td["name"]])
+	_say("%s uses %s on %s." % [h["data"]["name"], item_name, td["name"]])
 	_refresh_party()
 	await get_tree().create_timer(0.8).timeout
 	return true
@@ -2091,7 +2091,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
-	_say("%s greift an!" % h["data"]["name"])
+	_say("%s attacks!" % h["data"]["name"])
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	# 1) Ausholen: zurücklehnen, Waffe über die Schulter reißen (Anticipation).
 	var wind := create_tween()
@@ -2148,7 +2148,7 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
-	_say("%s eröffnet das Maschinengewehrfeuer!" % d["name"])
+	_say("%s opens up with the machine gun!" % d["name"])
 	# In den Schützenstand schweben und einrasten (wie beim Laser).
 	var fire_pos: Vector2 = h["home"] + Vector2(-58, 6)
 	await _sprint(h, fire_pos, 0.2)
@@ -2285,7 +2285,7 @@ func _anim_cast(s: Sprite2D) -> void:
 
 ## Kritischer Treffer: großer Schriftzug, extra Funken, stärkeres Beben.
 func _crit_fx(pos: Vector2) -> void:
-	_float_text(pos + Vector2(-30, -46), "KRITISCH!", Color(1.0, 0.62, 0.1), 36)
+	_float_text(pos + Vector2(-30, -46), "CRITICAL!", Color(1.0, 0.62, 0.1), 36)
 	_burst(pos, Color(1.0, 0.75, 0.2), 16, 200)
 	_shake_camera(1.9)
 	_punch_zoom(0.07, pos)
@@ -2362,7 +2362,7 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 
 func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	_say("%s entfesselt %s!" % [d["name"], ab["name"]])
+	_say("%s unleashes %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Konzentration: vortreten, Kraft sammeln, dann erst der Wirbel.
 	await _stance(h, Color(1.0, 0.95, 0.5))
@@ -2388,7 +2388,7 @@ func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 
 func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	_say("%s wirkt %s!" % [d["name"], ab["name"]])
+	_say("%s casts %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Beschwörungspose: vortreten und Kraft sammeln, dann aufsteigen.
 	await _stance(h, Color(1.0, 0.6, 0.2), "summon")
@@ -2499,7 +2499,7 @@ func _cross_slash(pos: Vector2) -> void:
 ## Stille — dann reißt der Kreuzschnitt auf. Ignoriert die Verteidigung.
 func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	_say("%s setzt %s ein!" % [d["name"], ab["name"]])
+	_say("%s uses %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
@@ -2557,7 +2557,7 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 ## dann steigt sie auf und fährt mit dem Fallstreich nieder.
 func _blade_dance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
-	_say("%s tanzt den %s!" % [d["name"], ab["name"]])
+	_say("%s dances the %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
@@ -2688,7 +2688,7 @@ func _beam(from: Vector2, to: Vector2, color: Color, width: float, hold: float) 
 func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s feuert %s!" % [d["name"], ab["name"]])
+	_say("%s fires %s!" % [d["name"], ab["name"]])
 	# 1) In Schussposition schweben und in den breiten Stand einrasten.
 	var fire_pos: Vector2 = h["home"] + Vector2(-64, 6)
 	await _sprint(h, fire_pos, 0.2)
@@ -2845,7 +2845,7 @@ func _rocket_step(t: float, r: Sprite2D, smoke: CPUParticles2D,
 func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s startet %s!" % [d["name"], ab["name"]])
+	_say("%s launches %s!" % [d["name"], ab["name"]])
 	# In Feuerposition schweben und den Schützenstand einnehmen.
 	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.6, 0.2))
@@ -2882,7 +2882,7 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s fordert %s an!" % [d["name"], ab["name"]])
+	_say("%s calls in %s!" % [d["name"], ab["name"]])
 	# Vortreten und den Uplink aufbauen (Schützenstand, Antenne dauerrot).
 	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	h["anim"] = "aim"
@@ -3321,7 +3321,7 @@ func _orbital_step(t: float, beam: Node2D, cx: float, cy: float, aa: float, bb: 
 func _ultimate_rax(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s aktiviert sein Overload-Protokoll!" % d["name"])
+	_say("%s activates its overload protocol!" % d["name"])
 	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.55)
@@ -3330,7 +3330,7 @@ func _ultimate_rax(h: Dictionary) -> void:
 	s.modulate = Color(1.4, 1.5, 1.7)
 	_burst(s.position, Color(0.5, 0.95, 1.0), 16, 150)
 	await get_tree().create_timer(0.8).timeout
-	_ult_banner("★ ORBITALLASER ★", Color(0.5, 0.9, 1.0))
+	_ult_banner("★ ORBITAL LASER ★", Color(0.5, 0.9, 1.0))
 	await get_tree().create_timer(0.5).timeout
 	var alive := []
 	for e in enemies:
@@ -3421,7 +3421,7 @@ func _ult_banner(text: String, color: Color) -> void:
 func _ultimate_serena(h: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s entfesselt ihre ultimative Kraft!" % d["name"])
+	_say("%s unleashes her ultimate power!" % d["name"])
 	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.55)
@@ -3430,7 +3430,7 @@ func _ultimate_serena(h: Dictionary) -> void:
 	s.modulate = Color(1.6, 1.5, 1.1)
 	_burst(s.position, Color(1.0, 0.95, 0.5), 14, 130)
 	await get_tree().create_timer(0.8).timeout
-	_ult_banner("★ STERNENKLINGE ★", Color(1.0, 0.9, 0.35))
+	_ult_banner("★ STARBLADE ★", Color(1.0, 0.9, 0.35))
 	await get_tree().create_timer(0.5).timeout
 	var alive := []
 	for e in enemies:
@@ -3504,7 +3504,7 @@ func _meteor_step(t: float, meteor: Sprite2D, trail: CPUParticles2D, smoke: CPUP
 func _meteor_rain(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s beschwört einen Meteorregen!" % d["name"])
+	_say("%s conjures a rain of meteors!" % d["name"])
 	var dim := _dim_world(0.55)
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
@@ -3515,7 +3515,7 @@ func _meteor_rain(h: Dictionary, ab: Dictionary) -> void:
 	rise.tween_property(s, "position:y", s.position.y - 34.0, 0.6) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	await get_tree().create_timer(0.8).timeout
-	_ult_banner("★ METEORREGEN ★", Color(1.0, 0.55, 0.2))
+	_ult_banner("★ METEOR RAIN ★", Color(1.0, 0.55, 0.2))
 	await get_tree().create_timer(0.5).timeout
 	var alive := []
 	for e in enemies:
@@ -3711,7 +3711,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	var org := Color(1.0, 0.55, 0.15)
-	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	_say("%s summons %s!" % [d["name"], sm["name"]])
 	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.65)
@@ -3788,7 +3788,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	gtw.tween_property(glow, "scale", Vector2(3.2, 3.2), 0.55) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await get_tree().create_timer(0.55).timeout
-	_ult_banner("HÖLLENFEUER", Color(1.0, 0.75, 0.25))
+	_ult_banner("HELLFIRE", Color(1.0, 0.75, 0.25))
 	glow.queue_free()
 	var alive := []
 	for e in enemies:
@@ -3900,7 +3900,7 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	var blue := Color(0.4, 0.8, 1.0)
-	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	_say("%s summons %s!" % [d["name"], sm["name"]])
 	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.6)
@@ -4036,7 +4036,7 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	var gold := Color(1.0, 0.72, 0.3)
-	_say("%s beschwört %s!" % [d["name"], sm["name"]])
+	_say("%s summons %s!" % [d["name"], sm["name"]])
 	if h.get("bob") != null:
 		(h["bob"] as Tween).kill()
 	var dim := _dim_world(0.66)
@@ -4200,7 +4200,7 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var td: Dictionary = target["data"]
-	_say("%s wirkt %s auf %s!" % [d["name"], ab["name"], td["name"]])
+	_say("%s casts %s on %s!" % [d["name"], ab["name"], td["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Beschwörungspose vor dem Heilzauber.
 	await _stance(h, Color(0.45, 1.0, 0.55), "summon")
@@ -4234,7 +4234,7 @@ func _storm_cut(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var wp: Sprite2D = h.get("weapon")
 	var es: Sprite2D = e["sprite"]
-	_say("%s zieht %s!" % [d["name"], ab["name"]])
+	_say("%s draws %s!" % [d["name"], ab["name"]])
 	var center: Vector2 = es.position
 	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
 	# Blitz auf die rechte Seite, Klinge in Ausgangsstellung.
@@ -4288,7 +4288,7 @@ func _blade_storm(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
 	var wp: Sprite2D = h.get("weapon")
-	_say("%s entfesselt %s!" % [d["name"], ab["name"]])
+	_say("%s unleashes %s!" % [d["name"], ab["name"]])
 	await _stance(h, Color(0.75, 0.92, 1.0))
 	# Klinge senkrecht hochreißen — Startsignal des Sturms.
 	var raise := create_tween()
@@ -4370,7 +4370,7 @@ func _tornado_hit(pos: Vector2) -> void:
 func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s schleudert die %s!" % [d["name"], ab["name"]])
+	_say("%s hurls the %s!" % [d["name"], ab["name"]])
 	var fire_pos: Vector2 = h["home"] + Vector2(-64, 6)
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
@@ -4458,7 +4458,7 @@ func _repair_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	var td: Dictionary = target["data"]
 	var s: Sprite2D = h["sprite"]
-	_say("%s startet %s an %s." % [d["name"], ab["name"], td["name"]])
+	_say("%s runs %s on %s." % [d["name"], ab["name"], td["name"]])
 	# Kurzer technischer „Impuls" statt Zauberpose.
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var pulse := create_tween()
@@ -4572,7 +4572,7 @@ func _enemy_turn(e: Dictionary) -> void:
 	if line != "":
 		_say(line % [e["name"], target["data"]["name"]])
 	else:
-		_say("%s greift %s an!" % [e["name"], target["data"]["name"]])
+		_say("%s attacks %s!" % [e["name"], target["data"]["name"]])
 	# „Die Stille" stürmt nicht — sie lässt die Leere unter dem Ziel aufreißen.
 	if e["is_boss"] and boss_def.get("theme", "") == "void":
 		await _void_grasp(e, target)
@@ -4787,7 +4787,7 @@ func _coin_impact(c: Sprite2D) -> void:
 func _boss_aoe(e: Dictionary, targets: Array) -> void:
 	var st := _style()
 	var theme: String = boss_def.get("theme", "toxic")
-	_say("%s holt aus — %s!" % [e["name"], boss_def["aoe_name"]])
+	_say("%s winds up — %s!" % [e["name"], boss_def["aoe_name"]])
 	AudioManager.play_sfx("roar")
 	var es: Sprite2D = e["sprite"]
 	var ebase: Vector2 = es.get_meta("base_scale", es.scale)
@@ -4922,7 +4922,7 @@ func _boss_ultimate(e: Dictionary, targets: Array) -> void:
 	var st := _style()
 	var theme: String = boss_def.get("theme", "toxic")
 	var ult_name: String = boss_def["ultimate_name"]
-	_say("%s entfesselt: %s!" % [e["name"], ult_name])
+	_say("%s unleashes: %s!" % [e["name"], ult_name])
 	var dim := _dim_world(0.55)
 	var es: Sprite2D = e["sprite"]
 	var base: Vector2 = es.scale
@@ -5310,7 +5310,7 @@ func _void_grasp(e: Dictionary, target: Dictionary) -> void:
 ## Licht wird fahler, die Augen erlöschen zu kaltem Weiß. Der Angriff steigt.
 func _boss4_phase(e: Dictionary) -> void:
 	AudioManager.play_sfx("ult_charge")
-	_say("%s hört auf, überhaupt etwas zu sein — die Leere um sie frisst das Licht." % e["name"])
+	_say("%s simply stops being — the void around it devours the light." % e["name"])
 	var es: Sprite2D = e["sprite"]
 	_flash_screen(Color(0.85, 0.88, 0.96, 0.4))
 	_shake_camera(1.8)
@@ -5355,7 +5355,7 @@ func _boss_enrage(e: Dictionary) -> void:
 		await _boss4_phase(e)
 		return
 	AudioManager.play_sfx("charge")
-	_say("%s tobt vor Wut!" % e["name"])
+	_say("%s flies into a rage!" % e["name"])
 	var es: Sprite2D = e["sprite"]
 	var st := _style()
 	_flash_screen(st["flash"])
@@ -5381,7 +5381,7 @@ func _boss_enrage(e: Dictionary) -> void:
 ## Inszenierter Boss-Tod: Zeitlupe, Explosionskette, weißer Blitz, Zerfall.
 func _boss_death(e: Dictionary) -> void:
 	var s: Sprite2D = e["sprite"]
-	_say("%s bricht zusammen!" % e["name"])
+	_say("%s collapses!" % e["name"])
 	await _hitstop(0.25)
 	AudioManager.play_sfx("roar")
 	# Explosionskette über den ganzen Körper
@@ -5728,7 +5728,7 @@ func _boss_entrance() -> void:
 	boss_e["bob"] = _idle_bob(boss_e["sprite"], 1.9)
 	# Wortwechsel: der Boss stellt sich vor, die Helden antworten.
 	for line: Array in boss_def.get("intro", []):
-		_say("%s: „%s“" % [line[0], line[1]])
+		_say("%s: \"%s\"" % [line[0], line[1]])
 		await get_tree().create_timer(2.2).timeout
 	AudioManager.play_sfx("roar")
 	_shake_camera(2.4)
@@ -5947,9 +5947,9 @@ func _victory() -> void:
 	AudioManager.play_music("victory")
 	_victory_banner()
 	if not boss_def.is_empty():
-		_say("%s ist besiegt!  %d Gold, %d EP!" % [boss_def["name"], gold, xp])
+		_say("%s is defeated!  %d gold, %d XP!" % [boss_def["name"], gold, xp])
 	else:
-		_say("Sieg!  %d Gold und %d EP erbeutet!" % [gold, xp])
+		_say("Victory!  Looted %d gold and %d XP!" % [gold, xp])
 	# Münzregen über den Helden
 	for i in 14:
 		var coin := Sprite2D.new()
@@ -5995,7 +5995,7 @@ func _victory() -> void:
 		_refresh_party()
 		for up in level_ups:
 			AudioManager.play_sfx("heal")
-			_say("%s erreicht Stufe %d!" % [up["name"], up["level"]])
+			_say("%s reaches level %d!" % [up["name"], up["level"]])
 			for h in heroes:
 				if h["data"]["name"] == up["name"]:
 					_sparkle(h["sprite"].position, Color(1.0, 0.92, 0.4))
@@ -6003,7 +6003,7 @@ func _victory() -> void:
 			await get_tree().create_timer(1.5).timeout
 			if up.has("unlock"):
 				AudioManager.play_sfx("summon")
-				_say("%s kann nun %s beschwören!" % [up["name"], up["unlock"]])
+				_say("%s can now summon %s!" % [up["name"], up["unlock"]])
 				await get_tree().create_timer(1.8).timeout
 	# Boss-Siege schalten den Fortschritt frei.
 	if enemy_ids.has("boss4"):
@@ -6016,13 +6016,13 @@ func _victory() -> void:
 		for h in heroes:
 			_sparkle(h["sprite"].position, Color(1.0, 0.95, 0.7))
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.95, 0.7))
-		_say("Der Hass verraucht — Lindenhain atmet auf, und euer Bund wird stärker denn je.")
+		_say("The shadow scatters. Down in the courtyard, neighbors are talking again — the Blessing of United Hearts flows through you!")
 		await get_tree().create_timer(2.4).timeout
 		await _announce_unlocked_tier()
 		if GameState.boss_defeated and GameState.boss2_defeated:
-			_say("Doch mit der letzten Plage kehrt keine Ruhe ein — im Norden reißt ein grauer Riss auf.")
+			_say("But the last plague brings no peace — in the north, a gray rift tears open without a sound.")
 			await get_tree().create_timer(2.4).timeout
-			_say("Aus ihm weht eine Kälte, die nicht hasst und nicht liebt. Dort wartet Die Leere.")
+			_say("No bird sings near it anymore. What waits there neither hates nor loves: the Void.")
 			await get_tree().create_timer(2.4).timeout
 	elif enemy_ids.has("boss2"):
 		GameState.boss2_defeated = true
@@ -6032,11 +6032,11 @@ func _victory() -> void:
 		for h in heroes:
 			_sparkle(h["sprite"].position, Color(1.0, 0.9, 0.4))
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(1.0, 0.9, 0.4))
-		_say("Der Hort des Fürsten fließt zurück ins Land — sein Dank stärkt euch!")
+		_say("The Prince's hoard flows back into the valley — field by field, house by house. The Blessing of Shared Prosperity strengthens you!")
 		await get_tree().create_timer(2.4).timeout
 		await _announce_unlocked_tier()
 		if GameState.boss_defeated and GameState.boss3_defeated:
-			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
+			_say("And in the north a gray rift tears open — the Void awaits.")
 			await get_tree().create_timer(2.4).timeout
 	elif enemy_ids.has("boss"):
 		GameState.boss_defeated = true
@@ -6046,11 +6046,11 @@ func _victory() -> void:
 		for h in heroes:
 			_sparkle(h["sprite"].position, Color(0.7, 1.0, 0.5))
 			_cast_circle(h["sprite"].position + Vector2(0, 40), Color(0.7, 1.0, 0.5))
-		_say("Der Fluss atmet auf — die Segnung des klaren Wassers durchströmt euch!")
+		_say("The sludge drains away, and for the first time in years the air smells of rain — the Blessing of Clear Water flows through you!")
 		await get_tree().create_timer(2.4).timeout
 		await _announce_unlocked_tier()
 		if GameState.boss2_defeated and GameState.boss3_defeated:
-			_say("Und im Norden reißt ein grauer Riss auf — dort wartet Die Leere.")
+			_say("And in the north a gray rift tears open — the Void awaits.")
 			await get_tree().create_timer(2.4).timeout
 	finished.emit(true)
 
@@ -6060,18 +6060,18 @@ func _victory() -> void:
 func _announce_unlocked_tier() -> void:
 	var n: int = GameState.bosses_defeated_count()
 	var names := {
-		1: "Fokusstoß, Raketensalve und Ifrits Pakt",
-		2: "Klingentanz, Nuke und Leviathans Pakt",
-		3: "Klingensturm, Plasmalanze und Bahamuts Pakt",
+		1: "Focus Pierce, Rocket Salvo and Ifrit's Pact",
+		2: "Blade Dance, Nuke and Leviathan's Pact",
+		3: "Blade Storm, Plasma Lance and Bahamut's Pact",
 	}
 	if names.has(n):
-		_say("Ein Siegel bricht — %s erwachen!" % names[n])
+		_say("A seal shatters — %s awaken!" % names[n])
 		await get_tree().create_timer(2.4).timeout
 
 ## Großes „SIEG!“-Banner, das ins Bild ploppt.
 func _victory_banner() -> void:
 	var banner := Label.new()
-	banner.text = "SIEG!"
+	banner.text = "VICTORY!"
 	banner.add_theme_font_size_override("font_size", 64)
 	banner.add_theme_color_override("font_color", Color(1.0, 0.88, 0.25))
 	banner.add_theme_color_override("font_outline_color", Color(0.35, 0.2, 0.0))
@@ -6092,7 +6092,7 @@ func _victory_banner() -> void:
 	tw.tween_callback(banner.queue_free)
 
 func _defeat() -> void:
-	_say("Die Gruppe wurde besiegt ...")
+	_say("The party has fallen ...")
 	AudioManager.play_music("defeat")
 	await get_tree().create_timer(2.5).timeout
 	finished.emit(false)

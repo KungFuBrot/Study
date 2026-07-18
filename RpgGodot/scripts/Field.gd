@@ -600,7 +600,7 @@ func _after_step() -> void:
 			# Versiegelte Portale (z. B. Frostgrotte) erst nach Freischaltung.
 			if portal.has("locked_until") and not GameState.is_unlocked(portal["locked_until"]):
 				AudioManager.play_sfx("error")
-				dialog_name.text = portal.get("locked_name", "Barriere")
+				dialog_name.text = portal.get("locked_name", "Barrier")
 				dialog_lines = [portal["locked_msg"]]
 				dialog_after_shop = false
 				state = "dialogue"
@@ -701,7 +701,7 @@ func _build_ui() -> void:
 	var svb := VBoxContainer.new()
 	shop_panel.add_child(svb)
 	var title := Label.new()
-	title.text = "— Gretas Laden —   (Z: Kaufen, X: Zurück)"
+	title.text = "— Greta's Shop —   (Z: Buy, X: Back)"
 	title.add_theme_font_size_override("font_size", 16)
 	svb.add_child(title)
 	shop_gold = Label.new()
@@ -746,7 +746,7 @@ func _refresh_shop() -> void:
 		var item: Dictionary = GameState.ITEMS[item_name]
 		var cursor := "> " if i == shop_index else "  "
 		var owned: int = GameState.inventory.get(item_name, 0)
-		l.text = "%s%s  %d G  (Besitz: %d) — %s" % [cursor, item_name, item["price"], owned, item["desc"]]
+		l.text = "%s%s  %d G  (owned: %d) — %s" % [cursor, item_name, item["price"], owned, item["desc"]]
 		l.add_theme_color_override("font_color", Color.WHITE if i == shop_index else Color(0.7, 0.7, 0.75))
 
 func _shop_move(delta: int) -> void:

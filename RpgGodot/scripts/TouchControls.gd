@@ -101,7 +101,7 @@ func _build_toggle() -> void:
 	b.add_theme_font_size_override("font_size", 22)
 	b.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 	b.add_theme_color_override("font_hover_color", Color(1, 1, 1, 0.9))
-	b.text = "Pad aus"
+	b.text = "Pad off"
 	b.pressed.connect(_toggle_pads)
 	add_child(b)
 	_toggle = b
@@ -109,7 +109,7 @@ func _build_toggle() -> void:
 func _toggle_pads() -> void:
 	_pads_visible = not _pads_visible
 	_root.visible = _pads_visible
-	_toggle.text = "Pad aus" if _pads_visible else "Pad ein"
+	_toggle.text = "Pad off" if _pads_visible else "Pad on"
 
 func _make(x: int, y: int, label: String, action: String, tint := Color(0.55, 0.60, 0.75), arrow := Vector2.ZERO) -> void:
 	var b := Button.new()

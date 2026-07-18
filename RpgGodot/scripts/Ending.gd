@@ -73,16 +73,16 @@ func _build_text() -> void:
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(vig)
 	var entries := [
-		["DAS ABENTEUER IST VOLLBRACHT", 40, Color(1.0, 0.85, 0.3), 54],
-		["Schlotbaron, Monopolfürst und Spalter sind Geschichte,", 22, Color.WHITE, 122],
-		["und selbst Die Leere, die nichts mehr fühlte,", 22, Color.WHITE, 152],
-		["zerfiel — weil ihr nicht aufhörtet zu fühlen.", 22, Color.WHITE, 182],
-		["Der Fluss glitzert, der Turm gehört allen, Gras wächst.", 22, Color.WHITE, 218],
-		["Helen  —  die Klinge des Lichts", 19, Color(0.95, 0.7, 0.7), 262],
-		["Janosch  —  der Meister der Flammen", 19, Color(0.7, 0.75, 0.95), 288],
-		["Wally  —  das Herz aus Stahl", 19, Color(0.75, 0.9, 0.85), 314],
-		["Erbeutetes Gold: %d — gespendet an Lindenhain" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 346],
-		["— DANKE FÜRS SPIELEN —", 26, Color(1.0, 0.85, 0.3), 480],
+		["THE VALLEY BREATHES AGAIN", 40, Color(1.0, 0.85, 0.3), 54],
+		["The Smokestack Baron, the Monopoly Prince and the Divider are history —", 22, Color.WHITE, 122],
+		["and the Silence? It shattered against three voices", 22, Color.WHITE, 152],
+		["that simply refused to stop feeling.", 22, Color.WHITE, 182],
+		["The river glitters again. Pia holds the record: seven skips.", 22, Color.WHITE, 218],
+		["Helen  —  still carries the blade. She never had to draw it again.", 19, Color(0.95, 0.7, 0.7), 262],
+		["Janosch  —  teaches in Lindenhain that questions warm better than fire.", 19, Color(0.7, 0.75, 0.95), 288],
+		["Wally  —  proves it daily: compassion is not a spare part.", 19, Color(0.75, 0.9, 0.85), 314],
+		["Gold earned: %d — donated to the rebuilding of Lindenhain" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 346],
+		["— THANK YOU FOR PLAYING —", 26, Color(1.0, 0.85, 0.3), 480],
 	]
 	for i in entries.size():
 		var e: Array = entries[i]
@@ -102,7 +102,7 @@ func _build_text() -> void:
 		tw.tween_property(l, "modulate:a", 1.0, 0.8)
 	# Hinweis zum Neustart erscheint zuletzt und blinkt sanft
 	var hint := Label.new()
-	hint.text = "Z: Neues Abenteuer beginnen"
+	hint.text = "Z: Begin a new adventure"
 	hint.add_theme_font_size_override("font_size", 17)
 	hint.add_theme_color_override("font_color", Color(0.8, 0.8, 0.9))
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)

@@ -7,27 +7,38 @@ signal done
 
 const PAGES := [
 	[
-		"Es war einmal ein Tal,",
-		"in dem der Fluss wie flüssiges Glas glitzerte.",
+		"Once there was a valley",
+		"where the river glittered like liquid glass.",
 		"",
-		"Lindenhain lebte von seinem Wasser —",
-		"und von seiner Gemeinschaft.",
+		"Lindenhain lived off its water, the scent of its linden trees —",
+		"and the certainty that no one here was ever left alone.",
 	],
 	[
-		"Doch dann kamen die drei Plagen:",
+		"Then came the three plagues.",
 		"",
-		"Das Schlotwerk kippte seinen Giftschlamm in den Fluss.",
-		"Der Konzernturm presste die Dörfer bis aufs Mark aus.",
-		"Und in einer Festung im Südwesten wurde Hass gepredigt.",
+		"The Smokeworks dumped its toxic sludge into the river",
+		"until no fish could live there — and called it progress.",
+		"The Corporate Spire bought field after field, house after house,",
+		"and sold the people their own lives back.",
+		"And on a fortress in the southwest stood a man",
+		"who taught neighbors to fear one another.",
 	],
 	[
-		"Drei Gefährten brechen auf, das Tal zu befreien:",
+		"But the elders whisper of a fourth plague:",
 		"",
-		"Helen, die Klinge des Lichts.",
-		"Janosch, der Meister der Flammen.",
-		"Wally, das Herz aus Stahl.",
+		"When poison, greed and hate rage on for too long,",
+		"a land at some point stops weeping.",
 		"",
-		"Ihre Reise beginnt am rauchenden Schlotwerk ...",
+		"Then it goes silent.",
+	],
+	[
+		"Three companions set out to free the valley:",
+		"",
+		"Helen, the Blade of Light — she protects rather than conquers.",
+		"Janosch, the Master of Flames — he doubts before he burns.",
+		"Wally, the Heart of Steel — it beats, though it never had to.",
+		"",
+		"Their journey begins beneath the black chimneys of the Smokeworks ...",
 	],
 ]
 
@@ -49,7 +60,7 @@ func _ready() -> void:
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(vig)
 	hint = Label.new()
-	hint.text = "Z: Weiter"
+	hint.text = "Z: Continue"
 	hint.add_theme_font_size_override("font_size", 16)
 	hint.add_theme_color_override("font_color", Color(0.75, 0.75, 0.9))
 	hint.add_theme_color_override("font_outline_color", Color.BLACK)

@@ -11,7 +11,7 @@ const HEROES := [
 	{"id": "rax", "pos": Vector2(630, 434), "flip": true},
 ]
 
-const MENU_ITEMS := ["Neues Spiel", "Steuerung", "Einstellungen"]
+const MENU_ITEMS := ["New Game", "Controls", "Settings"]
 
 var menu_index := 0
 var menu_labels: Array = []
@@ -278,7 +278,7 @@ func _build_ui() -> void:
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	lt.tween_property(logo, "position:y", 96.0, 1.8) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_label("Ein Mini-JRPG-Abenteuer", 19, Color(0.82, 0.82, 0.95), 176)
+	_label("Three companions. Three plagues. One valley.", 19, Color(0.82, 0.82, 0.95), 176)
 	# Startmenü
 	for i in MENU_ITEMS.size():
 		var l := _label(MENU_ITEMS[i], 24, Color.WHITE, 252 + i * 38)
@@ -292,12 +292,12 @@ func _build_ui() -> void:
 	vb.add_theme_constant_override("separation", 8)
 	help_panel.add_child(vb)
 	var lines := [
-		["— Steuerung —", 20, Color(1.0, 0.85, 0.32)],
-		["Pfeiltasten / WASD — Bewegen", 17, Color.WHITE],
-		["Z / Enter / Leertaste — Bestätigen, Reden", 17, Color.WHITE],
-		["X / Esc — Abbrechen", 17, Color.WHITE],
-		["Am Handy: eingeblendete Bildschirm-Tasten", 15, Color(0.75, 0.75, 0.9)],
-		["Z: Schließen", 15, Color(0.75, 0.75, 0.9)],
+		["— Controls —", 20, Color(1.0, 0.85, 0.32)],
+		["Arrow keys / WASD — Move", 17, Color.WHITE],
+		["Z / Enter / Space — Confirm, Talk", 17, Color.WHITE],
+		["X / Esc — Cancel", 17, Color.WHITE],
+		["On mobile: on-screen buttons", 15, Color(0.75, 0.75, 0.9)],
+		["Z: Close", 15, Color(0.75, 0.75, 0.9)],
 	]
 	for e in lines:
 		var l := Label.new()
@@ -316,7 +316,7 @@ func _build_ui() -> void:
 	svb.add_theme_constant_override("separation", 10)
 	settings_panel.add_child(svb)
 	var stitle := Label.new()
-	stitle.text = "— Einstellungen —"
+	stitle.text = "— Settings —"
 	stitle.add_theme_font_size_override("font_size", 20)
 	stitle.add_theme_color_override("font_color", Color(1.0, 0.85, 0.32))
 	stitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -330,19 +330,19 @@ func _build_ui() -> void:
 	debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(debug_label)
 	var shint := Label.new()
-	shint.text = "↑↓: Wählen   ·   Z: Umschalten   ·   X: Zurück"
+	shint.text = "↑↓: Select   ·   Z: Toggle   ·   X: Back"
 	shint.add_theme_font_size_override("font_size", 15)
 	shint.add_theme_color_override("font_color", Color(0.75, 0.75, 0.9))
 	shint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(shint)
 	var shint2 := Label.new()
-	shint2.text = "Tipp: 5-mal schnell tippen blendet das Pad wieder ein"
+	shint2.text = "Tip: tap 5 times quickly to bring the pad back"
 	shint2.add_theme_font_size_override("font_size", 13)
 	shint2.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
 	shint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(shint2)
 	var shint3 := Label.new()
-	shint3.text = "Debug-Modus: alle Fähigkeiten und Dungeons sofort verfügbar"
+	shint3.text = "Debug mode: all abilities and dungeons available right away"
 	shint3.add_theme_font_size_override("font_size", 13)
 	shint3.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
 	shint3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -353,11 +353,11 @@ func _build_ui() -> void:
 
 func _refresh_settings_labels() -> void:
 	var pcur := "> " if settings_index == 0 else "   "
-	pad_label.text = "%sBildschirm-Tasten (Pad):  %s" % [pcur, "AN" if GameState.touch_pad else "AUS"]
+	pad_label.text = "%sOn-screen buttons (pad):  %s" % [pcur, "ON" if GameState.touch_pad else "OFF"]
 	pad_label.add_theme_color_override("font_color",
 		Color(0.55, 1.0, 0.6) if GameState.touch_pad else Color(1.0, 0.55, 0.5))
 	var dcur := "> " if settings_index == 1 else "   "
-	debug_label.text = "%sDebug-Modus:  %s" % [dcur, "AN" if GameState.debug_mode else "AUS"]
+	debug_label.text = "%sDebug mode:  %s" % [dcur, "ON" if GameState.debug_mode else "OFF"]
 	debug_label.add_theme_color_override("font_color",
 		Color(0.55, 1.0, 0.6) if GameState.debug_mode else Color(1.0, 0.55, 0.5))
 
