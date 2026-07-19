@@ -21,7 +21,12 @@ extends SpriteFactoryLib
 ##     kind "poly": {pts: PackedVector2Array} (bone-lokal)
 ##     kind "disc": {c: Vector2, r: float}
 ##   anims: {name: {frames: int, loop: bool, ease: bool, keys: [
-##     {t: 0..1, j: {bone: rot}, off: {bone: Vector2}, root: Vector2} ]}}
+##     {t: 0..1, j: {bone: rot}, off: {bone: Vector2}, root: Vector2} ],
+##     waves: [ {bone, chan, amp, freq, phase} ] }}
+##     waves = kontinuierliche Sinus-Kanäle ADDITIV über der Keyframe-Pose.
+##     chan: "j" (Rotation), "ox"/"oy" (Bone-Offset), "rx"/"ry" (Root-Offset).
+##     Wert = amp * sin(TAU * (freq*t + phase)). Weil jeder Bone seine eigene
+##     Phase/Frequenz trägt, laufen die Teile NIE synchron → organischer Fluss.
 
 ## ---------- Backen ----------
 
@@ -45,13 +50,33 @@ static func bake(rig: Dictionary, anim: String, frame: int) -> Image:
 	var t := float(f) / float(n) if adef.get("loop", true) else \
 		(float(f) / float(maxi(n - 1, 1)))
 	var pose := pose_at(adef, t)
+	if adef.has("waves"):
+		_apply_waves(pose, adef["waves"], t)
 	return _rasterize(rig, pose)
+
+## Addiert kontinuierliche Sinus-Kanäle auf die interpolierte Keyframe-Pose.
+## Verändert `pose` in-place (pose_at liefert bei Loops ohnehin frische Dicts).
+static func _apply_waves(pose: Dictionary, waves: Array, t: float) -> void:
+	for wv: Dictionary in waves:
+		var v: float = wv["amp"] * sin(TAU * (wv.get("freq", 1.0) * t + wv.get("phase", 0.0)))
+		var bone: String = wv["bone"]
+		match wv.get("chan", "j"):
+			"j":
+				pose["j"][bone] = pose["j"].get(bone, 0.0) + v
+			"ox":
+				pose["off"][bone] = (pose["off"].get(bone, Vector2.ZERO) as Vector2) + Vector2(v, 0)
+			"oy":
+				pose["off"][bone] = (pose["off"].get(bone, Vector2.ZERO) as Vector2) + Vector2(0, v)
+			"rx":
+				pose["root"] = (pose["root"] as Vector2) + Vector2(v, 0)
+			"ry":
+				pose["root"] = (pose["root"] as Vector2) + Vector2(0, v)
 
 ## Interpolierte Pose zum Zeitpunkt t (0..1). Keys müssen nach t sortiert sein.
 static func pose_at(adef: Dictionary, t: float) -> Dictionary:
 	var keys: Array = adef["keys"]
 	if keys.size() == 1:
-		return keys[0]
+		return _lerp_pose(keys[0], keys[0], 0.0)  # frische Kopie (Waves mutieren!)
 	var loop: bool = adef.get("loop", true)
 	var a: Dictionary
 	var b: Dictionary
@@ -75,7 +100,7 @@ static func pose_at(adef: Dictionary, t: float) -> Dictionary:
 			span = (1.0 - a["t"]) + b["t"]
 			local = t - a["t"] if t >= a["t"] else (1.0 - a["t"]) + t
 		else:
-			return a
+			return _lerp_pose(a, a, 0.0)  # frische Kopie
 	var u := local / maxf(span, 0.0001)
 	if adef.get("ease", true):
 		u = u * u * (3.0 - 2.0 * u)  # smoothstep: An- und Abschwellen der Bewegung
@@ -233,14 +258,18 @@ static func count_parts(img: Image, min_px := 3) -> int:
 ## (einfaches AW-Tiefensignal). cfg-Farben: skin, hair, hair_dk, top, top_dk,
 ## pants, pants_dk, boots. Maße über cfg (Defaults = erwachsene Figur).
 static func humanoid(cfg: Dictionary) -> Dictionary:
-	var size: Vector2i = cfg.get("size", Vector2i(44, 56))
-	var hip: Vector2 = cfg.get("hip", Vector2(21, 33))
-	var torso_l: float = cfg.get("torso_len", 13.0)
-	var arm_u: float = cfg.get("arm_upper", 9.0)
-	var arm_l: float = cfg.get("arm_lower", 8.5)
-	var leg_u: float = cfg.get("leg_upper", 11.0)
-	var leg_l: float = cfg.get("leg_lower", 10.0)
-	var head_r: float = cfg.get("head_r", 5.2)
+	# Proportionen: schlank und ~5.5 Kopfhöhen groß (heroischer als die erste,
+	# gedrungene Fassung). Kopf klein, Torso/Beine lang, Gliedmaßen dünn.
+	var size: Vector2i = cfg.get("size", Vector2i(48, 62))
+	var hip: Vector2 = cfg.get("hip", Vector2(24, 33))
+	var torso_l: float = cfg.get("torso_len", 15.5)
+	var arm_u: float = cfg.get("arm_upper", 10.5)
+	var arm_l: float = cfg.get("arm_lower", 9.5)
+	var leg_u: float = cfg.get("leg_upper", 13.0)
+	var leg_l: float = cfg.get("leg_lower", 12.0)
+	var head_r: float = cfg.get("head_r", 4.4)
+	var arm_w: float = cfg.get("arm_w", 2.9)
+	var leg_w: float = cfg.get("leg_w", 3.8)
 	var skin: Color = cfg["skin"]
 	var top: Color = cfg["top"]
 	var top_dk: Color = cfg["top_dk"]
@@ -261,29 +290,31 @@ static func humanoid(cfg: Dictionary) -> Dictionary:
 		"leg_n_u": {"parent": "root", "pos": Vector2(1.0, 0)},
 		"leg_n_l": {"parent": "leg_n_u", "pos": Vector2(0, leg_u)},
 	}
+	var hip_w: float = cfg.get("hip_w", 7.0)
+	var sho_w: float = cfg.get("shoulder_w", 9.5)
 	var s: Array = []
 	# --- Ferne Gliedmaßen (hinter dem Rumpf) ---
-	_limb(s, "arm_f_u", "arm_f_l", arm_u, arm_l, 3.4, 2.6, top * far_mul, skin * far_mul, 2.0)
-	_limb(s, "leg_f_u", "leg_f_l", leg_u, leg_l, 4.6, 3.4, pants * far_mul, pants_dk * far_mul, 0.0)
+	_limb(s, "arm_f_u", "arm_f_l", arm_u, arm_l, arm_w, arm_w * 0.78, top * far_mul, skin * far_mul, 1.8)
+	_limb(s, "leg_f_u", "leg_f_l", leg_u, leg_l, leg_w, leg_w * 0.74, pants * far_mul, pants_dk * far_mul, 0.0)
 	s.append({"bone": "leg_f_l", "kind": "poly", "col": boots * far_mul, "pts": PackedVector2Array([
-		Vector2(-2.0, leg_l - 3.5), Vector2(2.0, leg_l - 3.5), Vector2(5.5, leg_l), Vector2(-2.0, leg_l)])})
-	# --- Rumpf: Trapez (Schultern breiter) + dunkles Rückenband ---
+		Vector2(-1.8, leg_l - 3.2), Vector2(1.8, leg_l - 3.2), Vector2(5.0, leg_l), Vector2(-1.8, leg_l)])})
+	# --- Rumpf: schlankes Trapez (Schultern breiter) + dunkles Rückenband ---
 	s.append({"bone": "torso", "kind": "quad", "col": top,
-		"w0": cfg.get("hip_w", 8.5), "w1": cfg.get("shoulder_w", 11.0), "len": -torso_l - 2.0})
+		"w0": hip_w, "w1": sho_w, "len": -torso_l - 2.0})
 	s.append({"bone": "torso", "kind": "poly", "col": top_dk, "pts": PackedVector2Array([
-		Vector2(-cfg.get("hip_w", 8.5) * 0.5, 0), Vector2(-cfg.get("hip_w", 8.5) * 0.5 + 2.6, 0),
-		Vector2(-cfg.get("shoulder_w", 11.0) * 0.5 + 2.6, -torso_l - 2.0),
-		Vector2(-cfg.get("shoulder_w", 11.0) * 0.5, -torso_l - 2.0)])})
+		Vector2(-hip_w * 0.5, 0), Vector2(-hip_w * 0.5 + 2.2, 0),
+		Vector2(-sho_w * 0.5 + 2.2, -torso_l - 2.0),
+		Vector2(-sho_w * 0.5, -torso_l - 2.0)])})
 	# Hüftpartie (Hose) über dem Beinansatz
-	s.append({"bone": "root", "kind": "quad", "col": pants, "w0": 8.5, "w1": 8.0, "len": 3.5})
-	s.append({"bone": "root", "kind": "disc", "c": Vector2(-2.0, 1.0), "r": 3.0, "col": pants})
-	s.append({"bone": "root", "kind": "disc", "c": Vector2(2.0, 1.0), "r": 3.0, "col": pants})
-	# --- Kopf: Hals, Schädel, Haar (hinten), Gesichtsfläche ---
-	s.append({"bone": "head", "kind": "quad", "col": skin, "w0": 3.6, "w1": 4.0, "len": -3.0})
-	s.append({"bone": "head", "kind": "disc", "c": Vector2(0.4, -3.0 - head_r + 1.0), "r": head_r, "col": skin})
+	s.append({"bone": "root", "kind": "quad", "col": pants, "w0": hip_w, "w1": hip_w - 0.5, "len": 3.5})
+	s.append({"bone": "root", "kind": "disc", "c": Vector2(-1.8, 1.0), "r": 2.7, "col": pants})
+	s.append({"bone": "root", "kind": "disc", "c": Vector2(1.8, 1.0), "r": 2.7, "col": pants})
+	# --- Kopf: schlanker Hals, kleiner Schädel, Haar (hinten), Gesichtsfläche ---
+	s.append({"bone": "head", "kind": "quad", "col": skin, "w0": 2.8, "w1": 3.2, "len": -2.6})
+	s.append({"bone": "head", "kind": "disc", "c": Vector2(0.4, -2.6 - head_r + 1.0), "r": head_r, "col": skin})
 	if cfg.has("hair"):
 		var hair: Color = cfg["hair"]
-		var hy := -3.0 - head_r + 1.0
+		var hy := -2.6 - head_r + 1.0
 		# Haarkappe: obere Kopfhälfte + Hinterkopf, kleine Stirnkante
 		s.append({"bone": "head", "kind": "poly", "col": hair, "pts": PackedVector2Array([
 			Vector2(0.4 + head_r - 1.0, hy - 1.0), Vector2(0.4 + head_r * 0.6, hy - head_r + 0.4),
@@ -294,18 +325,24 @@ static func humanoid(cfg: Dictionary) -> Dictionary:
 				Vector2(0.4 - head_r - 1.4, hy - 0.8), Vector2(0.4 - head_r + 0.6, hy - 0.6),
 				Vector2(0.4 - head_r + 1.0, hy + head_r * 0.6), Vector2(0.4 - head_r - 1.2, hy + head_r * 0.9)])})
 	# --- Nahe Gliedmaßen (vor dem Rumpf) ---
-	_limb(s, "leg_n_u", "leg_n_l", leg_u, leg_l, 4.6, 3.4, pants, pants_dk, 0.0)
+	_limb(s, "leg_n_u", "leg_n_l", leg_u, leg_l, leg_w, leg_w * 0.74, pants, pants_dk, 0.0)
 	s.append({"bone": "leg_n_l", "kind": "poly", "col": boots, "pts": PackedVector2Array([
-		Vector2(-2.0, leg_l - 3.5), Vector2(2.0, leg_l - 3.5), Vector2(5.5, leg_l), Vector2(-2.0, leg_l)])})
-	_limb(s, "arm_n_u", "arm_n_l", arm_u, arm_l, 3.4, 2.6, top, skin, 2.0)
+		Vector2(-1.8, leg_l - 3.2), Vector2(1.8, leg_l - 3.2), Vector2(5.0, leg_l), Vector2(-1.8, leg_l)])})
+	_limb(s, "arm_n_u", "arm_n_l", arm_u, arm_l, arm_w, arm_w * 0.78, top, skin, 1.8)
 	return {"size": size, "origin": hip, "bones": bones, "shapes": s, "anims": {}}
 
 ## Zweigliedrige Gliedmaße: Ober-/Unterteil als Trapeze + Gelenk-/Endscheiben.
+## Die Gelenkscheiben sind bewusst etwas größer als die Trapezbreite, damit
+## sich bei starker Beugung nie ein Haarriss zwischen den Segmenten öffnet
+## (der Zusammenhangs-Validator wäre sonst empfindlich).
 static func _limb(s: Array, upper: String, lower: String, ul: float, ll: float,
 		w0: float, w1: float, col_u: Color, col_l: Color, hand_r: float) -> void:
-	s.append({"bone": upper, "kind": "disc", "c": Vector2.ZERO, "r": w0 * 0.55, "col": col_u})
-	s.append({"bone": upper, "kind": "quad", "col": col_u, "w0": w0, "w1": w0 * 0.85, "len": ul})
-	s.append({"bone": lower, "kind": "disc", "c": Vector2.ZERO, "r": w0 * 0.48, "col": col_u})
-	s.append({"bone": lower, "kind": "quad", "col": col_l, "w0": w0 * 0.85, "w1": w1, "len": ll})
+	s.append({"bone": upper, "kind": "disc", "c": Vector2.ZERO, "r": w0 * 0.62, "col": col_u})
+	s.append({"bone": upper, "kind": "quad", "col": col_u, "w0": w0, "w1": w0 * 0.9, "len": ul})
+	# Ellenbogen: Scheibe am Unterteil-Pivot UND am Oberteil-Ende → doppelt
+	# abgedeckt, egal wie stark das Gelenk knickt.
+	s.append({"bone": upper, "kind": "disc", "c": Vector2(0, ul), "r": w0 * 0.52, "col": col_u})
+	s.append({"bone": lower, "kind": "disc", "c": Vector2.ZERO, "r": w0 * 0.56, "col": col_u})
+	s.append({"bone": lower, "kind": "quad", "col": col_l, "w0": w0 * 0.9, "w1": w1, "len": ll})
 	if hand_r > 0.0:
 		s.append({"bone": lower, "kind": "disc", "c": Vector2(0, ll), "r": hand_r, "col": col_l})

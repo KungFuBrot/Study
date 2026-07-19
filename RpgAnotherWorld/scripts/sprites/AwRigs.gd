@@ -63,7 +63,7 @@ static func aw_hero_has_anim(id: String, anim: String) -> bool:
 
 static func _helen_rig() -> Dictionary:
 	var rig := humanoid({
-		"size": Vector2i(48, 58), "hip": Vector2(23, 34),
+		"size": Vector2i(48, 62), "hip": Vector2(24, 33),
 		"skin": Color(0.97, 0.80, 0.66),
 		"hair": Color(0.98, 0.80, 0.34), "hair_dk": Color(0.70, 0.52, 0.18),
 		"top": Color(0.90, 0.30, 0.34), "top_dk": Color(0.58, 0.15, 0.19),
@@ -71,7 +71,7 @@ static func _helen_rig() -> Dictionary:
 		"boots": Color(0.52, 0.36, 0.22),
 	})
 	# Schwert an der nahen Faust: Parierstange, Klinge (nach oben), Knauf.
-	rig["bones"]["weapon"] = {"parent": "arm_n_l", "pos": Vector2(0, 8.5)}
+	rig["bones"]["weapon"] = {"parent": "arm_n_l", "pos": Vector2(0, 9.5)}
 	var blade := Color(0.92, 0.96, 1.0)
 	var blade_dk := Color(0.60, 0.68, 0.82)
 	var gold := Color(0.95, 0.80, 0.38)
@@ -81,17 +81,30 @@ static func _helen_rig() -> Dictionary:
 	rig["shapes"].append({"bone": "weapon", "kind": "poly", "col": blade_dk, "pts": PackedVector2Array([
 		Vector2(-1.2, -1.0), Vector2(-0.2, -1.0), Vector2(-0.2, -14.0), Vector2(-0.7, -14.0)])})
 	rig["shapes"].append({"bone": "weapon", "kind": "disc", "c": Vector2(0, 2.0), "r": 1.4, "col": gold})
-	# Kampfstellung: Klinge vor dem Körper, Beine gegrätscht, ruhiges Atmen.
+	# Kampfstellung: Klinge vor dem Körper, Beine gegrätscht. Die gesamte
+	# Idle-Bewegung entsteht aus phasenversetzten Wellen (kein synchroner Snap)
+	# → weiches, lebendiges "Atmen".
 	var stance := {"leg_n_u": -0.16, "leg_n_l": 0.10, "leg_f_u": 0.18, "leg_f_l": 0.08,
 		"arm_f_u": 0.16, "arm_f_l": -0.22}
-	rig["anims"]["idle"] = {"frames": 8, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "root": Vector2(0, 0.3), "j": _merge(stance, {"torso": 0.06, "head": -0.02,
-			"arm_n_u": -0.42, "arm_n_l": -0.38, "weapon": 1.25})},
-		{"t": 0.5, "root": Vector2(0, -0.3), "j": _merge(stance, {"torso": 0.10, "head": 0.02,
-			"arm_n_u": -0.36, "arm_n_l": -0.44, "weapon": 1.20})},
-	]}
+	rig["anims"]["idle"] = {"frames": 16, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "root": Vector2(0, 0.0), "j": _merge(stance, {"torso": 0.08,
+			"head": 0.0, "arm_n_u": -0.40, "arm_n_l": -0.42, "weapon": 1.22})}],
+		"waves": [
+			{"bone": "root", "chan": "ry", "amp": 0.9, "freq": 1.0, "phase": 0.0},
+			{"bone": "torso", "chan": "j", "amp": 0.035, "freq": 1.0, "phase": 0.12},
+			{"bone": "head", "chan": "j", "amp": 0.06, "freq": 1.0, "phase": 0.40},
+			{"bone": "arm_n_u", "chan": "j", "amp": 0.07, "freq": 1.0, "phase": 0.25},
+			{"bone": "arm_n_l", "chan": "j", "amp": 0.06, "freq": 1.0, "phase": 0.55},
+			{"bone": "arm_f_u", "chan": "j", "amp": 0.06, "freq": 1.0, "phase": 0.62},
+			{"bone": "weapon", "chan": "j", "amp": 0.09, "freq": 1.0, "phase": 0.50},
+		]}
 	# Laufzyklus: Kontakt- und Passierposen, Arme gegenläufig, Klinge ruht.
-	rig["anims"]["run"] = {"frames": 8, "loop": true, "ease": true, "keys": [
+	# 12 Frames + Sekundär-Wellen (Kopf/Klinge wippen im Doppeltakt).
+	rig["anims"]["run"] = {"frames": 12, "loop": true, "ease": true,
+		"waves": [
+			{"bone": "head", "chan": "j", "amp": 0.04, "freq": 2.0, "phase": 0.1},
+			{"bone": "weapon", "chan": "j", "amp": 0.10, "freq": 2.0, "phase": 0.0},
+		], "keys": [
 		{"t": 0.0, "root": Vector2(0, 0.8), "j": {"torso": 0.16, "head": -0.05,
 			"leg_n_u": -0.85, "leg_n_l": 0.25, "leg_f_u": 0.75, "leg_f_l": 1.05,
 			"arm_n_u": 0.65, "arm_n_l": -0.95, "arm_f_u": -0.75, "arm_f_l": -0.85, "weapon": 1.35}},
@@ -106,7 +119,7 @@ static func _helen_rig() -> Dictionary:
 			"arm_n_u": -0.20, "arm_n_l": -0.80, "arm_f_u": 0.10, "arm_f_l": -0.75, "weapon": 1.35}},
 	]}
 	# Schwerthieb: Ausholen über den Kopf, schneller Diagonalschnitt, Ausklang.
-	rig["anims"]["attack"] = {"frames": 10, "loop": false, "ease": true, "keys": [
+	rig["anims"]["attack"] = {"frames": 14, "loop": false, "ease": true, "keys": [
 		{"t": 0.0, "root": Vector2(0, 0.3), "j": _merge(stance, {"torso": 0.06,
 			"arm_n_u": -0.50, "arm_n_l": -0.55, "weapon": 0.60})},
 		{"t": 0.30, "root": Vector2(-1.5, 0.5), "j": {"torso": -0.14, "head": 0.06,
@@ -132,7 +145,7 @@ static func _janosch_rig() -> Dictionary:
 	var robe := Color(0.32, 0.42, 0.86)
 	var robe_dk := Color(0.20, 0.26, 0.60)
 	var rig := humanoid({
-		"size": Vector2i(48, 58), "hip": Vector2(23, 34),
+		"size": Vector2i(48, 62), "hip": Vector2(24, 33),
 		"skin": Color(0.94, 0.79, 0.65),
 		"top": robe, "top_dk": robe_dk,
 		"pants": Color(0.26, 0.24, 0.50), "pants_dk": Color(0.18, 0.16, 0.36),
@@ -141,23 +154,23 @@ static func _janosch_rig() -> Dictionary:
 	# Robensaum über den Oberschenkeln — VOR den nahen Gliedmaßen einfügen
 	# (die letzten 8 Shapes des Builders sind nahes Bein/Stiefel/naher Arm).
 	rig["shapes"].insert(rig["shapes"].size() - 8,
-		{"bone": "root", "kind": "quad", "col": robe, "w0": 9.5, "w1": 12.0, "len": 9.0})
+		{"bone": "root", "kind": "quad", "col": robe, "w0": 8.0, "w1": 11.0, "len": 10.0})
 	rig["shapes"].insert(rig["shapes"].size() - 8,
 		{"bone": "root", "kind": "poly", "col": robe_dk, "pts": PackedVector2Array([
-			Vector2(-4.7, 0), Vector2(-2.2, 0), Vector2(-3.4, 9.0), Vector2(-6.0, 9.0)])})
-	# Spitzhut mit Krempe (ersetzt Haar)
-	var hy := -3.0 - 5.2 + 1.0
+			Vector2(-4.0, 0), Vector2(-1.8, 0), Vector2(-3.0, 10.0), Vector2(-5.5, 10.0)])})
+	# Spitzhut mit Krempe (ersetzt Haar). hy = Kopfmitte (Neck -2.6, head_r 4.4).
+	var hy := -2.6 - 4.4 + 1.0
 	rig["shapes"].append({"bone": "head", "kind": "poly", "col": robe_dk, "pts": PackedVector2Array([
-		Vector2(0.4 - 8.5, hy + 0.6), Vector2(0.4 + 8.5, hy + 0.6),
-		Vector2(0.4 + 7.0, hy - 2.0), Vector2(0.4 - 7.0, hy - 2.0)])})
+		Vector2(0.4 - 7.6, hy + 0.6), Vector2(0.4 + 7.6, hy + 0.6),
+		Vector2(0.4 + 6.2, hy - 1.8), Vector2(0.4 - 6.2, hy - 1.8)])})
 	rig["shapes"].append({"bone": "head", "kind": "poly", "col": robe, "pts": PackedVector2Array([
-		Vector2(0.4 - 6.2, hy - 1.6), Vector2(0.4 + 6.2, hy - 1.6),
-		Vector2(0.4 + 1.6, hy - 12.5), Vector2(0.4 - 1.2, hy - 12.5)])})
+		Vector2(0.4 - 5.6, hy - 1.4), Vector2(0.4 + 5.6, hy - 1.4),
+		Vector2(0.4 + 1.4, hy - 13.0), Vector2(0.4 - 1.0, hy - 13.0)])})
 	rig["shapes"].append({"bone": "head", "kind": "poly", "col": robe_dk, "pts": PackedVector2Array([
-		Vector2(0.4 - 6.2, hy - 1.6), Vector2(0.4 - 2.6, hy - 1.6),
-		Vector2(0.4 - 0.6, hy - 12.0), Vector2(0.4 - 1.2, hy - 12.5)])})
+		Vector2(0.4 - 5.6, hy - 1.4), Vector2(0.4 - 2.4, hy - 1.4),
+		Vector2(0.4 - 0.4, hy - 12.5), Vector2(0.4 - 1.0, hy - 13.0)])})
 	# Stab in der nahen Hand: langer Stecken + Kristall-Orb
-	rig["bones"]["weapon"] = {"parent": "arm_n_l", "pos": Vector2(0, 8.5)}
+	rig["bones"]["weapon"] = {"parent": "arm_n_l", "pos": Vector2(0, 9.5)}
 	rig["shapes"].append({"bone": "weapon", "kind": "quad", "col": Color(0.52, 0.36, 0.20),
 		"w0": 1.8, "w1": 1.8, "len": 7.0})
 	rig["shapes"].append({"bone": "weapon", "kind": "quad", "col": Color(0.52, 0.36, 0.20),
@@ -168,13 +181,20 @@ static func _janosch_rig() -> Dictionary:
 		"col": Color(0.95, 1.0, 1.0)})
 	var stance := {"leg_n_u": -0.10, "leg_n_l": 0.06, "leg_f_u": 0.12, "leg_f_l": 0.05,
 		"arm_f_u": 0.12, "arm_f_l": -0.18}
-	rig["anims"]["idle"] = {"frames": 8, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "root": Vector2(0, 0.3), "j": _merge(stance, {"torso": 0.04, "head": -0.02,
-			"arm_n_u": -0.22, "arm_n_l": -0.18, "weapon": 0.04})},
-		{"t": 0.5, "root": Vector2(0, -0.3), "j": _merge(stance, {"torso": 0.08, "head": 0.03,
-			"arm_n_u": -0.18, "arm_n_l": -0.22, "weapon": -0.04})},
-	]}
-	rig["anims"]["run"] = {"frames": 8, "loop": true, "ease": true, "keys": [
+	rig["anims"]["idle"] = {"frames": 16, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "root": Vector2(0, 0.0), "j": _merge(stance, {"torso": 0.05,
+			"head": 0.0, "arm_n_u": -0.20, "arm_n_l": -0.20, "weapon": 0.0})}],
+		"waves": [
+			{"bone": "root", "chan": "ry", "amp": 0.8, "freq": 1.0, "phase": 0.0},
+			{"bone": "torso", "chan": "j", "amp": 0.03, "freq": 1.0, "phase": 0.15},
+			{"bone": "head", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.42},
+			{"bone": "arm_n_u", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.30},
+			{"bone": "arm_n_l", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.58},
+			{"bone": "arm_f_u", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.66},
+			{"bone": "weapon", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.20},
+		]}
+	rig["anims"]["run"] = {"frames": 12, "loop": true, "ease": true,
+		"waves": [{"bone": "head", "chan": "j", "amp": 0.04, "freq": 2.0, "phase": 0.1}], "keys": [
 		{"t": 0.0, "root": Vector2(0, 0.8), "j": {"torso": 0.15, "head": -0.05,
 			"leg_n_u": -0.80, "leg_n_l": 0.25, "leg_f_u": 0.70, "leg_f_l": 1.0,
 			"arm_n_u": 0.35, "arm_n_l": -0.55, "weapon": 0.15, "arm_f_u": -0.65, "arm_f_l": -0.75}},
@@ -189,7 +209,13 @@ static func _janosch_rig() -> Dictionary:
 			"arm_n_u": -0.15, "arm_n_l": -0.50, "weapon": 0.12, "arm_f_u": 0.10, "arm_f_l": -0.65}},
 	]}
 	# Beschwörung: beide Arme zum Himmel, Stab hoch, Robe im Zauberwind.
-	rig["anims"]["cast"] = {"frames": 6, "loop": true, "ease": true, "keys": [
+	# 10 Frames + Zittern (Stab bebt schnell, Kopf pendelt) = kraftvolles Kanalisieren.
+	rig["anims"]["cast"] = {"frames": 10, "loop": true, "ease": true,
+		"waves": [
+			{"bone": "weapon", "chan": "j", "amp": 0.10, "freq": 3.0, "phase": 0.0},
+			{"bone": "arm_n_u", "chan": "j", "amp": 0.05, "freq": 2.0, "phase": 0.2},
+			{"bone": "head", "chan": "j", "amp": 0.04, "freq": 1.0, "phase": 0.3},
+		], "keys": [
 		{"t": 0.0, "root": Vector2(-0.5, 0.4), "j": _merge(stance, {"torso": -0.06, "head": 0.10,
 			"arm_n_u": -2.55, "arm_n_l": -0.30, "weapon": 0.10, "arm_f_u": -2.30, "arm_f_l": -0.35})},
 		{"t": 0.5, "root": Vector2(-0.5, -0.5), "j": _merge(stance, {"torso": -0.09, "head": 0.13,
@@ -204,16 +230,17 @@ static func _wally_rig() -> Dictionary:
 	var metal_m := Color(0.55, 0.62, 0.72)
 	var metal_d := Color(0.34, 0.40, 0.50)
 	var rig := humanoid({
-		"size": Vector2i(48, 58), "hip": Vector2(23, 34),
+		"size": Vector2i(48, 62), "hip": Vector2(24, 33),
 		"skin": metal_l, "top": metal_m, "top_dk": metal_d,
 		"pants": Color(0.46, 0.52, 0.62), "pants_dk": Color(0.30, 0.35, 0.44),
 		"boots": Color(0.36, 0.40, 0.48),
-		"head_r": 5.0, "shoulder_w": 12.0,
+		"head_r": 4.6, "shoulder_w": 10.5,
 	})
-	var hy := -3.0 - 5.0 + 1.0
-	# Antenne mit roter Blinkspitze
+	var hy := -2.6 - 4.6 + 1.0
+	# Antenne mit roter Blinkspitze. Basis tief in die Schädelkuppe gezogen
+	# (bis hy-1.5), damit sie sich bei Kopfdrehung nie ablöst.
 	rig["shapes"].append({"bone": "head", "kind": "quad", "col": metal_d,
-		"w0": 1.2, "w1": 1.0, "len": -4.5, "p0": Vector2(-1.8, hy - 4.4), "p1": Vector2(-0.4, hy - 4.4),
+		"w0": 1.2, "w1": 1.0, "len": -4.5, "p0": Vector2(-1.8, hy - 1.5), "p1": Vector2(-0.4, hy - 1.5),
 		"p2": Vector2(-0.4, hy - 10.4), "p3": Vector2(-1.8, hy - 10.4)})
 	rig["shapes"].append({"bone": "head", "kind": "disc", "c": Vector2(-1.1, hy - 10.6), "r": 1.5,
 		"col": Color(1.0, 0.40, 0.32)})
@@ -237,15 +264,21 @@ static func _wally_rig() -> Dictionary:
 		"p2": Vector2(1.9, 15.0), "p3": Vector2(-1.9, 15.0)})
 	rig["shapes"].append({"bone": "arm_n_l", "kind": "disc", "c": Vector2(0, 15.0), "r": 1.6,
 		"col": Color(0.45, 0.96, 1.0)})
+	# Roboter: mechanischeres Idle (kleinere Amplitude, aber Servo-Zittern
+	# im Doppeltakt am Arm) — wirkt wie eine unter Strom stehende Maschine.
 	var stance := {"leg_n_u": -0.12, "leg_n_l": 0.08, "leg_f_u": 0.14, "leg_f_l": 0.06,
 		"arm_f_u": 0.14, "arm_f_l": -0.20}
-	rig["anims"]["idle"] = {"frames": 8, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "root": Vector2(0, 0.2), "j": _merge(stance, {"torso": 0.03, "head": -0.02,
-			"arm_n_u": 0.10, "arm_n_l": -0.30})},
-		{"t": 0.5, "root": Vector2(0, -0.2), "j": _merge(stance, {"torso": 0.06, "head": 0.03,
-			"arm_n_u": 0.16, "arm_n_l": -0.36})},
-	]}
-	rig["anims"]["run"] = {"frames": 8, "loop": true, "ease": true, "keys": [
+	rig["anims"]["idle"] = {"frames": 16, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "root": Vector2(0, 0.0), "j": _merge(stance, {"torso": 0.04,
+			"head": 0.0, "arm_n_u": 0.13, "arm_n_l": -0.33})}],
+		"waves": [
+			{"bone": "root", "chan": "ry", "amp": 0.5, "freq": 1.0, "phase": 0.0},
+			{"bone": "head", "chan": "j", "amp": 0.04, "freq": 1.0, "phase": 0.35},
+			{"bone": "arm_n_u", "chan": "j", "amp": 0.05, "freq": 2.0, "phase": 0.1},
+			{"bone": "arm_n_l", "chan": "j", "amp": 0.04, "freq": 2.0, "phase": 0.5},
+			{"bone": "arm_f_u", "chan": "j", "amp": 0.04, "freq": 1.0, "phase": 0.6},
+		]}
+	rig["anims"]["run"] = {"frames": 12, "loop": true, "ease": true, "keys": [
 		{"t": 0.0, "root": Vector2(0, 0.8), "j": {"torso": 0.18, "head": -0.06,
 			"leg_n_u": -0.85, "leg_n_l": 0.25, "leg_f_u": 0.75, "leg_f_l": 1.05,
 			"arm_n_u": 0.60, "arm_n_l": -0.90, "arm_f_u": -0.70, "arm_f_l": -0.85}},
@@ -259,8 +292,11 @@ static func _wally_rig() -> Dictionary:
 			"leg_n_u": -0.30, "leg_n_l": 0.45, "leg_f_u": 0.15, "leg_f_l": 1.15,
 			"arm_n_u": -0.18, "arm_n_l": -0.75, "arm_f_u": 0.10, "arm_f_l": -0.70}},
 	]}
-	# Schützenstand: Kanone waagerecht auf die Gegner gerichtet.
-	rig["anims"]["aim"] = {"frames": 4, "loop": true, "ease": true, "keys": [
+	# Schützenstand: Kanone waagerecht auf die Gegner gerichtet, leichtes
+	# Rückstoß-Zittern des Laufs (schneller Servo-Wave am Unterarm).
+	rig["anims"]["aim"] = {"frames": 8, "loop": true, "ease": true,
+		"waves": [{"bone": "arm_n_l", "chan": "j", "amp": 0.05, "freq": 3.0, "phase": 0.0}],
+		"keys": [
 		{"t": 0.0, "root": Vector2(1.0, 0.6), "j": {"torso": 0.10, "head": 0.02,
 			"leg_n_u": -0.38, "leg_n_l": 0.22, "leg_f_u": 0.45, "leg_f_l": 0.30,
 			"arm_n_u": -1.62, "arm_n_l": 0.02, "arm_f_u": -1.10, "arm_f_l": -0.62}},

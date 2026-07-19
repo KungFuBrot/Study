@@ -929,8 +929,13 @@ func _add_theme_weather() -> void:
 func _start_idle_animations() -> void:
 	# Jede Figur taktet ihre Frames eigenständig und leicht unterschiedlich
 	# schnell — im globalen Gleichtakt wirkte die Szene wie ein starres GIF.
+	# Takt frame-zahl-bewusst: fein aufgelöste AW-Zyklen (12–16 Frames) laufen
+	# nicht langsamer, sondern über dieselbe ~2 s Grundzeit → flüssiger. Ein
+	# kleiner Jitter pro Figur entkoppelt sie voneinander.
 	for e in enemies:
-		_unit_ticker(randf_range(0.13, 0.19), func():
+		var ef: int = SpriteFactory.enemy_anim_frames(e["id"])
+		var eiv: float = clampf(2.1 / maxf(ef, 1), 0.05, 0.17) * randf_range(0.9, 1.1)
+		_unit_ticker(eiv, func():
 			if e["alive"] and SpriteFactory.enemy_has_anim(e["id"]):
 				e["frame"] = (e["frame"] + 1) % SpriteFactory.enemy_anim_frames(e["id"])
 				var tex := SpriteFactory.enemy_frame(e["id"], e["frame"])
@@ -938,7 +943,9 @@ func _start_idle_animations() -> void:
 				if is_instance_valid(e["refl"]):
 					(e["refl"] as Sprite2D).texture = tex)
 	for h in heroes:
-		_unit_ticker(randf_range(0.13, 0.19), func():
+		var hf: int = SpriteFactory.hero_anim_frames(h["data"]["id"], "idle")
+		var hiv: float = clampf(1.9 / maxf(hf, 1), 0.05, 0.16) * randf_range(0.9, 1.1)
+		_unit_ticker(hiv, func():
 			if h["data"]["hp"] > 0:
 				h["frame"] = (h["frame"] + 1) \
 					% SpriteFactory.hero_anim_frames(h["data"]["id"], h["anim"])

@@ -39,8 +39,10 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	h["anim"] = "run"
 	var foot_y := s.texture.get_height() * s.scale.y * 0.5 - 4.0
 	_step_dust(s.position + Vector2(0, foot_y))
+	# Lauf-Frames schnell durchtakten (feine AW-Zyklen brauchen ein flottes
+	# Tempo, damit die Schritte im kurzen Sprint überhaupt sichtbar werden).
 	var frames := create_tween().set_loops()
-	frames.tween_interval(0.06)
+	frames.tween_interval(0.04)
 	frames.tween_callback(func():
 		h["frame"] = (h["frame"] + 1) \
 			% SpriteFactory.hero_anim_frames(h["data"]["id"], "run")

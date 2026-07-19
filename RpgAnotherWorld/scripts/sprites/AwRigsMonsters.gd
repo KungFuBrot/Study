@@ -129,15 +129,23 @@ static func schlotbaron_rig() -> Dictionary:
 		Vector2(10, 25), Vector2(26, 24), Vector2(24, 27), Vector2(12, 27)])})
 	var rig := {"size": Vector2i(124, 124), "origin": Vector2(58, 92), "bones": bones,
 		"shapes": s, "anims": {}}
-	# Idle: schweres Heben und Senken der Masse, Kopf nickt gegenläufig, die
-	# Pranke pendelt, der Qualm quillt gegenphasig aus den Schloten.
-	rig["anims"]["idle"] = {"frames": 8, "loop": true, "ease": true, "keys": [
+	# Idle: schweres Heben und Senken der Masse (2 Keys, 14 Frames = träge und
+	# weich) + kontinuierliche Wellen — der Qualm quillt gegenphasig aus den
+	# Schloten, der Kopf und die Pranke haben ihr eigenes leichtes Zittern.
+	rig["anims"]["idle"] = {"frames": 14, "loop": true, "ease": true,
+		"waves": [
+			{"bone": "puff1", "chan": "oy", "amp": 1.8, "freq": 1.0, "phase": 0.0},
+			{"bone": "puff1", "chan": "ox", "amp": 1.0, "freq": 1.0, "phase": 0.25},
+			{"bone": "puff2", "chan": "oy", "amp": 1.8, "freq": 1.0, "phase": 0.5},
+			{"bone": "puff2", "chan": "ox", "amp": 1.0, "freq": 1.0, "phase": 0.75},
+			{"bone": "head", "chan": "j", "amp": 0.018, "freq": 2.0, "phase": 0.2},
+			{"bone": "jaw", "chan": "j", "amp": 0.03, "freq": 1.0, "phase": 0.6},
+			{"bone": "arm_n_l", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.4},
+		], "keys": [
 		{"t": 0.0, "root": Vector2(0, 0), "j": {"torso": 0.0, "head": 0.02, "jaw": 0.0,
-			"arm_n_u": -0.04, "arm_n_l": 0.05, "arm_f_u": 0.03},
-			"off": {"puff1": Vector2(0, 0), "puff2": Vector2(1.5, -2.0)}},
+			"arm_n_u": -0.04, "arm_n_l": 0.05, "arm_f_u": 0.03}},
 		{"t": 0.5, "root": Vector2(0, 2.0), "j": {"torso": 0.025, "head": -0.05, "jaw": 0.06,
-			"arm_n_u": 0.05, "arm_n_l": -0.04, "arm_f_u": -0.03},
-			"off": {"puff1": Vector2(1.5, -2.5), "puff2": Vector2(0, 0)}},
+			"arm_n_u": 0.05, "arm_n_l": -0.04, "arm_f_u": -0.03}},
 	]}
 	return rig
 
@@ -183,10 +191,16 @@ static func slime_rig() -> Dictionary:
 		Vector2(-4, 3), Vector2(-6, -3), Vector2(-1, -6), Vector2(4, -3), Vector2(5, 3)])})
 	var rig := {"size": Vector2i(48, 40), "origin": Vector2(24, 36), "bones": bones,
 		"shapes": s, "anims": {}}
-	rig["anims"]["idle"] = {"frames": 6, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "off": {"crest": Vector2(0, 0), "lump": Vector2(0, 0)}},
-		{"t": 0.5, "off": {"crest": Vector2(0.8, 2.2), "lump": Vector2(-1.0, 1.2)}},
-	]}
+	# Zäh-schwappendes Idle rein aus Wellen — die Kuppe und der Tropf-Lappen
+	# wabern gegenphasig, nichts bewegt sich synchron.
+	rig["anims"]["idle"] = {"frames": 12, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "off": {}}],
+		"waves": [
+			{"bone": "crest", "chan": "oy", "amp": 1.4, "freq": 1.0, "phase": 0.0},
+			{"bone": "crest", "chan": "ox", "amp": 0.5, "freq": 1.0, "phase": 0.25},
+			{"bone": "lump", "chan": "oy", "amp": 0.9, "freq": 1.0, "phase": 0.45},
+			{"bone": "lump", "chan": "ox", "amp": 0.7, "freq": 1.0, "phase": 0.7},
+		]}
 	return rig
 
 ## ---------- Smog Wraith: schwebender Qualmgeist ----------
@@ -232,13 +246,18 @@ static func wraith_rig() -> Dictionary:
 	s.append({"bone": "arm_n", "kind": "disc", "c": Vector2(3.0, 11.0), "r": 2.0, "col": body})
 	var rig := {"size": Vector2i(44, 48), "origin": Vector2(21, 44), "bones": bones,
 		"shapes": s, "anims": {}}
-	# Schweben: auf und ab, Schweif pendelt gegenphasig, Arme wogen.
-	rig["anims"]["idle"] = {"frames": 8, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "root": Vector2(0, 0), "j": {"tail": 0.06, "body": -0.03,
-			"arm_n": -0.15, "arm_f": 0.10, "head": 0.02}},
-		{"t": 0.5, "root": Vector2(0, -3.0), "j": {"tail": -0.08, "body": 0.03,
-			"arm_n": 0.10, "arm_f": -0.12, "head": -0.03}},
-	]}
+	# Schweben rein aus Wellen: auf und ab, Schweif und Arme wogen gegenphasig,
+	# der Kopf nickt verzögert — ein wirklich körperloses Driften.
+	rig["anims"]["idle"] = {"frames": 14, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "root": Vector2(0, -1.5), "j": {"tail": 0.0, "body": 0.0}}],
+		"waves": [
+			{"bone": "root", "chan": "ry", "amp": 2.0, "freq": 1.0, "phase": 0.0},
+			{"bone": "tail", "chan": "j", "amp": 0.09, "freq": 1.0, "phase": 0.5},
+			{"bone": "body", "chan": "j", "amp": 0.04, "freq": 1.0, "phase": 0.2},
+			{"bone": "arm_n", "chan": "j", "amp": 0.16, "freq": 1.0, "phase": 0.15},
+			{"bone": "arm_f", "chan": "j", "amp": 0.13, "freq": 1.0, "phase": 0.70},
+			{"bone": "head", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.40},
+		]}
 	return rig
 
 ## ---------- Scrap Gnome: kleiner Müllsammler mit Topfhelm ----------
@@ -255,7 +274,7 @@ static func gnome_rig() -> Dictionary:
 		"boots": Color(0.40, 0.34, 0.26),
 	})
 	# Topfhelm (rostiges Metall) über dem Schädel + Nietenkante
-	var hy := -3.0 - 5.4 + 1.0
+	var hy := -2.6 - 5.4 + 1.0
 	rig["shapes"].append({"bone": "head", "kind": "poly", "col": Color(0.60, 0.53, 0.46),
 		"pts": PackedVector2Array([
 			Vector2(0.4 - 6.6, hy - 0.5), Vector2(0.4 - 5.0, hy - 5.8), Vector2(0.4 + 5.4, hy - 5.6),
@@ -271,12 +290,15 @@ static func gnome_rig() -> Dictionary:
 	rig["shapes"].insert(0, {"bone": "torso", "kind": "poly", "col": Color(0.42, 0.39, 0.33),
 		"pts": PackedVector2Array([
 			Vector2(-3, -9), Vector2(-12, -13), Vector2(-15, -6), Vector2(-11, 0), Vector2(-4, -1)])})
-	rig["anims"]["idle"] = {"frames": 6, "loop": true, "ease": true, "keys": [
-		{"t": 0.0, "root": Vector2(0, 0.4), "j": {"torso": 0.05, "head": -0.03,
-			"arm_n_u": 0.10, "arm_n_l": -0.25, "arm_f_u": -0.06,
-			"leg_n_u": -0.10, "leg_n_l": 0.06, "leg_f_u": 0.12, "leg_f_l": 0.05}},
-		{"t": 0.5, "root": Vector2(0, -0.4), "j": {"torso": 0.01, "head": 0.03,
-			"arm_n_u": 0.16, "arm_n_l": -0.32, "arm_f_u": -0.10,
-			"leg_n_u": -0.10, "leg_n_l": 0.06, "leg_f_u": 0.12, "leg_f_l": 0.05}},
-	]}
+	# Nervöses Kramen: Grundpose + Wellen (Wühl-Arm im Doppeltakt, Kopf zuckt).
+	rig["anims"]["idle"] = {"frames": 12, "loop": true, "ease": true,
+		"keys": [{"t": 0.0, "root": Vector2(0, 0.0), "j": {"torso": 0.03, "head": 0.0,
+			"arm_n_u": 0.13, "arm_n_l": -0.28, "arm_f_u": -0.08,
+			"leg_n_u": -0.10, "leg_n_l": 0.06, "leg_f_u": 0.12, "leg_f_l": 0.05}}],
+		"waves": [
+			{"bone": "root", "chan": "ry", "amp": 0.5, "freq": 1.0, "phase": 0.0},
+			{"bone": "arm_n_u", "chan": "j", "amp": 0.06, "freq": 1.0, "phase": 0.2},
+			{"bone": "arm_n_l", "chan": "j", "amp": 0.10, "freq": 2.0, "phase": 0.4},
+			{"bone": "head", "chan": "j", "amp": 0.05, "freq": 1.0, "phase": 0.55},
+		]}
 	return rig
