@@ -1,0 +1,12 @@
+Roguelike/RPG Pack
+==================
+
+Autor:   Kenney (www.kenney.nl)
+Quelle:  https://kenney.nl/assets/roguelike-rpg-pack
+Lizenz:  CC0 1.0 Universal (Public Domain Dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+
+Gemeinfrei (CC0), keine Namensnennung nötig; hier freiwillig genannt.
+Verwendet in RpgGodot für die Überwelt-Bodenkacheln (Gras, Weg, Wasser,
+Baum, Berg). Datei roguelikeSheet.png = 16x16-Kacheln mit 1px Abstand
+(Rasterschritt 17).

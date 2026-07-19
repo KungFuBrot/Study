@@ -1,0 +1,231 @@
+class_name MapData
+## ASCII-Karten. Legende:
+##  g Gras, t Baum, p Weg, w Wasser, b Brücke, m Berg,
+##  R Dach, W Hauswand, D Tür, f Fabrikboden, # Fabrikwand,
+##  i Marmorboden, I Turmwand, y Festungsboden, Y Festungswand,
+##  n Leere-Boden, N Leere-Wand,
+##  T Stadt (Portal), C Schlotwerk (Portal), F Konzernturm (Portal),
+##  H Hassfestung (Portal), V Die Leere (Portal), X Dungeon-Ausgang (Portal)
+
+const WALKABLE := ["g", "p", "b", "f", "i", "y", "n", "T", "C", "F", "H", "V", "X"]
+
+const TILE_FOR_CHAR := {
+	"g": "grass", "t": "tree", "p": "path", "w": "water", "b": "bridge",
+	"m": "mount", "R": "roof", "W": "wall", "D": "door", "f": "floor",
+	"#": "dwall", "i": "ice", "I": "iwall", "y": "hfloor", "Y": "hwall",
+	"n": "void", "N": "vwall",
+	"T": "town_icon", "C": "factory_icon", "F": "tower_icon", "H": "keep_icon",
+	"V": "void_icon", "X": "path",
+}
+
+const MAPS := {
+	"town": {
+		"name": "Lindenhain",
+		"music": "town",
+		"encounters": false,
+		"ground": "grass",
+		"rows": [
+			"tttttttttttttttttttt",
+			"tggggggggggggggggggt",
+			"tgRRRRRgggggRRRRRggt",
+			"tgWWDWWgggggWWDWWggt",
+			"tggggggggggggggggggt",
+			"tggggpppppppppppgggt",
+			"tggggpggggggggpggggt",
+			"tggggpggggggggpggggt",
+			"tggggpggggggggpggggt",
+			"tggggpppppppppppgggt",
+			"tgggggggggpggggggggt",
+			"tgggggggggpggggggggt",
+			"tggggggggggggggggggt",
+			"ttttttttttpttttttttt",
+		],
+		"spawns": {"start": Vector2i(10, 11), "from_world": Vector2i(10, 12)},
+		"portals": [
+			{"pos": Vector2i(10, 13), "to": "world", "spawn": "from_town"},
+		],
+		"npcs": [
+			{"id": "npc_elder", "name": "Elder Theobald", "pos": Vector2i(7, 4),
+				"lines": [
+					"Welcome to Lindenhain, travelers. Forgive the humble reception —",
+					"we used to brew linden-blossom tea for guests. Now the river runs brown.",
+					"Three plagues are choking our valley. To the east, the Smokeworks fouls the sky:",
+					"its Baron dumps poison into the river and calls it progress.",
+					"To the northeast looms the Corporate Spire — it owns almost",
+					"everything here by now. I believe it is currently negotiating for the rain.",
+					"And to the southwest lies a fortress where hate is preached",
+					"until neighbors forget they were ever neighbors.",
+					"Face them in any order you like — every plague you defeat",
+					"leaves you stronger for the next one.",
+					"But beware: once all three have fallen, a gray rift opens in the north.",
+					"What waits there does not roar, does not threaten. It feels nothing at all.",
+					"And believe an old man: nothing in this world is colder."]},
+			{"id": "npc_kid", "name": "Pia", "pos": Vector2i(12, 8),
+				"lines": [
+					"The river used to glitter! I always skipped stones there.",
+					"My record is five skips. FIVE!",
+					"Now it's brown, and Papa says I can't even dip my feet in.",
+					"It's because of the Smokeworks. Will you make it better again?",
+					"When it glitters again, I'll show you the best skipping spot. Promise!"]},
+			{"id": "npc_shop", "name": "Greta the Merchant", "pos": Vector2i(15, 4), "shop": true,
+				"lines": [
+					"Welcome to Greta's! Fair prices, fair wages, no fine print.",
+					"The Corporate Spire tried to buy my shop three times. Three times",
+					"I said no — now they send legal letters instead of customers. Let them.",
+					"For folk draining that swamp, my door is always open. Have a look around!"]},
+		],
+	},
+	"world": {
+		"name": "World Map",
+		"music": "world",
+		"encounters": false,
+		"ground": "grass",
+		"rows": [
+			"mmmmmmmmmmmmmmmmmmmmmm",
+			"mggggtgggggwwggmmmmmmm",
+			"mggggggVgggwwggmmmFmmm",
+			"mgTggggggggwwggggggggm",
+			"mgpggggggggwwggggggggm",
+			"mgpppppppppbbppppppggm",
+			"mggggggggggwwgggggpggm",
+			"mggtgggggggwwgggggpggm",
+			"mggggggggggwwgggggpggm",
+			"mggggggggggwwggmmmpmmm",
+			"mggggggggggwwggmmmCmmm",
+			"mgggtggggggwwggmmmmmmm",
+			"mggggggggggwwggggggggm",
+			"mggtHggggggwwggggtgggm",
+			"mggggggggggwwggggggggm",
+			"mmmmmmmmmmmmmmmmmmmmmm",
+		],
+		"spawns": {"from_town": Vector2i(2, 4), "from_dungeon": Vector2i(18, 9),
+			"from_dungeon2": Vector2i(18, 3), "from_dungeon3": Vector2i(4, 12),
+			"from_dungeon4": Vector2i(7, 3)},
+		"portals": [
+			{"pos": Vector2i(2, 3), "to": "town", "spawn": "from_world"},
+			{"pos": Vector2i(18, 10), "to": "dungeon", "spawn": "entrance"},
+			{"pos": Vector2i(18, 2), "to": "dungeon2", "spawn": "entrance"},
+			{"pos": Vector2i(4, 13), "to": "dungeon3", "spawn": "entrance"},
+			{"pos": Vector2i(7, 2), "to": "dungeon4", "spawn": "entrance",
+				"locked_until": "all_bosses", "locked_name": "Gray Rift",
+				"locked_msg": "A gray rift gapes in the world — beyond it, nothing but silence. It will not open while even one of the three plagues still lives. Only when the Smokestack Baron, the Monopoly Prince and the Divider have fallen will the Void grant passage."},
+		],
+		"npcs": [],
+	},
+	"dungeon": {
+		"name": "The Smokeworks",
+		"music": "dungeon",
+		"encounters": true,
+		"ground": "floor",
+		"rows": [
+			"######################",
+			"#Xfffffffff##ffffffff#",
+			"#fffffffffff#ffffffff#",
+			"#fff##ffffff#fff##fff#",
+			"#fff##ffffffffff##fff#",
+			"#ffffffff##ffffffffff#",
+			"#ffffffff##ffffffffff#",
+			"#fff##fffffffff##ffff#",
+			"#fff##fffffffff##ffff#",
+			"#ffffffffffffffffffff#",
+			"#ffffffffffffffffffff#",
+			"#ffffffffffffffffffff#",
+			"######################",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon"},
+		],
+		"npcs": [],
+	},
+	"dungeon2": {
+		"name": "The Corporate Spire",
+		"music": "dungeon2",
+		"encounters": true,
+		"ground": "ice",
+		"rows": [
+			"IIIIIIIIIIIIIIIIIIIIII",
+			"IXiiiiiiIIiiiiiiiiiiiI",
+			"IiiiiiiiIIiiiiIIIiiiiI",
+			"IiiIIiiiiiiiiiiIIIiiiI",
+			"IiiIIiiiiIIiiiiiiiiiiI",
+			"IiiiiiiiiiIIiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiIIiiiiI",
+			"IiiiIIIiiiiiiiiiIIiiiI",
+			"IiiiIIIiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IiiiiiiiiiiiiiiiiiiiiI",
+			"IIIIIIIIIIIIIIIIIIIIII",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon2"},
+		],
+		"npcs": [],
+	},
+	"dungeon3": {
+		"name": "The Hate Fortress",
+		"music": "dungeon3",
+		"encounters": true,
+		"ground": "hfloor",
+		"rows": [
+			"YYYYYYYYYYYYYYYYYYYYYY",
+			"YXyyyyyyYYyyyyyyyyyyyY",
+			"YyyYYyyyyyyyyyYYYyyyyY",
+			"YyyYYyyyYYyyyyyyYYyyyY",
+			"YyyyyyyyYYyyyyyyyyyyyY",
+			"YyyyyyyyyyyyyYYyyyyyyY",
+			"YyyYYYyyyyyyyYYyyYYyyY",
+			"YyyyyyyyyYYyyyyyyYYyyY",
+			"YyyyyyyyyYYyyyyyyyyyyY",
+			"YyyYYyyyyyyyyyYYyyyyyY",
+			"YyyyyyyyyyyyyyyyyyyyyY",
+			"YyyyyyyyyyyyyyyyyyyyyY",
+			"YYYYYYYYYYYYYYYYYYYYYY",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon3"},
+		],
+		"npcs": [],
+	},
+	"dungeon4": {
+		"name": "The Void",
+		"music": "dungeon4",
+		"encounters": true,
+		"ground": "void",
+		"rows": [
+			"NNNNNNNNNNNNNNNNNNNNNN",
+			"NXnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnNnnnnnnnnnNnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnNnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnNnnnnnnnnnNnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NnnnnnnnnnnnnnnnnnnnnN",
+			"NNNNNNNNNNNNNNNNNNNNNN",
+		],
+		"spawns": {"entrance": Vector2i(2, 1)},
+		"portals": [
+			{"pos": Vector2i(1, 1), "to": "world", "spawn": "from_dungeon4"},
+		],
+		"npcs": [],
+	},
+}
+
+static func get_map(id: String) -> Dictionary:
+	return MAPS[id]
+
+static func is_walkable(map: Dictionary, pos: Vector2i) -> bool:
+	var rows: Array = map["rows"]
+	if pos.y < 0 or pos.y >= rows.size():
+		return false
+	var row: String = rows[pos.y]
+	if pos.x < 0 or pos.x >= row.length():
+		return false
+	return row[pos.x] in WALKABLE
