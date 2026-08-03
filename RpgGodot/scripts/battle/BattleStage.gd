@@ -915,6 +915,19 @@ func _start_idle_animations() -> void:
 				h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"])
 				(h["sprite"] as Sprite2D).texture = \
 					SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"]))
+	# Drohgebärde: alle paar Sekunden richtet sich eine wartende Kreatur auf
+	# und lehnt sich vor. Sonst steht die Gegnerseite zwischen den Zügen nur
+	# atmend herum.
+	var menace := Timer.new()
+	menace.wait_time = 3.4
+	menace.autostart = true
+	menace.timeout.connect(func():
+		var idle_ones := enemies.filter(func(e: Dictionary) -> bool:
+			return e["alive"] and e.get("anim", "idle") == "idle")
+		if idle_ones.is_empty():
+			return
+		_epose(idle_ones[randi() % idle_ones.size()], "taunt", 0.95))
+	add_child(menace)
 	var glint_timer := Timer.new()
 	glint_timer.wait_time = 2.6
 	glint_timer.autostart = true

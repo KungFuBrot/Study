@@ -115,6 +115,15 @@ static func _limb(a: Vector2, b: Vector2, r: float, id: int) -> void:
 		var p := a.lerp(b, float(i) / float(steps))
 		_ell(p.x, p.y, r, r, id)
 
+## Zweiteiliges, sich verjüngendes Glied: Oberschenkel dick, Knie schmal,
+## Wade wieder etwas kräftiger, Knöchel dünn. Gliedmaßen aus Kapseln mit
+## konstantem Radius sehen aus wie Würste — das ist einer der Gründe, warum
+## eine Figur nach Spielzeug aussieht statt nach Körper.
+static func _leg(a: Vector2, b: Vector2, c: Vector2, r0: float, r1: float,
+		r2: float, id: int) -> void:
+	_cone(a, b, r0, r1, id)
+	_cone(b, c, r1, r2, id)
+
 ## Kegelstumpf zwischen zwei Punkten: wie _limb, aber der Radius wandert von
 ## r0 auf r1. Damit lassen sich Rümpfe und Umhänge kippen — _taper kann das
 ## nicht, es zeichnet nur waagerechte Zeilen.
@@ -297,22 +306,30 @@ static func _villager(lift: int, swing: int, hair_c: Color, cloth_c: Color,
 	var trim := _part(trim_c, 0.7, 0.3)
 	var boot := _part(cloth_c.darkened(0.45), 0.7, 0.3)
 	var wood := _part(Color(0.44, 0.30, 0.17), 0.8, 0.2)
-	var top := 24 if old else 26      # Kinder sind kleiner
-	_limb(Vector2(13, top + 14), Vector2(12 - swing, 49), 2.4, cloth)
-	_limb(Vector2(18, top + 14), Vector2(20 + swing, 49), 2.4, cloth)
-	_ell(12 - swing, 51, 3.2, 2.5, boot)
-	_ell(20 + swing, 51, 3.2, 2.5, boot)
-	_limb(Vector2(14, top + 2 + lift), Vector2(10, top + 11 + lift), 2.2, cloth)
-	_taper(16, top + lift, top + 14, 15, 12, cloth)
-	_rect(10, top + 7 + lift, 13, 1, trim)
-	_ell(16, top - 9 + lift, 6.4, 6.8, hair)
-	_ell(18, top - 8 + lift, 4.6, 5.4, skin)
-	_dot(20, top - 8 + lift, Color(0.16, 0.12, 0.16))
-	_dot(21, top - 8 + lift, Color(0.16, 0.12, 0.16))
-	_limb(Vector2(19, top + 2 + lift), Vector2(23, top + 10 + lift), 2.2, cloth)
+	# Dieselbe Proportion wie die Party: Kopf rund ein Sechstel der Höhe.
+	# Kinder sind kleiner, aber nicht kopflastiger.
+	var top := 17 if old else 20      # Oberkante des Rumpfs
+	var foot := 50 if old else 51
+	_leg(Vector2(13, top + 15), Vector2(13 - swing * 0.4, top + 21),
+		Vector2(12 - swing, foot - 1), 2.6, 2.0, 1.7, cloth)
+	_leg(Vector2(19, top + 15), Vector2(19 + swing * 0.4, top + 21),
+		Vector2(20 + swing, foot - 1), 2.6, 2.0, 1.7, cloth)
+	_ell(12 - swing, foot + 1, 3.0, 2.3, boot)
+	_ell(20 + swing, foot + 1, 3.0, 2.3, boot)
+	_leg(Vector2(12, top + 2 + lift), Vector2(10, top + 7 + lift),
+		Vector2(9, top + 12 + lift), 2.1, 1.8, 1.5, cloth)
+	_cone(Vector2(16, top + 15 + lift), Vector2(16, top + 2 + lift), 4.6, 6.0, cloth)
+	_rect(11, top + 8 + lift, 11, 1, trim)
+	_ell(15.5, top - 6 + lift, 4.5, 4.8, hair)
+	_ell(17.2, top - 5.4 + lift, 3.6, 4.2, skin)
+	_limb(Vector2(15, top + lift), Vector2(17, top + lift), 1.5, skin)  # Hals
+	_dot(19, top - 5 + lift, Color(0.16, 0.12, 0.16))
+	_dot(20, top - 5 + lift, Color(0.16, 0.12, 0.16))
+	_leg(Vector2(20, top + 2 + lift), Vector2(22, top + 7 + lift),
+		Vector2(23, top + 12 + lift), 2.1, 1.8, 1.5, cloth)
 	if old:
-		_ell(18, top - 2 + lift, 3.4, 3.0, hair)   # langer Bart
-		_limb(Vector2(24, top + 12 + lift), Vector2(25, top - 10 + lift), 1.3, wood)
+		_ell(17.5, top - 1 + lift, 3.0, 2.6, hair)   # langer Bart
+		_limb(Vector2(24, top + 14 + lift), Vector2(25, top - 8 + lift), 1.3, wood)
 
 # Helen: Schwertkämpferin. Roter Waffenrock mit heller Borte, blondes
 # Haar im Zopf, Schwert in der vorderen Hand.
@@ -333,68 +350,80 @@ static func _serena(p: Dictionary) -> void:
 	var lean: float = p["lean"]
 	# Die Hüfte ist der Drehpunkt: alles darüber kippt mit `lean`, die Beine
 	# bleiben am Boden. So entsteht Gewicht statt eines starren Verschiebens.
-	# Hüfte, Brust, Kopf. Achtung: _cone/_limb sind Kapseln, sie ragen um den
-	# Radius über die Endpunkte hinaus — die Punkte liegen deshalb weiter innen
-	# als die sichtbare Silhouette.
-	var hip := _sq(Vector2(16, 33 + dy), sq)
-	var chest := _sq(_rot(Vector2(16, 26 + dy), hip, lean), sq)
-	var neck := _sq(_rot(Vector2(17, 20 + dy), hip, lean), sq)
-	var head := _sq(_rot(Vector2(16, 12 + dy + p["head"]), hip, lean), sq)
-	var sh_f := _sq(_rot(Vector2(20, 24 + dy), hip, lean), sq)
-	var sh_b := _sq(_rot(Vector2(13, 24 + dy), hip, lean), sq)
+	# Proportion: der Kopf misst rund 10 von 56 Pixeln, die Figur also knapp
+	# sechs Kopfhöhen. Vorher waren es 13 auf 56 — viereinhalb Kopfhöhen, und
+	# genau das liest sich als Püppchen statt als erwachsener Mensch.
+	# Achtung: _cone/_limb sind Kapseln, sie ragen um den Radius über die
+	# Endpunkte hinaus; die Punkte liegen also innerhalb der Silhouette.
+	var hip := _sq(Vector2(16, 32 + dy), sq)
+	var chest := _sq(_rot(Vector2(16, 21 + dy), hip, lean), sq)
+	var neck := _sq(_rot(Vector2(16, 15 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(16, 9 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(20, 18 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(12, 18 + dy), hip, lean), sq)
 	var turn: float = p["turn"]
 
-	# Beine: Fuß wandert, Knie folgt zur Hälfte.
-	var foot_b := _sq(Vector2(12 - p["leg_b"], 48), sq)
-	var foot_f := _sq(Vector2(20 + p["leg_f"], 48), sq)
-	_limb(hip + Vector2(-2, 3), foot_b, 2.5, pants)
-	_limb(hip + Vector2(3, 3), foot_f, 2.5, pants)
-	_ell(foot_b.x, foot_b.y + 2, 3.3, 2.6, boot)
-	_ell(foot_f.x, foot_f.y + 2, 3.3, 2.6, boot)
+	# Beine mit Knie: Oberschenkel kräftig, Knie schmal, Knöchel dünn.
+	# Das Standbein trägt, das Spielbein steht leicht versetzt — dieses
+	# Ungleichgewicht macht mehr Unterschied als jedes zusätzliche Detail.
+	var foot_b := _sq(Vector2(13 - p["leg_b"], 49), sq)
+	var foot_f := _sq(Vector2(19 + p["leg_f"], 49), sq)
+	_leg(hip + Vector2(-2, 1), Vector2(13.5 - p["leg_b"] * 0.4, 40 + dy * 0.3),
+		foot_b, 3.0, 2.0, 1.7, pants)
+	_leg(hip + Vector2(2, 1), Vector2(18.5 + p["leg_f"] * 0.4, 40 + dy * 0.3),
+		foot_f, 3.0, 2.0, 1.7, pants)
+	_ell(foot_b.x, foot_b.y + 2, 3.1, 2.3, boot)
+	_ell(foot_f.x, foot_f.y + 2, 3.1, 2.3, boot)
 
-	# Hinterer Arm um die Schulter gedreht
-	var hand_b := _rot(sh_b + Vector2(-3, 9), sh_b, p["arm_b"])
-	_limb(sh_b, hand_b, 2.3, cloth)
+	# Hinterer Arm: Oberarm kräftig, Handgelenk schmal.
+	var elb_b := _rot(sh_b + Vector2(-2, 5), sh_b, p["arm_b"])
+	var hand_b := _rot(sh_b + Vector2(-3, 10), sh_b, p["arm_b"])
+	_leg(sh_b, elb_b, hand_b, 2.2, 1.8, 1.5, cloth)
 
-	# Rumpf: unten Taille, oben Schultern.
-	_cone(hip, chest, 5.8, 6.8, cloth)
+	# Rumpf: Taille schmal, Schultern breit — eine Silhouette mit Kerbe.
+	_cone(hip, chest, 4.6, 6.4, cloth)
 	# Saumborte als flaches Band am unteren Rand des Waffenrocks
-	var hem := hip + Vector2(0, 4)
-	_limb(hem + Vector2(-5, 0), hem + Vector2(5, 0), 1.3, trim)
-	var belt := hip.lerp(chest, 0.45)
-	_limb(belt + Vector2(-5.5, 0), belt + Vector2(5.5, 0), 1.1, leather)
+	var hem := hip + Vector2(0, 3)
+	_limb(hem + Vector2(-4.5, 0), hem + Vector2(4.5, 0), 1.2, trim)
+	var belt := hip.lerp(chest, 0.25)
+	_limb(belt + Vector2(-4.6, 0), belt + Vector2(4.6, 0), 1.0, leather)
 	_dot(int(belt.x), int(belt.y), Color(0.96, 0.82, 0.36))
 	# Falten laufen mit dem Rumpf mit
 	for i in 4:
 		var f := hip.lerp(chest, 0.10 + i * 0.16)
-		_dot(int(f.x) - 3, int(f.y), cloth_shade)
-		_dot(int(f.x) + 3, int(f.y), cloth_shade)
-	# Schulterstück
-	_ell(sh_f.x, sh_f.y - 1, 3.4, 2.5, leather)
-	_limb(neck + Vector2(-2, 0), neck + Vector2(1, 0), 1.8, skin)
+		_dot(int(f.x) - 2, int(f.y), cloth_shade)
+		_dot(int(f.x) + 2, int(f.y), cloth_shade)
+	# Eckige Schulterplatte statt runder Kugel — Kanten lesen sich als Rüstung.
+	_limb(sh_f + Vector2(-2, -1), sh_f + Vector2(2, 0), 2.2, leather)
+	# Hals: schmal und kurz, aber vorhanden. Ohne ihn sitzt der Kopf auf dem
+	# Rumpf wie aufgesteckt.
+	_limb(neck + Vector2(-1, 0), neck + Vector2(1, 0), 1.6, skin)
 
 	# Kopf. Der Zopf hängt mit `sway` nach — Nachlauf verkauft Bewegung mehr
 	# als jede zusätzliche Gliedmaße.
-	# Haarmasse liegt HINTER dem Gesicht, das Gesicht tritt klar hervor, das
-	# Pony deckt nur die Stirn. Vorher verschluckte das Haar den halben Kopf.
-	_ell(head.x - 2, head.y, 6.2, 6.6, hair)
-	var braid := head + Vector2(-6 - p["sway"], 2)
-	_limb(head + Vector2(-5, 1), braid + Vector2(-1, 11), 2.2, hair)
-	_ell(head.x + 3 + turn, head.y + 1, 5.0, 5.6, skin)
-	_ell(head.x + 1, head.y - 4.5, 5.4, 2.3, hair)
-	var ex := int(round(head.x + 5 + turn))
+	# Kopf: Haarmasse hinter dem Gesicht, Kinn läuft schmal zu. Der Zopf hängt
+	# jetzt bis auf die Schulter und schwingt mit `sway` nach.
+	_ell(head.x - 1.5, head.y, 4.8, 5.2, hair)
+	var braid := head + Vector2(-4.5 - p["sway"], 2)
+	_leg(head + Vector2(-4, 1), braid + Vector2(0, 6), braid + Vector2(0.5, 13),
+		2.0, 1.7, 1.2, hair)
+	_ell(head.x + 1.6 + turn, head.y + 0.8, 3.7, 4.4, skin)
+	_ell(head.x + 1.4 + turn, head.y + 3.6, 2.4, 2.0, skin)   # Kinnpartie
+	_ell(head.x + 0.5, head.y - 3.4, 4.4, 1.9, hair)          # Pony
+	var ex := int(round(head.x + 3 + turn))
 	var ey := int(round(head.y + 1))
 	_dot(ex, ey, Color(0.16, 0.12, 0.16))
 	_dot(ex + 1, ey, Color(0.16, 0.12, 0.16))
 	_dot(ex, ey - 1, Color(0.58, 0.42, 0.24))
 	_dot(ex + 1, ey - 1, Color(0.58, 0.42, 0.24))
-	_dot(ex, ey + 3, Color(0.80, 0.56, 0.47))
+	_dot(ex, ey + 3, Color(0.78, 0.54, 0.45))
 
 	# Vorderer Arm und Schwert: der Arm dreht um die Schulter, die Klinge
 	# zusätzlich um die Hand — dadurch holt sie aus und zieht durch.
-	var hand := _rot(sh_f + Vector2(4, 8), sh_f, p["arm_f"])
-	var tip := _rot(hand + Vector2(3, -24), hand, p["wpn"] + p["arm_f"] * 0.4)
-	_limb(sh_f, hand, 2.2, cloth)
+	var hand := _rot(sh_f + Vector2(4, 10), sh_f, p["arm_f"])
+	var elb_f := _rot(sh_f + Vector2(2.5, 5), sh_f, p["arm_f"])
+	var tip := _rot(hand + Vector2(3, -26), hand, p["wpn"] + p["arm_f"] * 0.4)
+	_leg(sh_f, elb_f, hand, 2.2, 1.8, 1.4, cloth)
 	var grip_end := hand + (hand - tip).normalized() * 4.0
 	_limb(hand, grip_end, 1.3, grip)
 	_ell(hand.x, hand.y, 2.3, 2.0, skin)
@@ -422,43 +451,52 @@ static func _milo(p: Dictionary) -> void:
 	var sq: float = p["squash"]
 	var dy: float = p["body"]
 	var lean: float = p["lean"]
-	var hip := _sq(Vector2(16, 36 + dy), sq)
-	var chest := _sq(_rot(Vector2(16, 25 + dy), hip, lean), sq)
-	var head := _sq(_rot(Vector2(16, 16 + dy + p["head"]), hip, lean), sq)
-	var sh_f := _sq(_rot(Vector2(20, 26 + dy), hip, lean), sq)
-	var sh_b := _sq(_rot(Vector2(12, 26 + dy), hip, lean), sq)
+	# Gleiche Proportion wie bei Helen: Kopf rund 10 von 56 Pixeln. Die Kutte
+	# darf breit fallen, aber Kopf und Schultern müssen menschlich bleiben —
+	# vorher verschwand der Magier unter einem Hut von einem Drittel Körperhöhe.
+	var hip := _sq(Vector2(16, 33 + dy), sq)
+	var chest := _sq(_rot(Vector2(16, 21 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(16, 12 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(20, 19 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(12, 19 + dy), hip, lean), sq)
 	var turn: float = p["turn"]
 
 	# Beine schauen nur unten aus der Kutte
-	_limb(Vector2(14, 41), Vector2(13 - p["leg_b"], 49), 2.4, robe)
-	_limb(Vector2(19, 41), Vector2(20 + p["leg_f"], 49), 2.4, robe)
-	_ell(13 - p["leg_b"], 51, 3.2, 2.5, hair)
-	_ell(20 + p["leg_f"], 51, 3.2, 2.5, hair)
-	_limb(sh_b, _rot(sh_b + Vector2(-4, 8), sh_b, p["arm_b"]), 2.2, robe)
+	_leg(Vector2(14, 42), Vector2(13.5 - p["leg_b"] * 0.4, 46),
+		Vector2(13 - p["leg_b"], 50), 2.4, 2.0, 1.7, robe)
+	_leg(Vector2(19, 42), Vector2(19.5 + p["leg_f"] * 0.4, 46),
+		Vector2(20 + p["leg_f"], 50), 2.4, 2.0, 1.7, robe)
+	_ell(13 - p["leg_b"], 51, 3.0, 2.3, hair)
+	_ell(20 + p["leg_f"], 51, 3.0, 2.3, hair)
+	var elb_b := _rot(sh_b + Vector2(-2, 5), sh_b, p["arm_b"])
+	_leg(sh_b, elb_b, _rot(sh_b + Vector2(-3, 10), sh_b, p["arm_b"]),
+		2.1, 1.8, 1.5, robe)
 	# Kutte als gekippter Kegel; der Saum bleibt am Boden, das Wehen kommt
 	# über `sway`.
-	_cone(_sq(Vector2(16 + p["sway"] * 0.6, 47), sq), chest, 10.5, 7.0, robe)
-	_limb(Vector2(6, 47), Vector2(26, 47), 1.0, trim)
-	var belt := hip.lerp(chest, 0.35)
-	_limb(belt + Vector2(-6, 0), belt + Vector2(6, 0), 0.8, trim)
-	for i in 6:
-		var f := _sq(Vector2(16, 30 + i * 3), sq)
-		var spread := 3.0 + float(i) * 0.9
+	_cone(_sq(Vector2(16 + p["sway"] * 0.6, 46), sq), chest, 8.0, 5.4, robe)
+	_limb(Vector2(8, 47), Vector2(24, 47), 1.0, trim)
+	var belt := hip.lerp(chest, 0.25)
+	_limb(belt + Vector2(-5, 0), belt + Vector2(5, 0), 0.8, trim)
+	for i in 5:
+		var f := _sq(Vector2(16, 31 + i * 3), sq)
+		var spread := 2.6 + float(i) * 0.9
 		_dot(int(f.x - spread + p["sway"] * 0.4), int(f.y), robe_shade)
 		_dot(int(f.x + spread + p["sway"] * 0.4), int(f.y), robe_shade)
-	# Kopf mit Hut und Bart
-	_ell(head.x + 1 + turn, head.y, 5.0, 5.6, skin)
-	_ell(head.x - 1, head.y - 3, 6.2, 4.2, hair)
-	_ell(head.x + 2 + turn, head.y + 6, 3.2, 2.6, beard)
-	_limb(head + Vector2(-7, -5), head + Vector2(9, -5), 1.0, hat)
-	_cone(_sq(_rot(Vector2(16 + p["sway"] * 1.2, 3 + dy), hip, lean), sq),
-		head + Vector2(0, -5), 1.5, 6.5, hat)
+	# Kopf. Reihenfolge zählt: Haar liegt HINTER dem Gesicht, sonst verschwindet
+	# der Magier unter seiner eigenen Frisur. Die Krempe sitzt hoch genug, dass
+	# die Augen frei bleiben.
+	_ell(head.x - 1.5, head.y - 0.5, 4.3, 4.0, hair)
+	_ell(head.x + 1.4 + turn, head.y + 0.5, 3.8, 4.2, skin)
+	_ell(head.x + 1.2 + turn, head.y + 4.2, 2.7, 2.3, beard)
+	_limb(head + Vector2(-5, -4.5), head + Vector2(6, -4.5), 0.9, hat)
+	_cone(_sq(_rot(Vector2(16 + p["sway"] * 1.2, 2 + dy), hip, lean), sq),
+		head + Vector2(0.5, -4.5), 1.1, 4.0, hat)
+	_dot(int(head.x + 3 + turn), int(head.y), Color(0.13, 0.10, 0.15))
 	_dot(int(head.x + 4 + turn), int(head.y), Color(0.13, 0.10, 0.15))
-	_dot(int(head.x + 5 + turn), int(head.y), Color(0.13, 0.10, 0.15))
+	_dot(int(head.x + 3 + turn), int(head.y - 1), Color(0.55, 0.50, 0.58))
 	_dot(int(head.x + 4 + turn), int(head.y - 1), Color(0.55, 0.50, 0.58))
-	_dot(int(head.x + 5 + turn), int(head.y - 1), Color(0.55, 0.50, 0.58))
 	# Stab dreht mit der Hand; der Stein glüht, wenn der Arm ausschlägt.
-	var hand := _rot(sh_f + Vector2(3, 6), sh_f, p["arm_f"])
+	var hand := _rot(sh_f + Vector2(3, 8), sh_f, p["arm_f"])
 	var tip := _rot(hand + Vector2(3, -22), hand, p["wpn"] + p["arm_f"] * 0.5)
 	_limb(hand + (hand - tip).normalized() * 8.0, tip, 1.4, wood)
 	_ell(hand.x, hand.y, 2.1, 2.1, skin)
@@ -483,43 +521,47 @@ static func _rax(p: Dictionary) -> void:
 	var sq: float = p["squash"]
 	var dy: float = p["body"]
 	var lean: float = p["lean"]
-	var hip := _sq(Vector2(17, 37 + dy), sq)
-	var chest := _sq(_rot(Vector2(17, 26 + dy), hip, lean), sq)
-	var head := _sq(_rot(Vector2(17, 14 + dy + p["head"]), hip, lean), sq)
-	var sh_f := _sq(_rot(Vector2(22, 26 + dy), hip, lean), sq)
-	var sh_b := _sq(_rot(Vector2(12, 26 + dy), hip, lean), sq)
+	# Auch die Maschine bekommt menschliche Proportion: kleinerer Kopf, echter
+	# Hals, längere Beine. Kantig darf sie bleiben — das ist ihr Charakter.
+	var hip := _sq(Vector2(16, 34 + dy), sq)
+	var chest := _sq(_rot(Vector2(16, 22 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(16, 12 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(21, 20 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(11, 20 + dy), hip, lean), sq)
 	var turn: float = p["turn"]
 	var by := int(round(dy))
 
-	# Teleskopbeine
-	_rect(11 - int(round(p["leg_b"])), 37, 5, 12, dark)
-	_rect(18 + int(round(p["leg_f"])), 37, 5, 12, dark)
-	_rect(9 - int(round(p["leg_b"])), 49, 8, 5, shell)
-	_rect(17 + int(round(p["leg_f"])), 49, 8, 5, shell)
-	_limb(sh_b, _rot(sh_b + Vector2(-4, 9), sh_b, p["arm_b"]), 2.4, dark)
-	# Rumpfkasten kippt mit
-	_cone(hip, chest, 8.0, 8.0, shell)
-	_rect(10, 22 + by, 15, 2, dark)
-	_rect(10, 36 + by, 15, 2, dark)
-	for sy in range(25 + by, 36 + by):
-		_dot(13, sy, seam)
-		_dot(22, sy, seam)
+	# Teleskopbeine, länger als vorher
+	_rect(11 - int(round(p["leg_b"])), 36, 4, 13, dark)
+	_rect(17 + int(round(p["leg_f"])), 36, 4, 13, dark)
+	_rect(9 - int(round(p["leg_b"])), 49, 7, 4, shell)
+	_rect(16 + int(round(p["leg_f"])), 49, 7, 4, shell)
+	var elb_b := _rot(sh_b + Vector2(-2, 5), sh_b, p["arm_b"])
+	_leg(sh_b, elb_b, _rot(sh_b + Vector2(-3, 10), sh_b, p["arm_b"]),
+		2.2, 1.9, 1.6, dark)
+	# Rumpfkasten: unten schmaler, oben Schulterpartie
+	_cone(hip, chest, 5.6, 7.0, shell)
+	_rect(9, 17 + by, 14, 2, dark)
+	_rect(11, 34 + by, 11, 2, dark)
+	for sy in range(22 + by, 34 + by):
+		_dot(12, sy, seam)
+		_dot(20, sy, seam)
 	# Kern pulsiert mit dem Atem — der Roboter „lebt" über sein Licht.
 	var pulse: float = 0.6 + absf(dy) * 0.5 + absf(p["arm_f"]) / 60.0
-	_ell(17, 30 + by, 3.6, 3.6, dark)
-	_ell(17, 30 + by, 2.0 + pulse * 0.8, 2.0 + pulse * 0.8, core)
-	_dot(16, 29 + by, Color(1.0, 0.86, 0.55))
-	_ell(sh_f.x, sh_f.y - 1, 3.4, 2.6, shell)
+	_ell(16, 27 + by, 3.2, 3.2, dark)
+	_ell(16, 27 + by, 1.8 + pulse * 0.7, 1.8 + pulse * 0.7, core)
+	_dot(15, 26 + by, Color(1.0, 0.86, 0.55))
+	_limb(sh_f + Vector2(-2, -1), sh_f + Vector2(2, 0), 2.0, shell)
+	# Hals — ohne ihn sitzt der Schädel direkt auf der Kiste.
+	_rect(int(head.x) - 2, int(head.y) + 4, 4, 3, dark)
 	# Kopf: Visier wandert mit `turn` — er schaut sich um.
-	_rect(int(head.x) - 5, int(head.y) - 5, 11, 10, shell)
-	_rect(int(head.x) - 4 + int(round(turn)), int(head.y) - 2, 9, 3, visor)
-	_dot(int(head.x) - 3 + int(round(turn)), int(head.y) - 2, Color(0.82, 0.98, 1.0))
+	_rect(int(head.x) - 4, int(head.y) - 4, 9, 8, shell)
+	_rect(int(head.x) - 3 + int(round(turn)), int(head.y) - 2, 7, 3, visor)
 	_dot(int(head.x) - 2 + int(round(turn)), int(head.y) - 2, Color(0.82, 0.98, 1.0))
-	_rect(int(head.x) - 1, int(head.y) - 9 - int(round(p["sway"])), 2, 4, dark)
-	_dot(int(head.x), int(head.y) - 10 - int(round(p["sway"])), Color(1.0, 0.42, 0.30))
-	_rect(int(head.x) - 2, int(head.y) + 5, 5, 3, dark)
+	_rect(int(head.x) - 1, int(head.y) - 8 - int(round(p["sway"])), 2, 4, dark)
+	_dot(int(head.x), int(head.y) - 9 - int(round(p["sway"])), Color(1.0, 0.42, 0.30))
 	# Waffenarm dreht um die Schulter
-	var elbow := _rot(sh_f + Vector2(4, 5), sh_f, p["arm_f"])
+	var elbow := _rot(sh_f + Vector2(4, 6), sh_f, p["arm_f"])
 	var muzzle := _rot(elbow + Vector2(5, 0), elbow, p["arm_f"] * 0.5 + p["wpn"])
 	_limb(sh_f, elbow, 2.4, shell)
 	_limb(elbow, muzzle, 1.7, barrel)
@@ -855,6 +897,16 @@ const MON_ANIMS := {
 		{"t": 0.42, "squash": -11.0, "dx": 5.0, "dy": -2.0, "lean": 7.0},
 		{"t": 0.60, "squash": 7.0, "dx": 3.0, "lean": 3.5},
 		{"t": 0.80, "squash": -3.0, "dx": 1.0, "lean": 1.0},
+		{"t": 1.00},
+	]},
+	# Drohen: kurz aufrichten und vorlehnen, dann zurücksinken. Wird zwischen
+	# den Zügen zufällig ausgelöst — eine wartende Kreatur, die nur atmet,
+	# wirkt wie ein Möbelstück.
+	"taunt": {"fps": 9, "frames": 8, "loop": false, "keys": [
+		{"t": 0.00},
+		{"t": 0.28, "squash": -9.0, "dy": -2.0, "lean": 4.0},
+		{"t": 0.50, "squash": -7.0, "dx": 2.0, "lean": 6.0},
+		{"t": 0.78, "squash": 6.0, "dx": 0.5, "lean": 1.0},
 		{"t": 1.00},
 	]},
 	# Treffer: wird nach hinten geworfen, staucht beim Aufkommen.

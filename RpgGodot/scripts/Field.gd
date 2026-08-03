@@ -7,11 +7,13 @@ const TILE := 16
 const STEP_TIME := 0.18
 # DTII-Feldfiguren sind 16x28: horizontal in der 16er-Kachel zentrieren (x-2)
 # und so anheben, dass die Füße auf dem Kachelboden stehen (y -(28-16)).
-# Die Rig-Figuren sind 32x56; auf Maßstab 0.5 stehen sie auf der Karte exakt
-# so groß wie früher die 16x28-Sprites, nur doppelt so fein. Der Versatz gilt
-# in Texturpixeln und ist deshalb ebenfalls verdoppelt.
-const FIELD_CHAR_SCALE := 0.5
-const CHAR_OFFSET := Vector2(-4, -24)
+# Die Rig-Figuren sind 32x56. Seit sie erwachsene Proportionen haben (kleiner
+# Kopf, längere Beine), wurden sie auf Maßstab 0.5 zu klein zum Erkennen —
+# jetzt etwas größer, gut anderthalb Kacheln hoch wie in klassischen JRPGs.
+# Der Versatz wird aus dem Maßstab abgeleitet, damit die Füße unabhängig davon
+# auf dem Kachelboden stehen und die Figur mittig über der Kachel sitzt.
+const FIELD_CHAR_SCALE := 0.62
+const CHAR_OFFSET := Vector2(6.0 / FIELD_CHAR_SCALE - 16.0, 16.0 / FIELD_CHAR_SCALE - 56.0)
 # Verkleinerung des thronenden Bosses auf der Karte (Rig-Boss ist 112x128).
 const FIELD_BOSS_SCALE := 0.30
 
@@ -329,6 +331,7 @@ func _build_tiles() -> void:
 				s.material = Fx.water_material()  # sanftes Wogen + Glanzlichter
 				water_tiles.append(s)
 			add_child(s)
+			_add_ground_patch(x, y, terr)
 			_add_terrain_edges(x, y, terr)
 			var ch := row[x]
 			if OBJECT_CHARS.has(ch):
@@ -355,6 +358,21 @@ func _terrain_at(x: int, y: int) -> String:
 	if OBJECT_CHARS.has(ch):
 		return map.get("ground", "grass")
 	return MapData.TILE_FOR_CHAR[ch]
+
+## Unregelmäßige Flecken auf etwa jeder fünften Boden-Kachel. Sie brechen die
+## Wiederholung der wenigen Grundkacheln auf — ohne sie erkennt man auf großen
+## Flächen sofort das Raster.
+func _add_ground_patch(x: int, y: int, terr: String) -> void:
+	if not SpriteFactory.PATCH_TINTS.has(terr):
+		return
+	var h := ((x * 92837111) ^ (y * 689287499)) & 0x7fffffff
+	if h % 5 != 0:
+		return
+	var s := Sprite2D.new()
+	s.texture = SpriteFactory.ground_patch(terr, (h / 5) % 12)
+	s.centered = false
+	s.position = Vector2(x * TILE, y * TILE)
+	add_child(s)
 
 ## Übergänge: jedes höherrangige Nachbargelände greift in diese Kachel hinein
 ## (Ufer, Wegränder). Ohne das stoßen Gras/Weg/Wasser mit Linealkanten
@@ -830,6 +848,41 @@ func _attach_drop_shadow(s: Sprite2D) -> void:
 	sh.show_behind_parent = true
 	s.add_child(sh)
 
+## Kleiner Staubstoß dort, wo der Fuß abstößt. Ohne ihn wirkt Bewegung wie
+## Gleiten auf Eis — der Abdruck verkauft das Gewicht.
+func _step_dust(pos: Vector2) -> void:
+	var p := CPUParticles2D.new()
+	p.position = pos
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = 4
+	p.lifetime = 0.34
+	p.direction = Vector2(0, -1)
+	p.spread = 70.0
+	p.gravity = Vector2(0, 26)
+	p.initial_velocity_min = 6.0
+	p.initial_velocity_max = 15.0
+	p.scale_amount_min = 0.35
+	p.scale_amount_max = 0.7
+	p.color = Color(0.72, 0.70, 0.64, 0.42)
+	p.texture = SpriteFactory.circle(2, Color.WHITE)
+	p.z_index = 4
+	p.emitting = true
+	add_child(p)
+	var tw := create_tween()
+	tw.tween_interval(0.8)
+	tw.tween_callback(p.queue_free)
+
+## Abfedern beim Aufkommen: kurz stauchen, dann zurück. Zwei Prozent reichen —
+## mehr wirkt wie Gummi.
+func _step_squash(s: Sprite2D) -> void:
+	var base := Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
+	var tw := s.create_tween()
+	tw.tween_property(s, "scale", base * Vector2(1.07, 0.93), STEP_TIME * 0.35) \
+		.set_trans(Tween.TRANS_SINE)
+	tw.tween_property(s, "scale", base, STEP_TIME * 0.65) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
 func _dir_name(d: Vector2i) -> String:
 	if d.y > 0: return "down"
 	if d.y < 0: return "up"
@@ -905,6 +958,15 @@ func _try_step(dir: Vector2i) -> void:
 	walk_frame = 1 - walk_frame
 	_update_sprites()
 	AudioManager.play_sfx("step")
+	_step_dust(_tile_pos(old) + Vector2(8, 15))
+	_step_squash(player)
+	# Die Kamera schaut ein Stück in Laufrichtung voraus, statt starr auf der
+	# Figur zu kleben — das nimmt der Bewegung die Steifheit.
+	if is_instance_valid(camera):
+		var lead := Vector2(facing) * 9.0
+		var ct := camera.create_tween()
+		ct.tween_property(camera, "position", Vector2(6, 8) + lead, STEP_TIME * 1.6) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	var tw := create_tween().set_parallel(true)
 	tw.tween_property(player, "position", _tile_pos(player_tile), STEP_TIME)
 	tw.tween_property(follower, "position", _tile_pos(old), STEP_TIME)

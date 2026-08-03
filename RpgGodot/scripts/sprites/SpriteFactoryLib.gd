@@ -281,6 +281,53 @@ static func _kenney_tinted(cell: Vector2i, kind: String) -> Texture2D:
 	_cache[key] = t
 	return t
 
+## ---------- Bodenflecken ----------
+
+# Große Gras- und Wegflächen bestehen aus wenigen sich wiederholenden Kacheln;
+# ab etwa vier Kacheln Abstand erkennt das Auge das Muster. Diese Schicht legt
+# unregelmäßige, weiche Flecken darüber — heller ausgetretener Boden, dunklere
+# feuchte Stellen. Sie sitzen nicht im Kachelraster, sondern übergreifend.
+# Achtung: das sind echte Farben, keine Faktoren. Werte über 1.0 klemmen auf
+# Weiß und ergeben helle Kleckse statt Bodenvariation.
+const PATCH_TINTS := {
+	# feuchter Schatten, vertrocknet, moosig
+	"grass": [Color(0.16, 0.28, 0.14), Color(0.44, 0.48, 0.20), Color(0.20, 0.38, 0.24)],
+	# nass getreten, staubig, lehmig
+	"path": [Color(0.26, 0.18, 0.12), Color(0.56, 0.45, 0.31), Color(0.36, 0.26, 0.17)],
+	"mount": [Color(0.26, 0.28, 0.33), Color(0.56, 0.58, 0.62)],
+}
+
+## Weicher Fleck: eine ausgefranste Fläche, die die Kachel darunter tönt.
+## `variant` wählt Form und Tönung, `kind` die Farbfamilie.
+static func ground_patch(kind: String, variant: int) -> Texture2D:
+	var key := "patch_%s_%d" % [kind, variant]
+	if _cache.has(key):
+		return _cache[key]
+	var tints: Array = PATCH_TINTS.get(kind, PATCH_TINTS["grass"])
+	var tint: Color = tints[variant % tints.size()]
+	if _edge_noise == null:
+		_edge_noise = FastNoiseLite.new()
+		_edge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		_edge_noise.frequency = 0.11
+		_edge_noise.seed = 4711
+	var img := _img(TILE, TILE)
+	var ox := (variant * 37) % 64
+	var oy := (variant * 53) % 64
+	for y in TILE:
+		for x in TILE:
+			# Radialer Abfall zur Kachelmitte, vom Rauschen aufgebrochen.
+			var d := Vector2(x - 7.5, y - 7.5).length() / 9.0
+			var n := _edge_noise.get_noise_2d(ox + x * 1.6, oy + y * 1.6)
+			if 1.0 - d + n * 0.7 > 0.45:
+				# Tönung als halbtransparente Farbe: multiplikativ wäre
+				# korrekter, aber CanvasItem-Multiply kostet ein Material je
+				# Sprite. Bei diesen kleinen Abweichungen genügt Alpha.
+				var a: float = clampf((1.0 - d + n * 0.7 - 0.45) * 1.1, 0.0, 0.20)
+				img.set_pixel(x, y, Color(tint.r, tint.g, tint.b, a))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
 ## ---------- Bäume (drei Kacheln hoch) ----------
 
 # Im Sheet steht jeder Baum als 16x48-Säule (Krone, Mitte, Stamm) in drei
