@@ -59,6 +59,9 @@ func _enemy_turn(e: Dictionary) -> void:
 	at.tween_property(aura, "modulate:a", 0.6, 0.3)
 	at.tween_property(aura, "modulate:a", 0.0, 0.2)
 	at.tween_callback(aura.queue_free)
+	# Ausholen und Vorschnellen der Figur selbst (siehe RigFactory.MON_ANIMS) —
+	# der Tween darunter bewegt zusätzlich den ganzen Sprite.
+	_epose(e, "attack", 0.70)
 	var windup := create_tween()
 	windup.tween_property(es, "position:x", ehome.x - 26.0, 0.22) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)

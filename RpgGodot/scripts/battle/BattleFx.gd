@@ -394,6 +394,29 @@ func _pose(h: Dictionary, name: String, dur := 0.30) -> void:
 		(h["sprite"] as Sprite2D).texture = \
 			SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle"))
 
+## Dasselbe für Gegner. Sie haben kein Skelett, ihre Animation läuft über
+## Stauchen, Vorschnellen und Kippen (siehe RigFactory.MON_ANIMS).
+## "down" bleibt stehen — der Zusammenbruch fällt nicht auf idle zurück.
+func _epose(e: Dictionary, name: String, dur := 0.45) -> void:
+	if e.is_empty() or not is_instance_valid(e["sprite"]):
+		return
+	e["anim"] = name
+	e["frame"] = 0
+	var tex := SpriteFactory.enemy_frame(e["id"], 0, name)
+	(e["sprite"] as Sprite2D).texture = tex
+	if is_instance_valid(e.get("refl")):
+		(e["refl"] as Sprite2D).texture = tex
+	if name == "down":
+		return
+	var t := get_tree().create_timer(dur)
+	t.timeout.connect(func():
+		if e.get("anim", "") != name or not is_instance_valid(e["sprite"]):
+			return
+		if not e["alive"]:
+			return
+		e["anim"] = "idle"
+		e["frame"] = 0)
+
 func _weapon_glint(wp: Sprite2D) -> void:
 	if wp == null or not is_instance_valid(wp):
 		return

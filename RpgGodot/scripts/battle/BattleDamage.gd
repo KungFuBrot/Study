@@ -37,11 +37,14 @@ func _damage_enemy(e: Dictionary, dmg: int) -> void:
 	# Bosse stehen bombenfest; normale Gegner werden nach links (von den Helden weg) geworfen.
 	_shake(e["sprite"], 0.0 if e["is_boss"] else -1.0)
 	_shake_camera(1.4 if e["is_boss"] else 1.0)
+	_epose(e, "hit", 0.42)
 	if e["is_boss"]:
 		_refresh_boss_bar(e)
 	if e["hp"] <= 0:
 		e["alive"] = false
 		_pause_bob(e)
+		# Zusammensacken, bevor der Dissolve-Shader den Körper auflöst.
+		_epose(e, "down")
 		if e["is_boss"]:
 			await _boss_death(e)
 			return

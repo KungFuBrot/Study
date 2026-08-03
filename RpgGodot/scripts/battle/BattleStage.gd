@@ -414,7 +414,7 @@ func _build_scene() -> void:
 		s.modulate = tint
 		s.set_meta("tint", tint)
 		add_child(s)
-		enemies.append({"name": def["name"], "hp": e_hp, "max_hp": e_hp,
+		enemies.append({"anim": "idle", "name": def["name"], "hp": e_hp, "max_hp": e_hp,
 			"atk": e_atk, "def": e_def, "gold": e_gold, "xp": e_xp,
 			"sprite": s, "home": home, "alive": true, "is_boss": is_boss,
 			"id": def["sprite"], "frame": 0, "acts": 0, "enraged": false, "refl": refl,
@@ -899,12 +899,16 @@ func _start_idle_animations() -> void:
 	# schnell — im globalen Gleichtakt wirkte die Szene wie ein starres GIF.
 	for e in enemies:
 		_unit_ticker(randf_range(0.13, 0.19), func():
-			if e["alive"] and SpriteFactory.enemy_has_anim(e["id"]):
-				e["frame"] = (e["frame"] + 1) % SpriteFactory.ENEMY_FRAMES
-				var tex := SpriteFactory.enemy_frame(e["id"], e["frame"])
-				(e["sprite"] as Sprite2D).texture = tex
-				if is_instance_valid(e["refl"]):
-					(e["refl"] as Sprite2D).texture = tex)
+			# Auch Gefallene takten weiter — sonst friert der Zusammenbruch
+			# mitten in der Bewegung ein.
+			var anim: String = e.get("anim", "idle")
+			if not e["alive"] and anim != "down":
+				return
+			e["frame"] = (e["frame"] + 1) % RigFactory.mon_frames(anim)
+			var tex := SpriteFactory.enemy_frame(e["id"], e["frame"], anim)
+			(e["sprite"] as Sprite2D).texture = tex
+			if is_instance_valid(e["refl"]):
+				(e["refl"] as Sprite2D).texture = tex)
 	for h in heroes:
 		_unit_ticker(randf_range(0.13, 0.19), func():
 			if h["data"]["hp"] > 0:

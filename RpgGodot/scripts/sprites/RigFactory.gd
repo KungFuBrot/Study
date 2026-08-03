@@ -45,10 +45,19 @@ static var H := HERO_H
 ## und „lebt".
 static var _ctx_squash := 0.0
 static var _ctx_shift := Vector2.ZERO
+## Scherung statt Drehung: der Punkt wandert umso weiter, je höher er über der
+## Standfläche liegt. Bei dieser Auflösung liest sich das als Vorlehnen, ohne
+## die Drehartefakte, die gedrehte Pixel-Art matschig machen.
+static var _ctx_lean := 0.0
 static var _foot := 51.0
 
 static func _tp(p: Vector2) -> Vector2:
-	return _sq(p, _ctx_squash) + _ctx_shift
+	var q := _sq(p, _ctx_squash)
+	if not is_zero_approx(_ctx_lean):
+		# Auf die Figurenhöhe normiert — sonst schert derselbe Wert einen Boss
+		# (128 px) doppelt so weit aus dem Bild wie ein Monster (52 px).
+		q.x += _ctx_lean * (_foot - q.y) / (float(H) * 0.45)
+	return q + _ctx_shift
 
 static func _begin(w: int, h: int, foot := -1.0) -> void:
 	W = w
@@ -56,6 +65,7 @@ static func _begin(w: int, h: int, foot := -1.0) -> void:
 	_foot = foot if foot > 0.0 else float(h) - 5.0
 	_ctx_squash = 0.0
 	_ctx_shift = Vector2.ZERO
+	_ctx_lean = 0.0
 	_parts = PackedInt32Array()
 	_parts.resize(W * H)
 	_parts.fill(0)
@@ -72,12 +82,18 @@ static func _put(x: int, y: int, id: int) -> void:
 		return
 	_parts[y * W + x] = id
 
+# Zeile für Zeile in Halbschritten abgetastet: wird die Figur gestreckt,
+# landen aufeinanderfolgende Quellzeilen mehr als einen Pixel auseinander und
+# es blieben sonst waagerechte Lücken im Körper.
 static func _rect(x0: int, y0: int, w: int, h: int, id: int) -> void:
-	var a := _tp(Vector2(x0, y0))
-	var b := _tp(Vector2(x0 + w, y0 + h))
-	for y in range(int(round(a.y)), int(round(b.y))):
-		for x in range(int(round(a.x)), int(round(b.x))):
-			_put(x, y, id)
+	var steps := h * 2
+	for i in steps + 1:
+		var sy: float = float(y0) + float(h) * float(i) / float(steps)
+		var l := _tp(Vector2(x0, sy))
+		var r := _tp(Vector2(x0 + w, sy))
+		var yy := int(round(l.y))
+		for x in range(int(round(l.x)), int(round(r.x))):
+			_put(x, yy, id)
 
 # Achtung: cx/cy laufen durch die Verformung, die Radien werden mitskaliert.
 static func _ell(cx: float, cy: float, rx: float, ry: float, id: int) -> void:
@@ -121,11 +137,14 @@ static func _sq(p: Vector2, squash: float) -> Vector2:
 
 ## Sich verjüngender Rumpf: Zeile für Zeile von w0 auf w1.
 static func _taper(cx: float, y0: int, y1: int, w0: float, w1: float, id: int) -> void:
-	for y in range(y0, y1 + 1):
-		var t := float(y - y0) / maxf(float(y1 - y0), 1.0)
+	var span := maxi(y1 - y0, 1)
+	var steps := span * 2   # Halbschritte, siehe _rect
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		var sy: float = float(y0) + float(span) * t
 		var hw: float = lerpf(w0, w1, t) * 0.5
-		var l := _tp(Vector2(cx - hw, y))
-		var r := _tp(Vector2(cx + hw, y))
+		var l := _tp(Vector2(cx - hw, sy))
+		var r := _tp(Vector2(cx + hw, sy))
 		for x in range(int(round(l.x)), int(round(r.x)) + 1):
 			_put(x, int(round(l.y)), id)
 
@@ -821,21 +840,105 @@ const MON_IDLE := {
 	"boss4": {"squash": 3.0, "drift": 3.0, "phase": 0.75, "hover": true},
 }
 
-## Monster oder Boss, frame 0..MON_FRAMES-1.
-static func monster(id: String, frame := 0) -> Texture2D:
-	var key := "m_%s_%d" % [id, frame]
+## Bewegungstabelle der Kreaturen. Sie haben kein gemeinsames Skelett — ein
+## Schleim hat keine Arme, ein Schwaden keine Beine. Deshalb läuft ihre
+## Animation über das, was jede Form hat: Zusammenziehen und Strecken,
+## Vorschnellen, Zurückweichen, Kippen. Alle Werte sind Prozent bzw. Pixel.
+## dx positiv = auf die Party zu (nach rechts).
+const MON_ANIMS := {
+	# Ausholen durch Ducken, dann vorschnellen und nachfedern. Die Werte
+	# bleiben klein: der Sprite selbst wird im Kampf zusätzlich getweent, und
+	# die Leinwand ist nur wenig größer als die Figur.
+	"attack": {"fps": 12, "frames": 8, "loop": false, "keys": [
+		{"t": 0.00},
+		{"t": 0.22, "squash": 13.0, "dx": -2.5, "lean": -5.0},
+		{"t": 0.42, "squash": -11.0, "dx": 5.0, "dy": -2.0, "lean": 7.0},
+		{"t": 0.60, "squash": 7.0, "dx": 3.0, "lean": 3.5},
+		{"t": 0.80, "squash": -3.0, "dx": 1.0, "lean": 1.0},
+		{"t": 1.00},
+	]},
+	# Treffer: wird nach hinten geworfen, staucht beim Aufkommen.
+	"hit": {"fps": 14, "frames": 6, "loop": false, "keys": [
+		{"t": 0.00},
+		{"t": 0.18, "squash": -13.0, "dx": -3.5, "lean": -7.0},
+		{"t": 0.45, "squash": 9.0, "dx": -1.5, "lean": -2.5},
+		{"t": 0.72, "squash": -3.0, "dx": -0.5},
+		{"t": 1.00},
+	]},
+	# Zusammenbrechen: kurz aufbäumen, dann in sich zusammensacken.
+	"down": {"fps": 10, "frames": 8, "loop": false, "keys": [
+		{"t": 0.00},
+		{"t": 0.18, "squash": -9.0, "dy": -2.0, "lean": -2.5},
+		{"t": 0.45, "squash": 22.0, "dy": 2.0, "lean": 4.0},
+		{"t": 0.72, "squash": 40.0, "dy": 4.0, "lean": 5.5},
+		{"t": 1.00, "squash": 54.0, "dy": 5.0, "lean": 6.5},
+	]},
+}
+
+## Wie stark eine Kreatur die Tabelle ausspielt. Ein Koloss holt schwer aus,
+## ein Schwaden fließt — dieselbe Tabelle, andere Wucht.
+const MON_FORCE := {
+	"schlammschleim": 1.35, "qualmgeist": 0.75, "muellgnom": 1.0,
+	"gierschlund": 1.25, "paragraphengeist": 0.7, "zinshund": 1.2,
+	"hetzer": 1.0, "wutgeist": 1.3, "schlaeger": 1.15,
+	"hassprediger": 0.85, "hohlgaenger": 0.8, "grauschemen": 0.7,
+	"namenlose": 0.6,
+	"boss": 0.8, "boss2": 0.85, "boss3": 0.9, "boss4": 0.75,
+}
+
+## Frameanzahl einer Kreaturen-Animation.
+static func mon_frames(anim: String) -> int:
+	if anim == "idle" or not MON_ANIMS.has(anim):
+		return MON_FRAMES
+	return MON_ANIMS[anim]["frames"]
+
+static func mon_fps(anim: String) -> float:
+	if anim == "idle" or not MON_ANIMS.has(anim):
+		return 7.0
+	return float(MON_ANIMS[anim]["fps"])
+
+# Posenwerte einer Kreaturen-Animation (dx/dy/lean/squash).
+static func _mon_pose(anim: String, frame: int) -> Dictionary:
+	var a: Dictionary = MON_ANIMS[anim]
+	var n: int = a["frames"]
+	var t := float(mini(frame, n - 1)) / float(n - 1)
+	var keys: Array = a["keys"]
+	var i := 0
+	while i < keys.size() - 2 and float(keys[i + 1]["t"]) < t:
+		i += 1
+	var k0: Dictionary = keys[i]
+	var k1: Dictionary = keys[mini(i + 1, keys.size() - 1)]
+	var span: float = maxf(float(k1["t"]) - float(k0["t"]), 0.0001)
+	var f := clampf((t - float(k0["t"])) / span, 0.0, 1.0)
+	f = f * f * (3.0 - 2.0 * f)
+	var out := {}
+	for k: String in ["squash", "dx", "dy", "lean"]:
+		out[k] = lerpf(float(k0.get(k, 0.0)), float(k1.get(k, 0.0)), f)
+	return out
+
+## Monster oder Boss. anim: "idle" | "attack" | "hit" | "down".
+static func monster(id: String, frame := 0, anim := "idle") -> Texture2D:
+	var key := "m_%s_%s_%d" % [id, anim, frame]
 	if _cache.has(key):
 		return _cache[key]
 	var big := is_boss(id)
 	_begin(BOSS_W if big else MON_W, BOSS_H if big else MON_H,
 		127.0 if big else 51.0)
-	# Eigenbewegung als Kontext setzen — die Zeichenfunktionen unten wissen
-	# nichts davon, alle Primitiven laufen ohnehin durch die Verformung.
-	var mv: Dictionary = MON_IDLE.get(id, {"squash": 4.0, "drift": 1.0, "phase": 0.0})
-	var ph := TAU * (float(frame % MON_FRAMES) / float(MON_FRAMES) + float(mv["phase"]))
-	_ctx_squash = float(mv["squash"]) * sin(ph)
-	var d := float(mv["drift"])
-	_ctx_shift = Vector2(0, -d * (0.5 + 0.5 * sin(ph * (1.0 if mv.get("hover", false) else 2.0))))
+	# Bewegung als Kontext setzen — die Zeichenfunktionen unten wissen nichts
+	# davon, alle Primitiven laufen ohnehin durch die Verformung.
+	if MON_ANIMS.has(anim):
+		var force: float = MON_FORCE.get(id, 1.0)
+		var mp := _mon_pose(anim, frame)
+		_ctx_squash = mp["squash"] * force
+		_ctx_shift = Vector2(mp["dx"] * force, mp["dy"] * force)
+		_ctx_lean = mp["lean"] * force
+	else:
+		var mv: Dictionary = MON_IDLE.get(id, {"squash": 4.0, "drift": 1.0, "phase": 0.0})
+		var ph := TAU * (float(frame % MON_FRAMES) / float(MON_FRAMES) + float(mv["phase"]))
+		_ctx_squash = float(mv["squash"]) * sin(ph)
+		var d := float(mv["drift"])
+		_ctx_shift = Vector2(0,
+			-d * (0.5 + 0.5 * sin(ph * (1.0 if mv.get("hover", false) else 2.0))))
 	var f := frame % 4
 	match id:
 		"schlammschleim": _slime(f)
