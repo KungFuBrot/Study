@@ -25,6 +25,13 @@ func _ready() -> void:
 	# allen Szenen bestehen und speist die Input-Actions ein.
 	touch = TouchControls.new()
 	add_child(touch)
+	if OS.get_environment("PROTO3D") != "":
+		# Prototyp: 3D-Figur zu Pixel-Art backen (nicht headless starten).
+		var proto := Proto3D.new()
+		add_child(proto)
+		await proto.run(OS.get_environment("PROTO3D"))
+		get_tree().quit()
+		return
 	if OS.get_environment("SPELLSHOT") != "":
 		goto_map("town", "start")
 		await get_tree().create_timer(0.5).timeout
