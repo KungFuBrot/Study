@@ -92,6 +92,106 @@ func _prism(parent: Node3D, size: Vector3, offset: Vector3, lean: float,
 	parent.add_child(mi)
 	return mi
 
+## Freie Röhre entlang eines Streckenzugs mit eigenem Radius je Stützpunkt.
+## Damit bekommt ein Glied ein echtes PROFIL — Muskelbauch in der Mitte,
+## schmales Gelenk am Ende — statt eines linearen Kegels. Genau daran hing der
+## Baukasten-Eindruck: Grundkörper haben keine Verläufe.
+func _tube(parent: Node3D, pts: Array, radii: Array, m: StandardMaterial3D,
+		sides := 8) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rings := []
+	for i in pts.size():
+		var p: Vector3 = pts[i]
+		# Richtung aus Vorgänger/Nachfolger — an den Enden nur einseitig.
+		var dir: Vector3
+		if i == 0:
+			dir = (pts[1] - p).normalized()
+		elif i == pts.size() - 1:
+			dir = (p - pts[i - 1]).normalized()
+		else:
+			dir = ((pts[i + 1] - pts[i - 1]) as Vector3).normalized()
+		# Beliebige Senkrechte zur Richtung aufspannen.
+		var up := Vector3.UP if absf(dir.dot(Vector3.UP)) < 0.9 else Vector3.RIGHT
+		var a := dir.cross(up).normalized()
+		var b := dir.cross(a).normalized()
+		var ring := []
+		for s in sides:
+			var ang := TAU * float(s) / float(sides)
+			ring.append(p + (a * cos(ang) + b * sin(ang)) * float(radii[i]))
+		rings.append(ring)
+	for i in rings.size() - 1:
+		for s in sides:
+			var s2 := (s + 1) % sides
+			var v0: Vector3 = rings[i][s]
+			var v1: Vector3 = rings[i][s2]
+			var v2: Vector3 = rings[i + 1][s2]
+			var v3: Vector3 = rings[i + 1][s]
+			st.add_vertex(v0); st.add_vertex(v1); st.add_vertex(v2)
+			st.add_vertex(v0); st.add_vertex(v2); st.add_vertex(v3)
+	# Deckel, damit die Röhre nicht hohl wirkt, wenn man ins Ende schaut.
+	for e in [0, rings.size() - 1]:
+		var c: Vector3 = pts[e]
+		for s in sides:
+			var s2 := (s + 1) % sides
+			if e == 0:
+				st.add_vertex(c); st.add_vertex(rings[e][s2]); st.add_vertex(rings[e][s])
+			else:
+				st.add_vertex(c); st.add_vertex(rings[e][s]); st.add_vertex(rings[e][s2])
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	parent.add_child(mi)
+	return mi
+
+## Senkrechtes Glied mit Profil: der Radius folgt `prof` über die Länge.
+func _limb_tube(parent: Node3D, length: float, r: float, prof: Array,
+		m: StandardMaterial3D) -> MeshInstance3D:
+	var pts := []
+	var radii := []
+	for i in prof.size():
+		var t := float(i) / float(prof.size() - 1)
+		pts.append(Vector3(0, -length * t, 0))
+		radii.append(r * float(prof[i]))
+	return _tube(parent, pts, radii, m)
+
+## Umhang: eine gewölbte Fläche, die von den Schultern nach unten fällt und
+## sich nach hinten wegbiegt. Grundkörper können das nicht.
+func _cloak(parent: Node3D, w: float, h: float, sag: float,
+		m: StandardMaterial3D) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cols := 7
+	var rows := 6
+	var grid := []
+	for r in rows + 1:
+		var tv := float(r) / float(rows)
+		var row := []
+		for c in cols + 1:
+			var tu := float(c) / float(cols) * 2.0 - 1.0
+			# Nach unten breiter, nach hinten gewölbt, Ränder fallen ab.
+			var wide: float = w * (0.62 + 0.55 * tv)
+			row.append(Vector3(-sag * tv * tv - absf(tu) * w * 0.22,
+				-h * tv, tu * wide))
+		grid.append(row)
+	for r in rows:
+		for c in cols:
+			var v0: Vector3 = grid[r][c]
+			var v1: Vector3 = grid[r][c + 1]
+			var v2: Vector3 = grid[r + 1][c + 1]
+			var v3: Vector3 = grid[r + 1][c]
+			st.add_vertex(v0); st.add_vertex(v1); st.add_vertex(v2)
+			st.add_vertex(v0); st.add_vertex(v2); st.add_vertex(v3)
+			st.add_vertex(v0); st.add_vertex(v2); st.add_vertex(v1)
+			st.add_vertex(v0); st.add_vertex(v3); st.add_vertex(v2)
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = m
+	parent.add_child(mi)
+	return mi
+
 func _joint(parent: Node3D, name: String, at: Vector3) -> Node3D:
 	var n := Node3D.new()
 	n.position = at
@@ -154,6 +254,11 @@ func build_humanoid(s: Dictionary) -> void:
 		_box(head, Vector3(0.17 * k * hs, 0.11 * k * hs, 0.17 * k * hs),
 			Vector3(0.02 * k, 0.07 * k * hs, 0), skin)
 	_build_head_extras(head, s, k, hs, hair, cloth, trim)
+	# Umhang: fällt von den Schultern, wölbt sich nach hinten weg. Hängt am
+	# Rumpf-Gelenk, schwingt also beim Lehnen mit.
+	if s.has("cloak"):
+		var cl := _joint(spine, "cloak", Vector3(-0.06 * k, 0.42 * k, 0))
+		_cloak(cl, 0.20 * k * bw, 0.78 * k, 0.16 * k, mat(s["cloak"]))
 
 	for side in [-1, 1]:
 		var tag := "l" if side < 0 else "r"
@@ -163,24 +268,21 @@ func build_humanoid(s: Dictionary) -> void:
 		# abfallende Kante statt einer rechtwinkligen Ecke.
 		_prism(sh, Vector3(0.14 * k * bw, 0.12 * k, 0.13 * k * bw),
 			Vector3(0, 0.02 * k, 0), 0.5, trim)
-		# Gliedmaßen als sich verjüngende Zylinder: Oberarm kräftig, Ellenbogen
-		# schmal, Handgelenk dünn.
-		_cyl(sh, 0.052 * k * bw, 0.042 * k * bw, 0.25 * k,
-			Vector3(0, -0.13 * k, 0), cloth)
+		# Gliedmaßen mit Profil statt linearem Kegel: der Oberarm hat einen
+		# Muskelbauch, der Ellenbogen zieht sich zusammen.
+		_limb_tube(sh, 0.25 * k, 0.055 * k * bw, [0.86, 1.0, 0.94, 0.76], cloth)
 		var elb := _joint(sh, "elbow_" + tag, Vector3(0, -0.25 * k, 0))
-		_cyl(elb, 0.042 * k * bw, 0.033 * k * bw, 0.23 * k,
-			Vector3(0, -0.11 * k, 0), skin)
+		_limb_tube(elb, 0.23 * k, 0.044 * k * bw, [0.84, 0.98, 0.86, 0.66], skin)
 		var hand := _joint(elb, "hand_" + tag, Vector3(0, -0.23 * k, 0))
 		_sphere(hand, 0.048 * k, Vector3(0, -0.03 * k, 0), 1.1, skin)
 
 		if floats:
 			continue
 		var hp := _joint(hips, "hip_" + tag, Vector3(0, -0.08 * k, 0.09 * k * bw * side))
-		_cyl(hp, 0.068 * k * bw, 0.052 * k * bw, 0.32 * k,
-			Vector3(0, -0.16 * k, 0), legs)
+		# Oberschenkel kräftig oben, schmal am Knie; Wade mit Bauch.
+		_limb_tube(hp, 0.32 * k, 0.072 * k * bw, [0.92, 1.0, 0.88, 0.70], legs)
 		var knee := _joint(hp, "knee_" + tag, Vector3(0, -0.32 * k, 0))
-		_cyl(knee, 0.052 * k * bw, 0.040 * k * bw, 0.30 * k,
-			Vector3(0, -0.15 * k, 0), legs)
+		_limb_tube(knee, 0.30 * k, 0.056 * k * bw, [0.80, 1.0, 0.82, 0.58], legs)
 		# Knieschutz — bricht das lange Bein in zwei lesbare Abschnitte.
 		_box(knee, Vector3(0.12 * k * bw, 0.07 * k, 0.13 * k * bw),
 			Vector3(0.02 * k, 0.0, 0), boots)
@@ -222,11 +324,18 @@ func _build_head_extras(head: Node3D, s: Dictionary, k: float, hs: float,
 			_box(head, Vector3(0.22 * k * hs, 0.11 * k, 0.23 * k * hs),
 				Vector3(-0.01 * k, 0.20 * k * hs, 0), hair)
 		"hood":
-			# Kapuze steht vom Kopf ab und wirft ihn in Schatten.
-			_box(head, Vector3(0.27 * k * hs, 0.30 * k * hs, 0.28 * k * hs),
-				Vector3(-0.04 * k, 0.13 * k * hs, 0), cloth)
-			_box(head, Vector3(0.10 * k, 0.20 * k * hs, 0.22 * k * hs),
-				Vector3(0.10 * k, 0.11 * k * hs, 0), mat(Color(0.05, 0.04, 0.06)))
+			# Kapuze als nach hinten geneigte Spitze statt als Kasten — der
+			# Klotz auf dem runden Kopf war das letzte, was nach Baukasten aussah.
+			_tube(head, [
+					Vector3(0.02 * k, 0.02 * k * hs, 0),
+					Vector3(-0.02 * k, 0.16 * k * hs, 0),
+					Vector3(-0.09 * k, 0.28 * k * hs, 0),
+					Vector3(-0.17 * k, 0.34 * k * hs, 0)],
+				[0.150 * k * hs, 0.135 * k * hs, 0.075 * k * hs, 0.012 * k * hs],
+				cloth, 8)
+			# Schattenhöhle: der Kopf verschwindet darin bis auf die Augen.
+			_sphere(head, 0.085 * k * hs, Vector3(0.07 * k, 0.13 * k * hs, 0), 1.0,
+				mat(Color(0.05, 0.04, 0.06)))
 		"hat":
 			_box(head, Vector3(0.34 * k * hs, 0.04 * k, 0.36 * k * hs),
 				Vector3(-0.01 * k, 0.22 * k * hs, 0), cloth)
@@ -411,7 +520,7 @@ func build_spider(s: Dictionary) -> void:
 ## bleiben in Ruhestellung — deshalb funktionieren dieselben Tabellen auch für
 ## Figuren, die gar keine Arme haben.
 const ANIMS := {
-	"idle": {"fps": 10, "loop": true, "frames": 16, "keys": [
+	"idle": {"fps": 10, "loop": true, "frames": 24, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "shoulder_l": [-8, 0, 6],
 			"elbow_r": [-28, 0, 0], "elbow_l": [-22, 0, 0], "weapon": [-14, 0, 0],
 			"head": [2, 0, 0], "braid": [4, 0, 0], "hips": [0, 0, 0]},
@@ -422,7 +531,7 @@ const ANIMS := {
 			"elbow_r": [-28, 0, 0], "elbow_l": [-22, 0, 0], "weapon": [-14, 0, 0],
 			"head": [2, 0, 0], "braid": [4, 0, 0], "hips": [0, 0, 0]},
 	]},
-	"walk": {"fps": 11, "loop": true, "frames": 16, "keys": [
+	"walk": {"fps": 11, "loop": true, "frames": 24, "keys": [
 		{"t": 0.0, "spine": [5, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [8, 0, 0],
 			"hip_l": [20, 0, 0], "knee_l": [-32, 0, 0], "shoulder_r": [24, 0, -7],
 			"shoulder_l": [-28, 0, 7], "elbow_r": [-36, 0, 0], "elbow_l": [-34, 0, 0],
@@ -444,7 +553,7 @@ const ANIMS := {
 			"shoulder_l": [-28, 0, 7], "elbow_r": [-36, 0, 0], "elbow_l": [-34, 0, 0],
 			"braid": [-10, 0, 0], "weapon": [-22, 0, 0]},
 	]},
-	"run": {"fps": 14, "loop": true, "frames": 16, "keys": [
+	"run": {"fps": 14, "loop": true, "frames": 24, "keys": [
 		{"t": 0.0, "spine": [14, 0, 0], "hip_r": [-42, 0, 0], "knee_r": [22, 0, 0],
 			"hip_l": [34, 0, 0], "knee_l": [-58, 0, 0], "shoulder_r": [46, 0, -8],
 			"shoulder_l": [-52, 0, 8], "elbow_r": [-64, 0, 0], "elbow_l": [-70, 0, 0],
@@ -466,7 +575,7 @@ const ANIMS := {
 			"shoulder_l": [-52, 0, 8], "elbow_r": [-64, 0, 0], "elbow_l": [-70, 0, 0],
 			"braid": [-24, 0, 0], "head": [-8, 0, 0], "weapon": [-40, 0, 0]},
 	]},
-	"attack": {"fps": 16, "loop": false, "frames": 12, "keys": [
+	"attack": {"fps": 16, "loop": false, "frames": 18, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0], "head": [0, 0, 0]},
 		{"t": 0.30, "spine": [-16, -14, 0], "shoulder_r": [-118, 0, -20],
@@ -484,7 +593,7 @@ const ANIMS := {
 		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0], "head": [0, 0, 0]},
 	]},
-	"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+	"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0]},
 		{"t": 0.18, "spine": [-26, 0, 0], "head": [-20, 0, 0], "shoulder_r": [-40, 0, -20],
 			"shoulder_l": [34, 0, 20], "elbow_r": [-60, 0, 0], "hip_l": [-20, 0, 0],
@@ -493,7 +602,7 @@ const ANIMS := {
 			"braid": [-12, 0, 0], "hips": [-3, 0, 0]},
 		{"t": 1.0, "spine": [0, 0, 0]},
 	]},
-	"down": {"fps": 12, "loop": false, "frames": 12, "keys": [
+	"down": {"fps": 12, "loop": false, "frames": 18, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0]},
 		{"t": 0.25, "spine": [-14, 0, 0], "head": [-16, 0, 0], "hip_r": [-16, 0, 0],
 			"knee_r": [30, 0, 0], "hips": [-6, 0, 0]},
@@ -507,7 +616,7 @@ const ANIMS := {
 			"braid": [58, 0, 0]},
 	]},
 	# Rückhand: der zweite Schlag der Kombo, aus der Gegenrichtung.
-	"attack2": {"fps": 16, "loop": false, "frames": 12, "keys": [
+	"attack2": {"fps": 16, "loop": false, "frames": 18, "keys": [
 		{"t": 0.0, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
 			"weapon": [-2, 0, 0], "hips": [0, 7, 0]},
 		{"t": 0.28, "spine": [22, 20, 0], "shoulder_r": [78, 0, 14], "elbow_r": [-14, 0, 0],
@@ -524,7 +633,7 @@ const ANIMS := {
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0]},
 	]},
 	# Zaubern: sammeln, aufrichten, Stab nach vorn entladen.
-	"cast": {"fps": 12, "loop": false, "frames": 14, "keys": [
+	"cast": {"fps": 12, "loop": false, "frames": 20, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
 		{"t": 0.26, "spine": [12, 0, 0], "shoulder_r": [-24, 0, -14],
 			"elbow_r": [-58, 0, 0], "shoulder_l": [-20, 0, 14], "elbow_l": [-54, 0, 0],
@@ -544,7 +653,7 @@ const ANIMS := {
 			"weapon": [-14, 0, 0]},
 	]},
 	# Zielen und schießen: Arm hoch, kurzer Rückstoß, halten.
-	"aim": {"fps": 14, "loop": false, "frames": 10, "keys": [
+	"aim": {"fps": 14, "loop": false, "frames": 14, "keys": [
 		{"t": 0.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
 		{"t": 0.30, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
 			"spine": [-4, -8, 0], "head": [0, -6, 0], "weapon": [0, 0, 0]},
@@ -557,7 +666,7 @@ const ANIMS := {
 		{"t": 1.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
 	]},
 	# Decken: klein machen, Waffe quer vor den Körper.
-	"block": {"fps": 12, "loop": true, "frames": 10, "keys": [
+	"block": {"fps": 12, "loop": true, "frames": 14, "keys": [
 		{"t": 0.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
 			"elbow_r": [-84, 0, 0], "shoulder_l": [-30, 0, 30], "elbow_l": [-70, 0, 0],
 			"weapon": [64, 0, 0], "head": [10, 0, 0], "hip_r": [-22, 0, 0],
@@ -575,7 +684,7 @@ const ANIMS := {
 			"hips": [8, 0, 0]},
 	]},
 	# Drohen: aufrichten, vorlehnen, wieder sinken.
-	"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+	"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0]},
 		{"t": 0.30, "spine": [-16, 0, 0], "head": [-14, 0, 0],
 			"shoulder_r": [-30, 0, -24], "shoulder_l": [-26, 0, 24],
@@ -586,7 +695,7 @@ const ANIMS := {
 		{"t": 1.0, "spine": [0, 0, 0]},
 	]},
 	# Brüllen: weit zurückbäumen, Kopf hoch, dann vorschnellen.
-	"roar": {"fps": 11, "loop": false, "frames": 14, "keys": [
+	"roar": {"fps": 11, "loop": false, "frames": 20, "keys": [
 		{"t": 0.0, "spine": [0, 0, 0]},
 		{"t": 0.28, "spine": [-24, 0, 0], "head": [-30, 0, 0],
 			"shoulder_r": [-58, 0, -40], "shoulder_l": [-54, 0, 40],
@@ -601,7 +710,7 @@ const ANIMS := {
 			"hip_r": [-20, 0, 0], "knee_r": [26, 0, 0]},
 		{"t": 1.0, "spine": [0, 0, 0]},
 	]},
-	"cheer": {"fps": 10, "loop": true, "frames": 12, "keys": [
+	"cheer": {"fps": 10, "loop": true, "frames": 18, "keys": [
 		{"t": 0.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
 			"weapon": [-16, 0, 0], "hips": [0, 0, 0], "spine": [-6, 0, 0]},
 		{"t": 0.25, "shoulder_r": [-152, 0, -18], "elbow_r": [-16, 0, 0],
@@ -624,14 +733,14 @@ const FORM_ANIMS := {
 	"blob": {
 		# Wabern ist reines Stauchen: der Körper zieht sich zusammen und
 		# quillt wieder auseinander.
-		"idle": {"fps": 9, "loop": true, "frames": 14, "keys": [
+		"idle": {"fps": 9, "loop": true, "frames": 20, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
 			{"t": 0.35, "spine": [0, 0, 0, 1.10, 0.86, 1.08], "head": [-6, 0, 0]},
 			{"t": 0.70, "spine": [0, 0, 0, 0.93, 1.14, 0.95], "head": [5, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
 		]},
 		# Zusammenziehen, dann nach vorn schnellen und breit aufklatschen.
-		"attack": {"fps": 14, "loop": false, "frames": 12, "keys": [
+		"attack": {"fps": 14, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
 			{"t": 0.26, "spine": [0, 0, 0, 0.80, 1.30, 0.82], "hips": [0, 0, 0],
 				"head": [-16, 0, 0]},
@@ -640,20 +749,20 @@ const FORM_ANIMS := {
 			{"t": 0.66, "spine": [0, 0, 0, 0.94, 1.10, 0.96], "hips": [6, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
 			{"t": 0.18, "spine": [0, 0, 0, 1.28, 0.72, 1.24], "hips": [-14, 0, 0]},
 			{"t": 0.52, "spine": [0, 0, 0, 0.90, 1.16, 0.92], "hips": [-5, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
 		]},
 		# Zerfließen statt Umfallen.
-		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
 			{"t": 0.22, "spine": [0, 0, 0, 0.88, 1.18, 0.90], "head": [-10, 0, 0]},
 			{"t": 0.60, "spine": [0, 0, 0, 1.40, 0.46, 1.34], "head": [18, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0, 1.62, 0.22, 1.54], "head": [26, 0, 0]},
 		]},
-		"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+		"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
 			{"t": 0.34, "spine": [0, 0, 0, 0.84, 1.26, 0.86], "head": [-14, 0, 0]},
 			{"t": 0.62, "spine": [0, 0, 0, 1.14, 0.90, 1.12], "head": [12, 0, 0]},
@@ -662,14 +771,14 @@ const FORM_ANIMS := {
 	},
 	"quad": {
 		# Vierbeiner: Beine im Kreuzgang, Kopf senkt und hebt sich.
-		"idle": {"fps": 9, "loop": true, "frames": 14, "keys": [
+		"idle": {"fps": 9, "loop": true, "frames": 20, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
 			{"t": 0.5, "spine": [2, 0, 0], "head": [-5, 4, 0],
 				"leg_fl": [6, 0, 0], "leg_br": [-6, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
 		]},
 		# Zuschnappen: ducken, vorschnellen, Kopf reißt hoch.
-		"attack": {"fps": 15, "loop": false, "frames": 12, "keys": [
+		"attack": {"fps": 15, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
 			{"t": 0.26, "spine": [10, 0, 0], "head": [16, 0, 0],
 				"leg_fl": [-26, 0, 0], "leg_fr": [-26, 0, 0]},
@@ -679,14 +788,14 @@ const FORM_ANIMS := {
 			{"t": 0.70, "spine": [6, 0, 0], "head": [10, 0, 0], "hips": [4, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.18, "spine": [-18, 0, 0], "head": [-24, 0, 0], "hips": [-12, 0, 0],
 				"leg_fl": [24, 0, 0], "leg_fr": [24, 0, 0]},
 			{"t": 0.55, "spine": [-6, 0, 0], "head": [-8, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0]},
 		]},
-		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.30, "spine": [-12, 0, 0], "head": [-18, 0, 0]},
 			{"t": 0.70, "spine": [0, 0, 46], "head": [10, 0, 30], "hips": [0, 0, 40],
@@ -694,7 +803,7 @@ const FORM_ANIMS := {
 			{"t": 1.0, "spine": [0, 0, 74], "head": [14, 0, 50], "hips": [0, 0, 68],
 				"leg_fl": [56, 0, 0], "leg_fr": [56, 0, 0]},
 		]},
-		"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+		"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.35, "spine": [-14, 0, 0], "head": [-22, 0, 0], "hips": [-8, 0, 0]},
 			{"t": 0.65, "spine": [8, 0, 0], "head": [14, 0, 0]},
@@ -703,7 +812,7 @@ const FORM_ANIMS := {
 	},
 	"spider": {
 		# Beine tasten abwechselnd — vier Paare, gegenläufig.
-		"idle": {"fps": 9, "loop": true, "frames": 16, "keys": [
+		"idle": {"fps": 9, "loop": true, "frames": 24, "keys": [
 			{"t": 0.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
 				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
 			{"t": 0.5, "leg_0_-1": [12, 0, 0], "leg_1_1": [-10, 0, 0],
@@ -713,7 +822,7 @@ const FORM_ANIMS := {
 				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
 		]},
 		# Aufbäumen auf den Hinterbeinen, dann zustoßen.
-		"attack": {"fps": 14, "loop": false, "frames": 14, "keys": [
+		"attack": {"fps": 14, "loop": false, "frames": 20, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.30, "spine": [-24, 0, 0], "head": [-20, 0, 0], "hips": [-16, 0, 0],
 				"leg_0_-1": [-34, 0, 0], "leg_0_1": [-34, 0, 0],
@@ -724,7 +833,7 @@ const FORM_ANIMS := {
 			{"t": 0.76, "spine": [6, 0, 0], "head": [8, 0, 0], "hips": [4, 0, 0]},
 			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.18, "spine": [-20, 0, 0], "hips": [-14, 0, 0],
 				"leg_0_-1": [26, 0, 0], "leg_0_1": [26, 0, 0],
@@ -733,7 +842,7 @@ const FORM_ANIMS := {
 			{"t": 1.0, "spine": [0, 0, 0]},
 		]},
 		# Beine ziehen sich ein, der Leib sackt ab.
-		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
 			{"t": 0.30, "spine": [-14, 0, 0, 1.0, 1.0, 1.0],
 				"leg_0_-1": [-30, 0, 0], "leg_0_1": [-30, 0, 0]},
@@ -748,7 +857,7 @@ const FORM_ANIMS := {
 				"leg_2_-1": [74, 0, 0], "leg_2_1": [74, 0, 0],
 				"leg_3_-1": [68, 0, 0], "leg_3_1": [68, 0, 0]},
 		]},
-		"roar": {"fps": 10, "loop": false, "frames": 14, "keys": [
+		"roar": {"fps": 10, "loop": false, "frames": 20, "keys": [
 			{"t": 0.0, "spine": [0, 0, 0]},
 			{"t": 0.34, "spine": [-30, 0, 0], "head": [-34, 0, 0], "hips": [-20, 0, 0],
 				"leg_0_-1": [-44, 0, 0], "leg_0_1": [-44, 0, 0],
