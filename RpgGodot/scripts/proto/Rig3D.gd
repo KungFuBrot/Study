@@ -306,6 +306,118 @@ func build_humanoid(s: Dictionary) -> void:
 				Vector3(-0.02 * k * i, -0.09 * k - i * 0.17 * k, 0), cloth)
 
 	_build_prop(s, k, trim)
+	# Figuren, die man in jeder Szene sieht, bekommen eigene Geometrie oben
+	# drauf — die gemeinsame Bauform trägt nur bis zu einem gewissen Punkt.
+	match String(s.get("detail", "")):
+		"serena": _detail_serena(s, k, bw)
+		"milo": _detail_milo(s, k, bw)
+		"rax": _detail_rax(s, k, bw)
+
+# --- Figurenspezifische Geometrie -------------------------------------------
+
+## Helen: Beintaschen über den Schenkeln, gewölbter Brustpanzer, Armschienen,
+## geflochtener Zopf mit Band, Schwert mit Hohlkehle und Knauf.
+func _detail_serena(s: Dictionary, k: float, bw: float) -> void:
+	var cloth := mat(s["cloth"])
+	var trim := mat(s["trim"])
+	var leather := mat(Color(0.34, 0.22, 0.14))
+	var steel := mat(Color(0.74, 0.78, 0.84), 0.32)
+	var hair := mat(s["hair"])
+	var spine: Node3D = joints["spine"]
+	# Gewölbter Brustpanzer: eine Röhre quer über die Brust, nach vorn gebogen.
+	_tube(spine, [Vector3(0.02 * k, 0.26 * k, -0.16 * k),
+			Vector3(0.09 * k, 0.31 * k, 0), Vector3(0.02 * k, 0.26 * k, 0.16 * k)],
+		[0.045 * k, 0.075 * k, 0.045 * k], trim, 8)
+	# Beintaschen: vier schmale Lappen, die über den Schenkeln hängen.
+	for i in 4:
+		var z := (-0.15 + i * 0.10) * k * bw
+		_tube(joints["hips"], [Vector3(0.06 * k, -0.06 * k, z),
+				Vector3(0.07 * k, -0.20 * k, z * 1.1),
+				Vector3(0.05 * k, -0.31 * k, z * 1.15)],
+			[0.040 * k, 0.036 * k, 0.022 * k], cloth, 6)
+	# Armschienen
+	for tag in ["l", "r"]:
+		_tube(joints["elbow_" + tag], [Vector3(0, -0.06 * k, 0), Vector3(0, -0.19 * k, 0)],
+			[0.050 * k * bw, 0.043 * k * bw], leather, 8)
+	# Zopf: drei Abschnitte, unten mit Band.
+	if joints.has("braid"):
+		var b: Node3D = joints["braid"]
+		_tube(b, [Vector3(0, -0.02 * k, 0), Vector3(-0.02 * k, -0.12 * k, 0),
+				Vector3(-0.01 * k, -0.22 * k, 0), Vector3(0.01 * k, -0.30 * k, 0)],
+			[0.042 * k, 0.048 * k, 0.036 * k, 0.016 * k], hair, 7)
+		_tube(b, [Vector3(-0.005 * k, -0.25 * k, 0), Vector3(0.005 * k, -0.28 * k, 0)],
+			[0.030 * k, 0.030 * k], trim, 6)
+	# Schwert: Hohlkehle in der Klinge, Knauf am Griffende.
+	if joints.has("weapon"):
+		var w: Node3D = joints["weapon"]
+		_box(w, Vector3(0.012 * k, 0.58 * k, 0.030 * k), Vector3(0.019 * k, 0.35 * k, 0),
+			mat(Color(0.52, 0.56, 0.64), 0.45))
+		_sphere(w, 0.035 * k, Vector3(0, -0.13 * k, 0), 0.9, steel)
+
+## Janosch: Faltenwurf auf der Robe, weite Ärmelglocken, geknickte Hutspitze,
+## Gürteltaschen.
+func _detail_milo(s: Dictionary, k: float, bw: float) -> void:
+	var robe := mat((s["cloth"] as Color).darkened(0.22))
+	var trim := mat(s["trim"])
+	var leather := mat(Color(0.32, 0.24, 0.16))
+	var spine: Node3D = joints["spine"]
+	# Falten: vier Grate, die von der Brust nach unten auseinanderlaufen.
+	for i in 4:
+		var z := (-0.12 + i * 0.08) * k * bw
+		_tube(spine, [Vector3(0.09 * k, 0.30 * k, z * 0.7),
+				Vector3(0.10 * k, 0.10 * k, z),
+				Vector3(0.08 * k, -0.10 * k, z * 1.25)],
+			[0.016 * k, 0.024 * k, 0.020 * k], robe, 5)
+	# Ärmelglocken: weiten sich zum Handgelenk hin.
+	for tag in ["l", "r"]:
+		_tube(joints["elbow_" + tag], [Vector3(0, -0.02 * k, 0), Vector3(0, -0.13 * k, 0),
+				Vector3(0, -0.21 * k, 0)],
+			[0.048 * k * bw, 0.062 * k * bw, 0.082 * k * bw], mat(s["cloth"]), 8)
+		_tube(joints["elbow_" + tag], [Vector3(0, -0.19 * k, 0), Vector3(0, -0.22 * k, 0)],
+			[0.084 * k * bw, 0.084 * k * bw], trim, 8)
+	# Hutspitze knickt nach hinten weg statt gerade zu stehen.
+	if joints.has("head"):
+		_tube(joints["head"], [Vector3(-0.01 * k, 0.30 * k, 0),
+				Vector3(-0.08 * k, 0.44 * k, 0), Vector3(-0.22 * k, 0.50 * k, 0),
+				Vector3(-0.34 * k, 0.44 * k, 0)],
+			[0.072 * k, 0.050 * k, 0.028 * k, 0.010 * k], mat(s["cloth"]), 7)
+	# Gürteltaschen
+	for z in [-0.10, 0.12]:
+		_sphere(spine, 0.042 * k, Vector3(0.07 * k, -0.02 * k, z * k), 1.2, leather)
+
+## Wally: Nieten, Kolbenarme, Auspuffrohre auf dem Rücken, Schulterpanzer.
+func _detail_rax(s: Dictionary, k: float, bw: float) -> void:
+	var shell := mat(s["cloth"], 0.55)
+	var dark := mat(s["trim"], 0.6)
+	var pipe := mat(Color(0.26, 0.27, 0.31), 0.5)
+	var hot := mat(Color(1.0, 0.55, 0.16), 0.4, 1.6)
+	var spine: Node3D = joints["spine"]
+	# Nietenreihen an der Brustplatte.
+	for i in 5:
+		for z in [-0.14, 0.14]:
+			_sphere(spine, 0.014 * k, Vector3(0.11 * k * bw,
+				(0.22 + i * 0.055) * k, z * k * bw), 1.0, dark)
+	# Auspuffrohre auf dem Rücken, leicht nach außen geneigt.
+	for z in [-0.10, 0.10]:
+		_tube(spine, [Vector3(-0.13 * k, 0.18 * k, z * k),
+				Vector3(-0.16 * k, 0.40 * k, z * k * 1.3),
+				Vector3(-0.18 * k, 0.54 * k, z * k * 1.5)],
+			[0.032 * k, 0.028 * k, 0.036 * k], pipe, 7)
+	# Kolben in den Armen: schmales Innenrohr über dem Ellenbogen.
+	for tag in ["l", "r"]:
+		_tube(joints["shoulder_" + tag], [Vector3(0, -0.19 * k, 0), Vector3(0, -0.26 * k, 0)],
+			[0.026 * k, 0.026 * k], pipe, 6)
+		_tube(joints["elbow_" + tag], [Vector3(0, -0.02 * k, 0), Vector3(0, -0.07 * k, 0)],
+			[0.048 * k * bw, 0.044 * k * bw], dark, 8)
+	# Schulterpanzer als gewölbte Kappe.
+	for tag in ["l", "r"]:
+		var side := -1.0 if tag == "l" else 1.0
+		_tube(joints["shoulder_" + tag], [Vector3(0.05 * k, 0.03 * k, 0),
+				Vector3(0, 0.05 * k, 0.02 * k * side), Vector3(-0.05 * k, 0.03 * k, 0)],
+			[0.052 * k * bw, 0.070 * k * bw, 0.052 * k * bw], shell, 8)
+	# Glühender Spalt am Rumpf
+	_box(spine, Vector3(0.02 * k, 0.10 * k, 0.14 * k),
+		Vector3(0.115 * k * bw, 0.14 * k, 0), hot)
 
 ## Kopfaufsatz: Haar, Kapuze, Hut, Helm — plus glühende Augen, wo gewünscht.
 func _build_head_extras(head: Node3D, s: Dictionary, k: float, hs: float,

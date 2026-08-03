@@ -13,12 +13,12 @@ const BOSS := "boss"
 
 const F := {
 	# --- Party ---------------------------------------------------------------
-	"serena": {"class": HERO, "form": "human", "h": 1.70,
+	"serena": {"class": HERO, "form": "human", "detail": "serena", "h": 1.70,
 		"skin": Color(0.93, 0.74, 0.58), "cloth": Color(0.62, 0.13, 0.16),
 		"trim": Color(0.85, 0.76, 0.54), "legs": Color(0.31, 0.21, 0.14),
 		"boots": Color(0.19, 0.13, 0.09), "hair": Color(0.80, 0.60, 0.20),
 		"hair_style": "braid", "prop": "sword"},
-	"milo": {"class": HERO, "form": "human", "cloak": Color(0.15, 0.21, 0.48), "h": 1.66, "build": 0.95,
+	"milo": {"class": HERO, "form": "human", "detail": "milo", "cloak": Color(0.15, 0.21, 0.48), "h": 1.66, "build": 0.95,
 		"skin": Color(0.90, 0.73, 0.58), "cloth": Color(0.19, 0.27, 0.60),
 		"trim": Color(0.70, 0.74, 0.92), "legs": Color(0.16, 0.22, 0.48),
 		"boots": Color(0.18, 0.15, 0.24), "hair": Color(0.17, 0.24, 0.55),
@@ -26,7 +26,7 @@ const F := {
 		"gem": Color(0.35, 0.90, 0.45)},
 	# Deutlich dunkleres Metall: hell gehalten verschwamm der Roboter im Licht
 	# zu einem blassen Fleck ohne erkennbare Form.
-	"rax": {"class": HERO, "form": "human", "boxhead": true, "h": 1.62, "build": 1.15, "head": 0.9,
+	"rax": {"class": HERO, "form": "human", "detail": "rax", "boxhead": true, "h": 1.62, "build": 1.15, "head": 0.9,
 		"skin": Color(0.34, 0.36, 0.40), "cloth": Color(0.44, 0.46, 0.50),
 		"trim": Color(0.22, 0.23, 0.27), "legs": Color(0.20, 0.21, 0.25),
 		"boots": Color(0.30, 0.32, 0.36), "hair": Color(0.22, 0.23, 0.27),
