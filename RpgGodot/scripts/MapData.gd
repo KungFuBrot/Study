@@ -15,7 +15,7 @@ const TILE_FOR_CHAR := {
 	"#": "dwall", "i": "ice", "I": "iwall", "y": "hfloor", "Y": "hwall",
 	"n": "void", "N": "vwall",
 	"T": "town_icon", "C": "factory_icon", "F": "tower_icon", "H": "keep_icon",
-	"V": "void_icon", "X": "path",
+	"V": "void_icon", "X": "exit",
 }
 
 const MAPS := {

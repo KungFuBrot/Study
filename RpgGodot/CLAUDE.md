@@ -50,9 +50,32 @@ Neue geteilte Helfer gehören nach `BattleFx` (visuell) bzw. `BattleBase` (Zusta
 
 ### SpriteFactory-Kette (`scripts/sprites/` + `scripts/SpriteFactory.gd`)
 
-`SpriteFactoryLib` (Asset-Loader, Kacheln, Pixel-Helfer) → `SpriteFactoryChars`
-(Helden/Roboter) → `SpriteFactory` (Beschwörungen, Gegner, Props). Alle Aufrufe
-von außen laufen über `SpriteFactory.*` (statische Vererbung).
+`SpriteFactoryLib` (Asset-Loader, Kacheln, Gelände-Übergänge, Pixel-Helfer) →
+`SpriteFactoryChars` (Figuren-Einstiege) → `SpriteFactory` (Beschwörungen,
+Gegner, Props). Alle Aufrufe von außen laufen über `SpriteFactory.*`
+(statische Vererbung).
+
+**`scripts/sprites/RigFactory.gd` steht daneben, nicht in der Kette.** Dort
+werden ALLE Kampffiguren gezeichnet — Helden, 13 Monster, 4 Bosse, Dorf-NPCs:
+Körperteil-Karte → Schattierung je Glied über dessen eigene Ausdehnung →
+farbige Kontur. Eine Lichtrichtung (oben links), eine Tonwertleiter, ein
+Maßstab (`BATTLE_SCALE = 2.0`); die Größe steckt in der Leinwand
+(Held 32x56, Monster 52x52, Boss 112x128), nicht in der Vergrößerung — nur so
+ist ein Pixel bei allen Figuren gleich groß. `SpriteFactoryChars.field_char` /
+`hero_battle_frame` und `SpriteFactory.enemy_frame` reichen nur noch dorthin
+durch. DTII liefert seither ausschließlich Kacheln und Requisiten.
+
+Offen im Rig: Lauf-/Angriffs-/Trefferposen im Kampf (es gibt nur Atmen) und
+Blickrichtungen im Feld (nur Seitenansicht).
+
+### Gelände-Übergänge (`SpriteFactoryLib.edge_overlay`)
+
+Karten werden nicht mehr aus Vollkacheln gestapelt: `TERRAIN_RANK` legt fest,
+welches Gelände in die Kachel des niedrigeren hineingreift (Fels > Weg > Gras >
+Wasser). Die Kante bleibt pixelscharf, mäandert aber über tieffrequentes
+Rauschen; am Saum liegt Kontaktschatten bzw. Ufersaum. Bäume, Häuser, Wände und
+Portalsymbole sind Objekte AUF dem Gelände (`Field.OBJECT_CHARS`), damit der
+Untergrund durchläuft.
 
 ## Befehle
 

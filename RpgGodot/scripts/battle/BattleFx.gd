@@ -377,6 +377,23 @@ func _attack_banner(text: String, color: Color) -> void:
 	tw.tween_callback(banner.queue_free)
 
 ## Kurzer weißer Glanzblitz an der Waffe (Anticipation vor dem Schlag).
+## Kurzzeitige Pose einer Heldin/eines Helden (Angriff, Zauber, Treffer).
+## Das Sprite wird sofort umgesetzt; der laufende Idle-Ticker übernimmt die
+## Pose danach von selbst, bis sie hier wieder auf "idle" zurückfällt.
+func _pose(h: Dictionary, name: String, dur := 0.30) -> void:
+	if h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	h["anim"] = name
+	(h["sprite"] as Sprite2D).texture = \
+		SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], name)
+	var t := get_tree().create_timer(dur)
+	t.timeout.connect(func():
+		if h.get("anim", "") != name or not is_instance_valid(h["sprite"]):
+			return
+		h["anim"] = "idle"
+		(h["sprite"] as Sprite2D).texture = \
+			SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle"))
+
 func _weapon_glint(wp: Sprite2D) -> void:
 	if wp == null or not is_instance_valid(wp):
 		return

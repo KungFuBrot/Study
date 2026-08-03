@@ -7,7 +7,13 @@ const TILE := 16
 const STEP_TIME := 0.18
 # DTII-Feldfiguren sind 16x28: horizontal in der 16er-Kachel zentrieren (x-2)
 # und so anheben, dass die Füße auf dem Kachelboden stehen (y -(28-16)).
-const CHAR_OFFSET := Vector2(-2, -12)
+# Die Rig-Figuren sind 32x56; auf Maßstab 0.5 stehen sie auf der Karte exakt
+# so groß wie früher die 16x28-Sprites, nur doppelt so fein. Der Versatz gilt
+# in Texturpixeln und ist deshalb ebenfalls verdoppelt.
+const FIELD_CHAR_SCALE := 0.5
+const CHAR_OFFSET := Vector2(-4, -24)
+# Verkleinerung des thronenden Bosses auf der Karte (Rig-Boss ist 112x128).
+const FIELD_BOSS_SCALE := 0.30
 
 # Feld-Bosse: welcher Boss in welchem Dungeon thront (bis sein Flag gesetzt ist).
 const FIELD_BOSSES := {
@@ -59,22 +65,38 @@ var hud: Label
 
 # Dunkle Karten: Grundlicht + Laternenfarbe + Wandschmuck (Fackel/Kristall).
 const LIGHTING := {
+	# Die Grundfarbe tönt, sie verdunkelt kaum noch: die Stimmung tragen
+	# Vignette, Punktlichter und Farbgrading — ein Dungeon, in dem man den
+	# Boden nicht sieht, ist nicht atmosphärisch, sondern unlesbar.
 	# Schlotwerk: giftgrüner Dunst, Schleim trieft von den Wänden.
-	"dungeon": {"ambient": Color(0.32, 0.42, 0.32), "lantern": Color(0.85, 1.0, 0.60),
+	"dungeon": {"ambient": Color(0.78, 0.92, 0.70), "lantern": Color(0.85, 1.0, 0.60),
 		"wall_prop": "goo", "light": Color(0.55, 0.95, 0.35)},
 	# Konzernturm: kaltes Marmorlicht mit goldenen Kronleuchter-Kristallen.
-	"dungeon2": {"ambient": Color(0.44, 0.42, 0.36), "lantern": Color(1.0, 0.92, 0.65),
+	"dungeon2": {"ambient": Color(0.88, 0.84, 0.72), "lantern": Color(1.0, 0.92, 0.65),
 		"wall_prop": "crystal", "light": Color(1.0, 0.85, 0.45)},
 	# Hassfestung: rote Banner, glutrote Fackelschächte.
-	"dungeon3": {"ambient": Color(0.42, 0.28, 0.28), "lantern": Color(1.0, 0.72, 0.45),
+	"dungeon3": {"ambient": Color(0.86, 0.62, 0.58), "lantern": Color(1.0, 0.72, 0.45),
 		"wall_prop": "banner_red", "light": Color(1.0, 0.42, 0.22)},
 	# Die Leere: fahles, farbloses Dämmerlicht, kalte graue Kristallsplitter.
-	"dungeon4": {"ambient": Color(0.34, 0.36, 0.40), "lantern": Color(0.78, 0.82, 0.90),
+	"dungeon4": {"ambient": Color(0.74, 0.78, 0.86), "lantern": Color(0.78, 0.82, 0.90),
 		"wall_prop": "crystal", "light": Color(0.70, 0.78, 0.90)},
 }
 
 # Kacheln, die einen Kontaktschatten auf den Boden darunter werfen.
 const SOLID_ABOVE := ["t", "m", "R", "W", "D", "#", "I", "Y"]
+
+# Zeichen, die als Objekt AUF dem Grundgelände stehen (siehe _terrain_at).
+# Berge fehlen hier bewusst: sie sind selbst Gelände und bekommen dadurch
+# ausgefranste Felskanten statt einer Quadratmauer.
+const OBJECT_CHARS := ["t", "R", "W", "D", "b", "#", "I", "Y", "N",
+	"T", "C", "F", "H", "V", "X"]
+# Portale, die im Gebirge liegen statt auf der Wiese.
+const OBJECT_GROUND := {"C": "mount", "F": "mount"}
+# Dungeonwände — bekommen Front/Krone/Masse je nach Lage (siehe _wall_variant).
+const WALL_CHARS := ["#", "I", "Y", "N"]
+# Nachbarreihenfolge für die Übergangs-Bitmaske: im Uhrzeigersinn ab Norden.
+const NEIGHBOR_DIRS := [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
+	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)]
 
 func _ready() -> void:
 	add_child(Fx.glow_environment())
@@ -94,14 +116,14 @@ func _add_lighting() -> void:
 		# Auch Tageslicht-Karten leicht abdunkeln — gedecktere, realistischere
 		# Grundstimmung statt Bilderbuch-Helligkeit.
 		var soft := CanvasModulate.new()
-		soft.color = Color(0.86, 0.84, 0.88)
+		soft.color = Color(0.94, 0.92, 0.95)
 		add_child(soft)
 		return
 	var cfg: Dictionary = LIGHTING[map_id]
 	var cm := CanvasModulate.new()
 	cm.color = cfg["ambient"]
 	add_child(cm)
-	var lantern := Fx.point_light(cfg["lantern"], 90.0, 1.1)
+	var lantern := Fx.point_light(cfg["lantern"], 135.0, 1.25)
 	lantern.position = Vector2(6, 8)
 	player.add_child(lantern)
 	# Wandlichter überall dort, wo unter einer Wand freier Boden liegt.
@@ -296,18 +318,117 @@ func _build_tiles() -> void:
 	for y in rows.size():
 		var row: String = rows[y]
 		for x in row.length():
-			var ch := row[x]
-			var kind: String = MapData.TILE_FOR_CHAR[ch]
+			var terr := _terrain_at(x, y)
 			var s := Sprite2D.new()
-			s.texture = SpriteFactory.tile_at(kind, x, y)
+			s.texture = SpriteFactory.tile_at(terr, x, y)
 			s.centered = false
 			s.position = Vector2(x * TILE, y * TILE)
-			if kind == "water":
+			if terr == "water":
 				s.material = Fx.water_material()  # sanftes Wogen + Glanzlichter
 				water_tiles.append(s)
 			add_child(s)
+			_add_terrain_edges(x, y, terr)
+			var ch := row[x]
+			if OBJECT_CHARS.has(ch):
+				_place_map_object(ch, x, y)
 	_add_tile_details()
 	_add_plague_signs()
+
+## Gelände unter einer Kartenposition. Bäume, Berge, Häuser, Wände und
+## Portalsymbole sind Objekte, die auf dem Grundgelände der Karte STEHEN —
+## dadurch laufen Gras, Ufer und Wege ununterbrochen darunter hindurch,
+## statt an jeder Blockkante hart abzubrechen.
+func _terrain_at(x: int, y: int) -> String:
+	var rows: Array = map["rows"]
+	if y < 0 or y >= rows.size():
+		return ""
+	var row: String = rows[y]
+	if x < 0 or x >= row.length():
+		return ""
+	var ch := row[x]
+	if ch == "b":
+		return "water"  # die Brücke steht im Fluss
+	if OBJECT_GROUND.has(ch):
+		return OBJECT_GROUND[ch]
+	if OBJECT_CHARS.has(ch):
+		return map.get("ground", "grass")
+	return MapData.TILE_FOR_CHAR[ch]
+
+## Übergänge: jedes höherrangige Nachbargelände greift in diese Kachel hinein
+## (Ufer, Wegränder). Ohne das stoßen Gras/Weg/Wasser mit Linealkanten
+## aneinander und die Karte wirkt wie ein Tabellenblatt.
+func _add_terrain_edges(x: int, y: int, terr: String) -> void:
+	var rank: int = SpriteFactory.TERRAIN_RANK.get(terr, -1)
+	if rank < 0:
+		return
+	var masks := {}
+	for i in NEIGHBOR_DIRS.size():
+		var d: Vector2i = NEIGHBOR_DIRS[i]
+		var nt := _terrain_at(x + d.x, y + d.y)
+		if SpriteFactory.TERRAIN_RANK.get(nt, -1) > rank:
+			masks[nt] = int(masks.get(nt, 0)) | (1 << i)
+	var kinds: Array = masks.keys()
+	kinds.sort_custom(func(a: String, b: String) -> bool:
+		return SpriteFactory.TERRAIN_RANK[a] < SpriteFactory.TERRAIN_RANK[b])
+	for k: String in kinds:
+		var ov := Sprite2D.new()
+		ov.texture = SpriteFactory.edge_overlay(k, terr, masks[k], x, y)
+		ov.centered = false
+		ov.position = Vector2(x * TILE, y * TILE)
+		add_child(ov)
+
+## Objekt auf dem Grundgelände: Baum, Berg, Hauswand, Portalsymbol, Dungeonwand.
+func _place_map_object(ch: String, x: int, y: int) -> void:
+	if ch == "t":
+		_place_tree(x, y)
+		return
+	var s := Sprite2D.new()
+	s.texture = SpriteFactory.tile_at(_wall_variant(ch, x, y), x, y)
+	s.centered = false
+	s.position = Vector2(x * TILE, y * TILE)
+	s.z_index = 2
+	add_child(s)
+
+## Dungeonwände dreistufig statt überall dieselbe Ziegelfläche: die Reihe am
+## Boden zeigt die Ziegelfront, die Reihe darüber die Mauerkrone, alles
+## dahinter bleibt dunkle Masse. Erst dadurch liest man im Dunkeln, wo der
+## begehbare Boden aufhört.
+func _wall_variant(ch: String, x: int, y: int) -> String:
+	var kind: String = MapData.TILE_FOR_CHAR[ch]
+	if not WALL_CHARS.has(ch):
+		return kind
+	if MapData.WALKABLE.has(_char_at(x, y + 1)):
+		return kind  # Ziegelfront zum Boden hin
+	if MapData.WALKABLE.has(_char_at(x, y + 2)):
+		return "wall_crown"
+	return "wall_deep"
+
+func _char_at(x: int, y: int) -> String:
+	var rows: Array = map["rows"]
+	if y < 0 or y >= rows.size():
+		return ""
+	var row: String = rows[y]
+	if x < 0 or x >= row.length():
+		return ""
+	return row[x]
+
+## Baum als 16x48-Säule: Krone ragt zwei Kacheln nach oben, Fuß steht auf der
+## eigenen Kachel. Weil die Reihen von oben nach unten gebaut werden,
+## überdecken vordere Bäume automatisch die dahinterliegenden.
+func _place_tree(x: int, y: int) -> void:
+	var n := _tile_noise(x, y)
+	var s := Sprite2D.new()
+	s.texture = SpriteFactory.tree_tex(int(n * 977.0))
+	s.centered = false
+	s.position = Vector2(x * TILE, y * TILE + TILE - SpriteFactory.TREE_H)
+	s.z_index = 3
+	add_child(s)
+	var sh := Sprite2D.new()
+	sh.texture = SpriteFactory.shadow(7, 3)
+	sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sh.position = Vector2(x * TILE + 8, y * TILE + 13)
+	sh.z_index = 1
+	add_child(sh)
 
 ## Detailschicht über den Kacheln: Kontaktschatten unter massiven Kacheln
 ## (verankert Wände und Bäume am Boden) plus gestreute Requisiten.
@@ -580,6 +701,7 @@ func _spawn_npcs() -> void:
 		s.texture = SpriteFactory.character(npc["id"], "down", 0)
 		s.centered = false
 		s.offset = CHAR_OFFSET
+		s.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 		s.position = Vector2(npc["pos"].x * TILE + 2, npc["pos"].y * TILE)
 		s.z_index = 5
 		add_child(s)
@@ -594,9 +716,13 @@ func _spawn_npcs() -> void:
 		var bs := Sprite2D.new()
 		bs.texture = SpriteFactory.enemy(cfg["id"])
 		bs.centered = false
+		# Die Rig-Bosse sind für den Kampf ausgelegt (112x128). Auf der Karte
+		# müssen sie auf etwa zwei Kacheln herunter, sonst füllt der Boss den
+		# halben Bildschirm.
+		bs.scale = Vector2(FIELD_BOSS_SCALE, FIELD_BOSS_SCALE)
 		# Sprite mittig über der Kachel, Füße auf dem Kachelboden.
-		var tw2 := bs.texture.get_width()
-		var th := bs.texture.get_height()
+		var tw2 := bs.texture.get_width() * FIELD_BOSS_SCALE
+		var th := bs.texture.get_height() * FIELD_BOSS_SCALE
 		bs.position = Vector2(boss_tile.x * TILE + 8 - tw2 / 2.0, boss_tile.y * TILE + TILE - th + 1)
 		bs.z_index = 5
 		add_child(bs)
@@ -651,18 +777,21 @@ func _spawn_party() -> void:
 	player = Sprite2D.new()
 	player.centered = false
 	player.offset = CHAR_OFFSET
+	player.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	player.z_index = 10
 	add_child(player)
 	_attach_drop_shadow(player)
 	follower = Sprite2D.new()
 	follower.centered = false
 	follower.offset = CHAR_OFFSET
+	follower.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	follower.z_index = 9
 	add_child(follower)
 	_attach_drop_shadow(follower)
 	follower2 = Sprite2D.new()
 	follower2.centered = false
 	follower2.offset = CHAR_OFFSET
+	follower2.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	follower2.z_index = 8
 	add_child(follower2)
 	_attach_drop_shadow(follower2)
@@ -692,7 +821,10 @@ func _attach_drop_shadow(s: Sprite2D) -> void:
 	var sh := Sprite2D.new()
 	sh.texture = SpriteFactory.shadow(5, 2)
 	sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sh.position = Vector2(6, 15)
+	# Die Figur steht auf FIELD_CHAR_SCALE — Kinder erben das, also müssen
+	# Ort und Größe des Schattens gegengerechnet werden.
+	sh.position = Vector2(6, 15) / FIELD_CHAR_SCALE
+	sh.scale = Vector2(1.0, 1.0) / FIELD_CHAR_SCALE
 	sh.show_behind_parent = true
 	s.add_child(sh)
 
@@ -702,18 +834,23 @@ func _dir_name(d: Vector2i) -> String:
 	return "side"
 
 func _update_sprites() -> void:
-	player.texture = SpriteFactory.field_char("serena", moving, anim_frame)
-	player.flip_h = facing.x < 0
+	# Blickrichtung: nach oben/unten gibt es eigene Ansichten (Rücken bzw.
+	# Gesicht), seitwärts wird die Seitenansicht gespiegelt.
+	var pd := _dir_name(facing)
+	player.texture = SpriteFactory.field_char("serena", moving, anim_frame, pd)
+	player.flip_h = pd == "side" and facing.x < 0
 	var fd := player_tile - follower_tile
 	if fd == Vector2i.ZERO:
 		fd = facing
-	follower.texture = SpriteFactory.field_char("milo", moving, anim_frame)
-	follower.flip_h = fd.x < 0
+	var fdn := _dir_name(fd)
+	follower.texture = SpriteFactory.field_char("milo", moving, anim_frame, fdn)
+	follower.flip_h = fdn == "side" and fd.x < 0
 	var fd2 := follower_tile - follower2_tile
 	if fd2 == Vector2i.ZERO:
 		fd2 = fd
-	follower2.texture = SpriteFactory.field_char("rax", moving, anim_frame)
-	follower2.flip_h = fd2.x < 0
+	var fd2n := _dir_name(fd2)
+	follower2.texture = SpriteFactory.field_char("rax", moving, anim_frame, fd2n)
+	follower2.flip_h = fd2n == "side" and fd2.x < 0
 
 func _process(delta: float) -> void:
 	# Weiterlaufende Idle-/Lauf-Animation (4 Frames, ~7 fps).
@@ -854,7 +991,7 @@ func _build_ui() -> void:
 	grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(grade)
 	var vig := TextureRect.new()
-	vig.texture = SpriteFactory.vignette(240, 135, 0.45)
+	vig.texture = SpriteFactory.vignette(240, 135, 0.34)
 	vig.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.set_anchors_preset(Control.PRESET_FULL_RECT)

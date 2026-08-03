@@ -56,6 +56,10 @@ const DTII_TILES := {
 	"floor": "floor_1", "dwall": "wall_mid",
 	"ice": "floor_2", "iwall": "wall_mid",
 	"hfloor": "floor_3", "hwall": "wall_mid",
+	# Mauerkrone: die Oberkante der Wand, eine Reihe über der Ziegelfront.
+	"wall_crown": "wall_top_mid",
+	# Dungeon-Ausgang: Leiter im Boden statt einer Erdkachel im Gemäuer.
+	"exit": "floor_ladder",
 }
 
 # Requisiten, die direkt aus DTII-Frames kommen (statt PROP_ART).
@@ -111,24 +115,248 @@ const KENNEY_STRIDE := 17  # 16px-Kacheln mit 1px Abstand
 
 # Kartenzeichen → Kenney-Zelle (Spalte, Zeile). Nur Terrain; Häuser/Marker
 # und Dungeon-Kacheln kommen weiterhin von anderswo.
+# Der Weg lag früher auf (0,25) — das ist im Sheet ein Holzdielenboden für
+# Innenräume und sah auf der Karte wie eine braune Platte aus. (6,0) ist
+# echter Erdboden.
+# Der Berg lag früher auf (6,14) — das ist ein einzelnes Felsbruchstück, das
+# als Vollkachel eine Quadratmauer ergab. (7,0) ist glatter Fels als Fläche;
+# die Form entsteht jetzt über die Übergangskanten.
 const KENNEY_TILES := {
-	"grass": Vector2i(0, 15), "tree": Vector2i(13, 10), "path": Vector2i(0, 25),
-	"water": Vector2i(0, 0), "mount": Vector2i(6, 14),
+	"grass": Vector2i(0, 15), "tree": Vector2i(13, 10), "path": Vector2i(6, 0),
+	"water": Vector2i(0, 0), "mount": Vector2i(7, 0),
 }
 
 # Mehrere gleichwertige Voll-Kacheln pro Terrain → bricht den Rastereindruck.
 const KENNEY_VARIANTS := {
 	"grass": [Vector2i(0, 15), Vector2i(1, 15), Vector2i(0, 16), Vector2i(1, 16)],
 	"water": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)],
-	"path": [Vector2i(0, 25), Vector2i(1, 25), Vector2i(0, 26), Vector2i(1, 26)],
+	"path": [Vector2i(6, 0), Vector2i(6, 1)],
+	"mount": [Vector2i(7, 0), Vector2i(9, 0)],
 }
+
+# Der Kenney-Fels ist als helles Pflaster gedacht; als Gebirge muss er
+# abgedunkelt und leicht kühl getönt werden, sonst wirkt er wie Beton.
+const KENNEY_TINT := {"mount": Color(0.72, 0.74, 0.80)}
+
+## ---------- Gelände-Übergänge (Autotiling) ----------
+
+# Rangfolge des Geländes: Höherwertiges blutet in die Kachel des Niedrigeren
+# hinein. Wasser liegt zuunterst (Land bildet das Ufer), Wege liegen obenauf.
+# Gelände ohne Eintrag bekommt keine Übergänge (Dungeonböden, Brücken).
+const TERRAIN_RANK := {"water": 0, "grass": 1, "path": 2, "mount": 3}
+
+# Nachbar-Bitmaske, im Uhrzeigersinn ab Norden.
+const M_N := 1
+const M_NE := 2
+const M_E := 4
+const M_SE := 8
+const M_S := 16
+const M_SW := 32
+const M_W := 64
+const M_NW := 128
+
+# Wie weit (in Pixeln) das höhere Gelände über die Kachelkante greift.
+const EDGE_REACH := 7.0
+# Wie stark das Rauschen die Kante auslenkt (0.55 ≈ ±2 Pixel Mäander).
+const EDGE_WOBBLE := 0.55
+# Kachelperiode des Kantenrauschens. Kleine Zahl = kleiner Kachel-Cache,
+# große Zahl = weniger Wiederholung. 8 Kacheln = 128 px, das sieht niemand.
+const EDGE_WRAP := 8
+
+static var _edge_noise: FastNoiseLite
+
+## Übergangskachel: Gelände `over` greift gemäß Nachbarmaske in die Kachel des
+## darunter liegenden Geländes `under` hinein. Die Kante bleibt pixelscharf
+## (Pixel-Art verträgt keinen Weichzeichner), mäandert aber durch tieffrequentes
+## Rauschen um mehrere Pixel — das ist der Unterschied zwischen „Tabellenzelle"
+## und „gewachsenem Gelände". Am Saum liegt eine Kontaktkante: Schatten an
+## Land/Land-Übergängen, heller Schaum am Ufer.
+## `tx`/`ty` sind die Kachelkoordinaten — das Rauschen läuft in Weltkoordinaten
+## weiter, damit lange Ufer nicht in Kachelmustern zerfallen.
+static func edge_overlay(over: String, under: String, mask: int, tx: int, ty: int) -> Texture2D:
+	var vx := tx % EDGE_WRAP
+	var vy := ty % EDGE_WRAP
+	var key := "edge_%s_%s_%d_%d_%d" % [over, under, mask, vx, vy]
+	if _cache.has(key):
+		return _cache[key]
+	if _edge_noise == null:
+		_edge_noise = FastNoiseLite.new()
+		_edge_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+		_edge_noise.frequency = 0.11
+		_edge_noise.seed = 4711
+	var rim := Color(0.86, 0.95, 1.0, 0.5) if under == "water" else Color(0, 0, 0, 0.22)
+	var src := _tile_image(over)
+	var img := _img(TILE, TILE)
+	for y in TILE:
+		for x in TILE:
+			var d := _edge_coverage(mask, x, y)
+			if d <= 0.0:
+				continue
+			var n := _edge_noise.get_noise_2d(vx * TILE + x, vy * TILE + y)
+			var t := d + n * EDGE_WOBBLE
+			if t > 0.5:
+				img.set_pixel(x, y, src.get_pixel(x, y))
+			elif t > 0.30:
+				img.set_pixel(x, y, rim)
+	var t2 := _tex(img)
+	_cache[key] = t2
+	return t2
+
+# Deckungsgrad an der Stelle (x,y): 1.0 an der Kachelkante zum höheren
+# Gelände hin, 0.0 ab EDGE_REACH Pixeln Abstand.
+static func _edge_coverage(mask: int, x: int, y: int) -> float:
+	# Liegt das höhere Gelände auf beiden gegenüberliegenden Seiten, ist diese
+	# Kachel ein schmaler Streifen (einreihiger Weg, enger Fluss). Dann greift
+	# der Übergang von beiden Seiten — ohne Drosselung wäre der Streifen weg.
+	var rx := EDGE_REACH * (0.5 if (mask & M_W) and (mask & M_E) else 1.0)
+	var ry := EDGE_REACH * (0.5 if (mask & M_N) and (mask & M_S) else 1.0)
+	var rd := minf(rx, ry)
+	var d := 0.0
+	if mask & M_N:
+		d = maxf(d, 1.0 - float(y) / ry)
+	if mask & M_S:
+		d = maxf(d, 1.0 - float(TILE - 1 - y) / ry)
+	if mask & M_W:
+		d = maxf(d, 1.0 - float(x) / rx)
+	if mask & M_E:
+		d = maxf(d, 1.0 - float(TILE - 1 - x) / rx)
+	# Diagonalen füllen nur dann die Ecke, wenn keine der beiden anliegenden
+	# Seiten ohnehin schon deckt — sonst entstünde eine Doppelkante.
+	if (mask & M_NW) and not (mask & (M_N | M_W)):
+		d = maxf(d, 1.0 - Vector2(x, y).length() / rd)
+	if (mask & M_NE) and not (mask & (M_N | M_E)):
+		d = maxf(d, 1.0 - Vector2(TILE - 1 - x, y).length() / rd)
+	if (mask & M_SW) and not (mask & (M_S | M_W)):
+		d = maxf(d, 1.0 - Vector2(x, TILE - 1 - y).length() / rd)
+	if (mask & M_SE) and not (mask & (M_S | M_E)):
+		d = maxf(d, 1.0 - Vector2(TILE - 1 - x, TILE - 1 - y).length() / rd)
+	return d
+
+## Rohbild einer Kachel (für Übergänge). Kenney-Zellen werden direkt aus dem
+## Sheet geschnitten — AtlasTexture-Bilder sind dafür nicht verlässlich.
+static func _tile_image(kind: String) -> Image:
+	var key := "timg_" + kind
+	if _cache.has(key):
+		return _cache[key]
+	var img: Image
+	if KENNEY_TILES.has(kind):
+		img = _kenney_cell_image(KENNEY_TILES[kind], kind)
+	else:
+		img = tile(kind).get_image()
+		img.convert(Image.FORMAT_RGBA8)
+	_cache[key] = img
+	return img
+
+static var _kenney_img: Image
+
+static func _kenney_image() -> Image:
+	if _kenney_img == null:
+		if _kenney_sheet == null:
+			_kenney_sheet = load(KENNEY_SHEET)
+		_kenney_img = _kenney_sheet.get_image()
+		_kenney_img.convert(Image.FORMAT_RGBA8)
+	return _kenney_img
+
+static func _kenney_rect(cell: Vector2i) -> Rect2i:
+	return Rect2i(cell.x * KENNEY_STRIDE, cell.y * KENNEY_STRIDE, TILE, TILE)
+
+## Einzelzelle als Bild, bei getönten Geländearten gleich eingefärbt — damit
+## Basiskachel und Übergangskante dieselbe Farbe haben.
+static func _kenney_cell_image(cell: Vector2i, kind: String) -> Image:
+	var img := _img(TILE, TILE)
+	img.blit_rect(_kenney_image(), _kenney_rect(cell), Vector2i.ZERO)
+	if KENNEY_TINT.has(kind):
+		var t: Color = KENNEY_TINT[kind]
+		for y in TILE:
+			for x in TILE:
+				var c := img.get_pixel(x, y)
+				img.set_pixel(x, y, Color(c.r * t.r, c.g * t.g, c.b * t.b, c.a))
+	return img
+
+static func _kenney_tinted(cell: Vector2i, kind: String) -> Texture2D:
+	var key := "ktint_%s_%d_%d" % [kind, cell.x, cell.y]
+	if _cache.has(key):
+		return _cache[key]
+	var t := _tex(_kenney_cell_image(cell, kind))
+	_cache[key] = t
+	return t
+
+## ---------- Bäume (drei Kacheln hoch) ----------
+
+# Im Sheet steht jeder Baum als 16x48-Säule (Krone, Mitte, Stamm) in drei
+# Zellen übereinander. Angegeben ist die oberste Zelle. Bisher wurde nur der
+# einzelne Busch (13,10) benutzt — daher der „Heckenwall"-Eindruck.
+# Überwiegend Grüntöne, ein Herbstbaum als seltener Farbtupfer.
+const KENNEY_TREES := [Vector2i(15, 9), Vector2i(16, 9), Vector2i(18, 9),
+	Vector2i(15, 9), Vector2i(16, 9), Vector2i(14, 9)]
+const TREE_H := TILE * 3
+
+## Baum als eine 16x48-Textur; die 1px-Fugen des Sheets werden dabei entfernt.
+static func tree_tex(variant: int) -> Texture2D:
+	var key := "tree3_%d" % variant
+	if _cache.has(key):
+		return _cache[key]
+	var cell: Vector2i = KENNEY_TREES[variant % KENNEY_TREES.size()]
+	var img := _img(TILE, TREE_H)
+	for i in 3:
+		img.blit_rect(_kenney_image(), _kenney_rect(cell + Vector2i(0, i)), Vector2i(0, i * TILE))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
+## ---------- Dungeonböden: aufgehellt und variiert ----------
+
+# Die DTII-Böden sind mit einem Mittelwert von 0.25 sehr dunkel. Zusammen mit
+# Vignette, Farbgrading und Tiefenunschärfe (zusammen rund 0.5) blieb davon
+# fast Schwarz übrig — man sah im Dungeon buchstäblich den Boden nicht. Also
+# werden sie beim Laden angehoben; die Stimmung tragen weiterhin Grundlicht,
+# Punktlichter und Vignette.
+# Die drei Riss-Böden sind auffällige Einzelmotive — als gleichwertige
+# Varianten wiederholen sie sich sichtbar. Deshalb bleibt floor_1 die Fläche,
+# die Risse sind seltene Akzente.
+const DTII_FLOOR_ACCENTS := ["floor_2", "floor_3", "floor_4"]
+const DUNGEON_FLOORS := ["floor", "ice", "hfloor"]
+# Aufhellung als Gamma, nicht als Faktor: die dunkle Fläche steigt deutlich,
+# die ohnehin hellen Fugenränder kaum — ein linearer Faktor hatte daraus ein
+# grelles Kachelgitter gemacht.
+const FLOOR_GAMMA := 0.62
+const WALL_GAMMA := 0.78
+
+## Aufgehellte Kopie eines DTII-Frames (gecacht).
+static func _lifted(frame: String, gamma: float) -> Texture2D:
+	var key := "lift_%s_%f" % [frame, gamma]
+	if _cache.has(key):
+		return _cache[key]
+	var img := dtii(frame).get_image()
+	img.convert(Image.FORMAT_RGBA8)
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			img.set_pixel(x, y, Color(pow(c.r, gamma), pow(c.g, gamma), pow(c.b, gamma), c.a))
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
+# Ruhige Fläche aus floor_1, jede achte Kachel ein Riss als Akzent.
+static func _dungeon_floor(x: int, y: int) -> Texture2D:
+	var h := ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff
+	if h % 8 == 0:
+		return _lifted(DTII_FLOOR_ACCENTS[(h / 8) % DTII_FLOOR_ACCENTS.size()], FLOOR_GAMMA)
+	return _lifted("floor_1", FLOOR_GAMMA)
 
 ## Kachel für Kartenposition (x,y) mit deterministischer Variation (falls vorhanden).
 static func tile_at(kind: String, x: int, y: int) -> Texture2D:
+	if DUNGEON_FLOORS.has(kind):
+		return _dungeon_floor(x, y)
+	if kind == "dwall" or kind == "iwall" or kind == "hwall":
+		return _lifted("wall_mid", WALL_GAMMA)
+	if kind == "wall_crown":
+		return _lifted("wall_top_mid", WALL_GAMMA)
 	if KENNEY_VARIANTS.has(kind):
 		var vs: Array = KENNEY_VARIANTS[kind]
 		var h := ((x * 73856093) ^ (y * 19349663)) & 0x7fffffff
-		return _kenney(vs[h % vs.size()])
+		var cell: Vector2i = vs[h % vs.size()]
+		return _kenney_tinted(cell, kind) if KENNEY_TINT.has(kind) else _kenney(cell)
 	return tile(kind)
 
 static var _kenney_sheet: Texture2D
@@ -251,6 +479,10 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 		"dwall":
 			if y % 4 == 0 or (x + (y / 4) * 2) % 6 == 0: return Color(0.12, 0.11, 0.16)
 			return Color(0.20, 0.18, 0.26)
+		"wall_deep":
+			# Mauermasse hinter der Krone: ruhige dunkle Fläche, damit das Auge
+			# an der Kante hängen bleibt statt an endlosem Ziegelmuster.
+			return Color(0.26, 0.25, 0.30) if n > 0.25 else Color(0.22, 0.21, 0.26)
 		"mount":
 			var ridge := absf(float(x) - 8.0) + float(15 - y) * 0.8
 			if ridge < 6.0: return Color(0.55, 0.50, 0.46) if n > 0.3 else Color(0.62, 0.58, 0.54)
@@ -266,7 +498,9 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			if y >= 9 and x > 1 and x < 15:
 				if y <= 10: return Color(0.28, 0.25, 0.29)
 				return Color(0.45, 0.41, 0.43) if (x % 4 != 0) else Color(0.38, 0.34, 0.37)
-			return _tile_color("mount", x, y)
+			# Der Rest bleibt frei: das Symbol steht auf dem echten Gelände,
+			# sonst sitzt eine fremde Kachel als Loch in der Landschaft.
+			return Color(0, 0, 0, 0)
 		"ice":
 			if (x * 2 + y) % 11 == 0: return Color(0.44, 0.62, 0.82)
 			var ci := Color(0.62, 0.80, 0.94)
@@ -284,7 +518,7 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 					if y % 3 == 1 and x % 2 == 0: return Color(0.32, 0.52, 0.72)
 					return Color(0.80, 0.78, 0.76)
 			if y >= 13 and x > 3 and x < 13: return Color(0.58, 0.56, 0.58)
-			return _tile_color("mount", x, y)
+			return Color(0, 0, 0, 0)
 		"keep_icon":
 			# Rotes Banner über dem Tor
 			if x >= 7 and x <= 8 and y >= 1 and y < 4: return Color(0.72, 0.12, 0.14)
@@ -294,12 +528,15 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			if y >= 6 and y < 14 and x > 2 and x < 14:
 				if x >= 7 and x <= 9 and y >= 10: return Color(0.08, 0.06, 0.09)
 				return Color(0.30, 0.26, 0.30) if n > 0.25 else Color(0.26, 0.22, 0.26)
-			return _tile_color("grass", x, y)
+			return Color(0, 0, 0, 0)
 		"town_icon":
 			if y > 9 and x > 2 and x < 13: return Color(0.75, 0.68, 0.55)
 			if y > 5 and y <= 9 and x > 1 and x < 14: return Color(0.66, 0.24, 0.20)
-			return _tile_color("grass", x, y)
+			return Color(0, 0, 0, 0)
 		"bridge":
+			# Steg mit freien Rändern: der Fluss läuft sichtbar darunter durch.
+			if y < 2 or y > 13: return Color(0, 0, 0, 0)
+			if y == 2 or y == 13: return Color(0.28, 0.19, 0.10)
 			if y % 3 == 0: return Color(0.45, 0.32, 0.18)
 			return Color(0.55, 0.40, 0.22)
 		"void":
@@ -317,9 +554,7 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			if x >= 7 and x <= 9 and y >= 2 and y < 14:
 				return Color(0.30, 0.31, 0.34) if n > 0.3 else Color(0.23, 0.24, 0.27)
 			if x >= 6 and x <= 10 and y >= 12 and y < 14: return Color(0.18, 0.19, 0.22)
-			var g := _tile_color("grass", x, y)
-			var lum := (g.r + g.g + g.b) / 3.0
-			return Color(lum * 0.7 + 0.07, lum * 0.72 + 0.07, lum * 0.7 + 0.1)
+			return Color(0, 0, 0, 0)
 	return Color.MAGENTA
 
 ## ---------- Charaktere (12x16, prozedural, 2 Laufframes) ----------

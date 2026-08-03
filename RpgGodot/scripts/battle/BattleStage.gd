@@ -6,9 +6,34 @@ extends BattleFx
 ## BattleBase > BattleFx > BattleStage > BattleUi > BattleBossCine > BattleDamage
 ## > BattleHeroActions > BattleRaxActions > BattleSummons > BattleEnemyActions > Battle
 
-## Farbstimmung des Schauplatzes (Schlotwerk giftgrün, Konzernturm golden,
-## Hassfestung blutrot).
+var _pal_cache: Dictionary = {}
+
+# Himmel, Boden und Fels waren so dunkel angelegt, dass von der ganzen
+# Tiefenstaffelung im fertigen Bild nichts mehr ankam: Ambiente, Vignette und
+# Farbgrading nehmen zusammen rund die Hälfte weg, und aus 0.18 wird dabei
+# 0.09 — also Schwarz. Die Kulisse wird deshalb angehoben; dunkel bleiben
+# jetzt die Silhouetten, und die heben sich gegen den helleren Himmel ab.
+const STAGE_LIFT := {
+	"bg_top": 2.4, "bg_bottom": 2.0,
+	"floor_top": 1.8, "floor_bottom": 1.8, "stone": 1.35,
+	# Grundlicht: seit die Figuren aus dem Rig kommen (eigene, teils dunkle
+	# Farben statt heller DTII-Grautöne) war die alte Abdunklung zu viel.
+	"ambient": 1.28,
+}
+
+## Farbstimmung des Schauplatzes, angehoben (Schlotwerk giftgrün,
+## Konzernturm golden, Hassfestung blutrot).
 func _palette() -> Dictionary:
+	if _pal_cache.is_empty():
+		_pal_cache = _palette_raw()
+		for k: String in STAGE_LIFT:
+			var c: Color = _pal_cache[k]
+			var f: float = STAGE_LIFT[k]
+			_pal_cache[k] = Color(minf(c.r * f, 1.0), minf(c.g * f, 1.0),
+				minf(c.b * f, 1.0), c.a)
+	return _pal_cache
+
+func _palette_raw() -> Dictionary:
 	var boss_fight := not boss_def.is_empty()
 	match arena_theme:
 		"gold":
@@ -65,6 +90,110 @@ func _palette() -> Dictionary:
 			}
 
 
+## Kulissen-Silhouette je Schauplatz. Vorher standen überall dieselben
+## Dreiecke — dadurch sahen alle vier Arenen gleich aus und die Kulisse las
+## sich als Farbverlauf. Grundlinie ist y = 0, die Form wächst nach oben.
+func _skyline_shape(i: int, w: float, h: float) -> PackedVector2Array:
+	var hw := w * 0.5
+	match arena_theme:
+		"gold":
+			# Konzernturm: gestufter Hochhausriegel mit Antennenspitze.
+			var sw := hw * 0.34
+			return PackedVector2Array([
+				Vector2(-hw, 0), Vector2(-hw, -h * 0.72),
+				Vector2(-hw * 0.62, -h * 0.72), Vector2(-hw * 0.62, -h * 0.93),
+				Vector2(-sw, -h * 0.93), Vector2(-sw * 0.35, -h),
+				Vector2(sw * 0.35, -h), Vector2(sw, -h * 0.93),
+				Vector2(hw * 0.62, -h * 0.93), Vector2(hw * 0.62, -h * 0.72),
+				Vector2(hw, -h * 0.72), Vector2(hw, 0)])
+		"hate":
+			# Festungsmauer mit Zinnenkranz.
+			var pts := PackedVector2Array([Vector2(-hw, 0), Vector2(-hw, -h)])
+			var merlons := 4
+			var step := w / float(merlons * 2)
+			for k in merlons * 2:
+				var x0 := -hw + k * step
+				var top := -h - (h * 0.11 if k % 2 == 0 else 0.0)
+				pts.append(Vector2(x0, top))
+				pts.append(Vector2(x0 + step, top))
+			pts.append(Vector2(hw, -h))
+			pts.append(Vector2(hw, 0))
+			return pts
+		"void":
+			# Zersplitterter Monolith, schief und oben abgebrochen.
+			var lean := hw * 0.32 * (1.0 if i % 2 == 0 else -1.0)
+			return PackedVector2Array([
+				Vector2(-hw, 0), Vector2(-hw * 0.55 + lean, -h * 0.62),
+				Vector2(-hw * 0.30 + lean, -h), Vector2(hw * 0.12 + lean, -h * 0.78),
+				Vector2(hw * 0.48 + lean, -h * 0.90), Vector2(hw * 0.60, -h * 0.40),
+				Vector2(hw, 0)])
+		_:
+			# Schlotwerk: Fabrikschlot mit verbreitertem Fuß und Kragen.
+			var cw := hw * 0.40
+			return PackedVector2Array([
+				Vector2(-hw, 0), Vector2(-hw * 0.72, -h * 0.16),
+				Vector2(-cw, -h * 0.30), Vector2(-cw, -h * 0.88),
+				Vector2(-cw * 1.35, -h * 0.88), Vector2(-cw * 1.35, -h),
+				Vector2(cw * 1.35, -h), Vector2(cw * 1.35, -h * 0.88),
+				Vector2(cw, -h * 0.88), Vector2(cw, -h * 0.30),
+				Vector2(hw * 0.72, -h * 0.16), Vector2(hw, 0)])
+
+## Details der vordersten Kulissenebene: beleuchtete Fenster im Konzernturm,
+## Rauch aus den Schloten, Glut auf den Zinnen, Splitterglimmen in der Leere.
+func _skyline_detail(shape: Polygon2D, i: int, w: float, h: float, pal: Dictionary) -> void:
+	match arena_theme:
+		"gold":
+			var cols := 3
+			var rows := maxi(3, int(h / 34.0))
+			for r in rows:
+				for c in cols:
+					if (i * 7 + r * 3 + c) % 3 == 0:
+						continue  # dunkle Büros, sonst wirkt es wie ein Lichtgitter
+					var win := Polygon2D.new()
+					var wx: float = (c - 1) * w * 0.20
+					var wy: float = -h * 0.14 - r * (h * 0.58 / rows)
+					win.polygon = PackedVector2Array([
+						Vector2(wx - 3, wy), Vector2(wx + 3, wy),
+						Vector2(wx + 3, wy + 6), Vector2(wx - 3, wy + 6)])
+					win.color = Color(1.0, 0.86, 0.45, 0.55)
+					shape.add_child(win)
+		"hate":
+			var ember := Sprite2D.new()
+			ember.texture = SpriteFactory.circle(9, Color(1.0, 0.38, 0.14, 0.30))
+			ember.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			ember.material = _additive_mat()
+			ember.position = Vector2(0, -h)
+			shape.add_child(ember)
+		"void":
+			var shard := Sprite2D.new()
+			shard.texture = SpriteFactory.circle(7, Color(0.72, 0.80, 0.95, 0.22))
+			shard.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			shard.material = _additive_mat()
+			shard.position = Vector2(0, -h * 0.85)
+			shape.add_child(shard)
+		_:
+			# Qualm quillt aus dem Schlot — das Wahrzeichen des Schlotwerks.
+			var smoke := CPUParticles2D.new()
+			smoke.amount = 9
+			smoke.lifetime = 4.5
+			smoke.preprocess = 4.5
+			smoke.position = Vector2(0, -h)
+			smoke.direction = Vector2(0.25, -1)
+			smoke.spread = 12.0
+			smoke.gravity = Vector2(6, -10)
+			smoke.initial_velocity_min = 8.0
+			smoke.initial_velocity_max = 16.0
+			smoke.scale_amount_min = 0.25
+			smoke.scale_amount_max = 0.55
+			smoke.color = Color(pal["fog"].r, pal["fog"].g, pal["fog"].b, 0.16)
+			smoke.texture = SpriteFactory.particle("smoke_07")
+			shape.add_child(smoke)
+
+static func _additive_mat() -> CanvasItemMaterial:
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	return m
+
 func _build_scene() -> void:
 	add_child(Fx.glow_environment())
 	cam = Camera2D.new()
@@ -117,10 +246,14 @@ func _build_scene() -> void:
 			var stal := Polygon2D.new()
 			var w: float = spec["w0"] + fmod(i * 37.0 + li * 23.0, 50.0)
 			var hh: float = spec["h0"] + fmod(i * 73.0 + li * 41.0, spec["hv"])
-			stal.polygon = PackedVector2Array([Vector2(-w / 2, 0), Vector2(0, -hh), Vector2(w / 2, 0)])
+			stal.polygon = _skyline_shape(i, w, hh)
 			stal.color = spec["col"]
 			stal.position = Vector2(fmod(30.0 + i * (980.0 / n) + li * 57.0, 1000.0) - 20.0, spec["y"])
 			layer.add_child(stal)
+			# Nur die vorderste Ebene bekommt Details — dahinter würden sie
+			# den Dunst-Eindruck der Tiefenstaffelung zerstören.
+			if li == layer_specs.size() - 1:
+				_skyline_detail(stal, i, w, hh, pal)
 		var drift := layer.create_tween().set_loops()
 		drift.tween_property(layer, "position:x", spec["amp"], spec["dur"] * 0.5) \
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -198,7 +331,10 @@ func _build_scene() -> void:
 		s.texture = SpriteFactory.hero_battle(data["id"])
 		var form: Dictionary = BATTLE_FORMATION.get(data["id"],
 			{"pos": Vector2(700 + (i % 2) * 60, 170 + i * 78), "scale": 4.0})
-		var hscale: float = form["scale"]
+		# Einheitlicher Maßstab für alle Kampffiguren: die Leinwand des Rigs
+		# wächst mit der Figur, nicht die Vergrößerung. Dadurch ist ein Pixel
+		# bei Held, Monster und Boss gleich groß.
+		var hscale := RigFactory.BATTLE_SCALE
 		s.scale = Vector2(hscale, hscale)
 		# Kanonische Größe festhalten: alle Squash-/Pose-Tweens lesen sie von
 		# hier statt von s.scale — sonst friert ein überlappender Tween einen
@@ -211,7 +347,8 @@ func _build_scene() -> void:
 		_attach_shadow(s, 9, 3, foot_h)
 		_attach_glow_pool(s, foot_h, pal["pool_hero"])
 		_attach_reflection(s, foot_h, 0.09)
-		var wp := _attach_weapon(s, data["id"])
+		# Die Rig-Figuren tragen ihre Waffe selbst — kein DTII-Overlay darüber.
+		var wp: Sprite2D = null
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false,
 			"frame": 0, "weapon": wp, "anim": "idle"})
@@ -234,8 +371,10 @@ func _build_scene() -> void:
 		s.texture = SpriteFactory.enemy(def["sprite"])
 		# Der finale Boss „Die Stille" (dunkles Spinnentier) thront breit und
 		# bedrohlich über den anderen — sein Sprite ist zudem breiter angelegt.
-		var boss_sc := 7.8 if def["sprite"] == "boss4" else 7.2
-		s.scale = Vector2(boss_sc, boss_sc) if is_boss else Vector2(6.5, 6.5)
+		# Derselbe Maßstab wie bei den Helden: die Größe steckt in der Leinwand
+		# des Rigs (Monster 52x52, Boss 112x128), nicht in der Vergrößerung —
+		# nur so ist ein Pixel bei allen Figuren gleich groß.
+		s.scale = Vector2(RigFactory.BATTLE_SCALE, RigFactory.BATTLE_SCALE)
 		s.set_meta("base_scale", s.scale)
 		var home := Vector2(222, 222) if is_boss else Vector2(225 + (i % 2) * 100, 180 + i * 88)
 		s.position = home - Vector2(500, 0)
@@ -263,8 +402,13 @@ func _build_scene() -> void:
 		# Themen-Tönung, zusätzlich abgedunkelt und leicht ins Violette
 		# entsättigt — die Monster lauern im Halbdunkel. Die Spiegelung
 		# erbt die Färbung als Kind automatisch.
-		var dark := Color(0.90, 0.88, 0.94) if is_boss else Color(0.78, 0.75, 0.86)
-		var tint: Color = def.get("tint", Color.WHITE) * dark
+		# Die Themen-Tönung aus ENEMIES entfällt: sie war dafür da, graue
+		# DTII-Fremdsprites einzufärben. Die Rig-Monster bringen ihre Farben
+		# selbst mit; geblieben ist nur das atmosphärische Abdunkeln.
+		# Kaum noch Abdunklung: die Rig-Monster haben eigene, teils dunkle
+		# Farben, und Grundlicht plus Vignette nehmen ohnehin schon viel weg.
+		var dark := Color(1.0, 1.0, 1.0) if is_boss else Color(0.96, 0.94, 0.98)
+		var tint := dark
 		s.modulate = tint
 		s.set_meta("tint", tint)
 		add_child(s)
@@ -385,7 +529,11 @@ func _attach_reflection(s: Sprite2D, foot_y: float, alpha := 0.15) -> Sprite2D:
 	r.texture = s.texture
 	r.flip_v = true
 	r.flip_h = s.flip_h
-	r.position = Vector2(0, foot_y * 2.0 + 1.0)
+	# Gestaucht statt spiegelbildlich in voller Höhe: seit die Figuren aus dem
+	# Rig kommen (bis 128px hoch), reichte die volle Spiegelung bis in die
+	# Figur dahinter. Eine flache Bodenspiegelung liest sich ohnehin besser.
+	r.scale = Vector2(1.0, 0.45)
+	r.position = Vector2(0, foot_y * 1.45 + 1.0)
 	r.modulate = Color(1, 1, 1, alpha)
 	r.z_index = -2
 	r.show_behind_parent = true

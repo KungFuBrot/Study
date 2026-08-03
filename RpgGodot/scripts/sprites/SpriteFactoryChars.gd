@@ -125,15 +125,14 @@ const CHAR_TPL := {
 # Feldfigur aus dem CC0-Pack (Idle-Pose). dir wird ignoriert (DTII blickt
 # nach rechts; das Feld spiegelt für „links").
 static func character(id: String, dir: String, frame: int) -> Texture2D:
-	return field_char(id, false, frame)
+	return field_char(id, false, frame, dir)
 
-## Feldfigur mit Zustand: laufend → Lauf-Animation, sonst Idle (je 4 Frames).
-static func field_char(id: String, walking: bool, frame: int) -> Texture2D:
-	if id == "rax":
-		return robot_field(walking, frame)
-	var base: String = FIELD_DTII.get(id, "elf_f")
-	var anim := "run" if walking else "idle"
-	return dtii("%s_%s_anim_f%d" % [base, anim, frame % 4])
+## Feldfigur mit Zustand: laufend → Beinausschlag, sonst nur Atmen (4 Frames).
+## Kommt aus derselben RigFactory wie die Kampfsprites; der Aufrufer stellt sie
+## auf FIELD_SCALE, damit sie auf der Karte so groß steht wie früher das
+## 16x28-Sprite — bei doppelter Pixeldichte.
+static func field_char(id: String, walking: bool, frame: int, dir := "side") -> Texture2D:
+	return RigFactory.field(id, walking, frame, dir)
 
 ## (Alt, ungenutzt) prozedurale Feldfigur aus Row-Art.
 static func character_art(id: String, dir: String, frame: int) -> Texture2D:
@@ -254,13 +253,13 @@ const HERO_BATTLE_ART := {
 static func hero_battle(id: String) -> Texture2D:
 	return hero_battle_frame(id, 0)
 
-## anim: "idle" | "run" (DTII-Lauf-Frames) | "aim" (nur Rax, Schusspose).
+## Kampfsprite eines Helden. Kommt seit dem Rig-Umbau aus RigFactory: alle
+## Kampffiguren (Helden, Monster, Bosse) werden dort in derselben Auflösung,
+## Lichtrichtung und Tonwertleiter gezeichnet und im Kampf einheitlich auf
+## RigFactory.BATTLE_SCALE gestellt.
+## anim: "idle" | "run" | "attack" | "aim" | "hit".
 static func hero_battle_frame(id: String, frame: int, anim := "idle") -> Texture2D:
-	if id == "rax":
-		return robot_battle_pose(anim, frame)
-	var def: Dictionary = HERO_DTII.get(id, HERO_DTII["serena"])
-	var set_name := "run" if anim == "run" else "idle"
-	return dtii("%s_%s_anim_f%d" % [def["base"], set_name, frame % 4])
+	return RigFactory.battle(id, frame, anim)
 
 ## Waffe eines Helden (kleines Overlay-Sprite), oder null.
 static func hero_weapon(id: String) -> Texture2D:

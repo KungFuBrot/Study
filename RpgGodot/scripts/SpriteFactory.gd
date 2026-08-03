@@ -644,12 +644,10 @@ static func enemy(id: String) -> Texture2D:
 static func enemy_has_anim(id: String) -> bool:
 	return MON_DTII.has(id)
 
+## Alle Gegner kommen seit dem Rig-Umbau aus RigFactory — dieselbe Hand wie
+## die Helden, dieselbe Pixelgröße auf dem Bildschirm.
 static func enemy_frame(id: String, frame: int) -> Texture2D:
-	# Der Endboss ist ein eigens gezeichnetes Spinnentier statt eines DTII-Frames.
-	if id == "boss4":
-		return spider_boss(frame)
-	var def: Dictionary = MON_DTII.get(id, MON_DTII["schlammschleim"])
-	return dtii("%s_f%d" % [def["anim"], frame % ENEMY_FRAMES])
+	return RigFactory.monster(id, frame % ENEMY_FRAMES)
 
 ## Ist dieser Gegner ein großes Boss-Sprite (32x36 statt 16x16)?
 static func enemy_is_big(id: String) -> bool:

@@ -29,6 +29,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	lean.tween_property(s, "rotation", -0.10, 0.16)
 	lean.parallel().tween_property(s, "scale", base, 0.16)
 	await _sprint(h, strike_pos, 0.16)
+	_pose(h, "attack", 0.55)
 	# 3) Kombo, Schlag 1: Waffe schwingt in einem Ruck durch den Gegner (mit
 	# Nachbildern), der Körper macht einen Ausfallschritt hinterher.
 	if wp != null:
@@ -89,6 +90,9 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 	var s: Sprite2D = h["sprite"]
 	await _sprint(h, h["home"] + Vector2(-56, 4), 0.18)
 	_cast_circle(s.position + Vector2(0, 40), color)
+	# Wirkpose: Stab nach vorn, Stein glüht auf — hält über die ganze
+	# Sammelphase, die je nach Zauber gut eine Sekunde dauert.
+	_pose(h, "attack", 1.4)
 	_anim_cast(s)
 	if sfx == "summon":
 		_chant(s, 1.1)  # der Zauberer murmelt die Beschwörungsformel

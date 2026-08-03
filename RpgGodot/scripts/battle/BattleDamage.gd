@@ -20,6 +20,7 @@ func _damage_hero(target: Dictionary, dmg: int) -> void:
 	target["data"]["hp"] = maxi(target["data"]["hp"] - dmg, 0)
 	_float_text(target["sprite"].position, str(dmg), Color(1.0, 0.45, 0.35))
 	_shake(target["sprite"], 1.0)  # Held wird nach rechts (von den Gegnern weg) geworfen
+	_pose(target, "hit", 0.32)     # Waffe wird hochgerissen, Figur weicht zurück
 	_shake_camera()
 	_refresh_party()
 	if target["data"]["hp"] <= 0:
