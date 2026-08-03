@@ -76,7 +76,8 @@ func _make_rig(id: String, turn: float) -> void:
 		_rig.queue_free()
 	var s := Figures3D.spec(id)
 	_rig = Rig3D.new()
-	match String(s.get("form", "human")):
+	_rig.form = String(s.get("form", "human"))
+	match _rig.form:
 		"blob": _rig.build_blob(s)
 		"quad": _rig.build_quadruped(s)
 		"spider": _rig.build_spider(s)
@@ -128,7 +129,7 @@ static func stylize(src: Image) -> Image:
 
 func _bake_strip(id: String, anim: String, size: Vector2i, suffix: String,
 		dir: String) -> void:
-	var n := Rig3D.frames_of(anim)
+	var n := Rig3D.frames_of(anim, _rig.form)
 	var strip := Image.create(size.x * n, size.y, false, Image.FORMAT_RGBA8)
 	strip.fill(Color(0, 0, 0, 0))
 	for f in n:

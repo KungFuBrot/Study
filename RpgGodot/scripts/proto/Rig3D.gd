@@ -60,6 +60,38 @@ func _sphere(parent: Node3D, r: float, offset: Vector3, sy: float,
 	parent.add_child(mi)
 	return mi
 
+## Sich verjüngender Zylinder — die Grundform für Gliedmaßen. Acht Segmente
+## sind grob genug, dass die Facetten sichtbar bleiben, und rund genug, dass
+## die Silhouette nicht mehr kastig wirkt. Genau das war die Grenze der
+## reinen Quader-Bauweise.
+func _cyl(parent: Node3D, r_top: float, r_bot: float, height: float,
+		offset: Vector3, m: StandardMaterial3D, seg := 8) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = r_top
+	cm.bottom_radius = r_bot
+	cm.height = height
+	cm.radial_segments = seg
+	cm.rings = 1
+	mi.mesh = cm
+	mi.material_override = m
+	mi.position = offset
+	parent.add_child(mi)
+	return mi
+
+## Keil — für Schulterstücke, Kapuzenspitzen, Hutkegel.
+func _prism(parent: Node3D, size: Vector3, offset: Vector3, lean: float,
+		m: StandardMaterial3D) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var pm := PrismMesh.new()
+	pm.size = size
+	pm.left_to_right = lean
+	mi.mesh = pm
+	mi.material_override = m
+	mi.position = offset
+	parent.add_child(mi)
+	return mi
+
 func _joint(parent: Node3D, name: String, at: Vector3) -> Node3D:
 	var n := Node3D.new()
 	n.position = at
@@ -91,7 +123,9 @@ func build_humanoid(s: Dictionary) -> void:
 		Vector3(0, -0.02 * k, 0), legs if not floats else cloth)
 
 	var spine := _joint(hips, "spine", Vector3(0, 0.06 * k, 0))
-	_box(spine, Vector3(0.19 * k * bw, 0.20 * k, 0.27 * k * bw),
+	# Taille rund und verjüngt, Brust kantig — so bekommt der Rumpf eine
+	# Kerbe statt eines durchgehenden Quaders.
+	_cyl(spine, 0.105 * k * bw, 0.088 * k * bw, 0.22 * k,
 		Vector3(0, 0.10 * k, 0), cloth)
 	_box(spine, Vector3(0.23 * k * bw, 0.24 * k, 0.34 * k * bw),
 		Vector3(0, 0.32 * k, 0), cloth)
@@ -108,33 +142,44 @@ func build_humanoid(s: Dictionary) -> void:
 		Vector3(-0.01 * k, 0.44 * k, 0), trim)
 
 	var neck := _joint(spine, "neck", Vector3(0, 0.48 * k, 0))
-	_box(neck, Vector3(0.09 * k, 0.06 * k, 0.10 * k), Vector3(0, 0.02 * k, 0), skin)
+	_cyl(neck, 0.045 * k, 0.05 * k, 0.08 * k, Vector3(0, 0.02 * k, 0), skin, 6)
 	var head := _joint(neck, "head", Vector3(0, 0.06 * k, 0))
-	_box(head, Vector3(0.20 * k * hs, 0.24 * k * hs, 0.21 * k * hs),
-		Vector3(0.01 * k, 0.12 * k * hs, 0), skin)
+	# Rundes Schädeldach auf kantigem Kiefer: der Kopf war als reiner Würfel
+	# das Auffälligste an der Kastenoptik.
+	if s.get("boxhead", false):
+		_box(head, Vector3(0.20 * k * hs, 0.24 * k * hs, 0.21 * k * hs),
+			Vector3(0.01 * k, 0.12 * k * hs, 0), skin)
+	else:
+		_sphere(head, 0.115 * k * hs, Vector3(0.01 * k, 0.155 * k * hs, 0), 1.05, skin)
+		_box(head, Vector3(0.17 * k * hs, 0.11 * k * hs, 0.17 * k * hs),
+			Vector3(0.02 * k, 0.07 * k * hs, 0), skin)
 	_build_head_extras(head, s, k, hs, hair, cloth, trim)
 
 	for side in [-1, 1]:
 		var tag := "l" if side < 0 else "r"
 		var sh := _joint(spine, "shoulder_" + tag,
 			Vector3(0, 0.40 * k, 0.15 * k * bw * side))
-		_box(sh, Vector3(0.13 * k * bw, 0.11 * k, 0.12 * k * bw),
-			Vector3(0, 0.01 * k, 0), trim)
-		_box(sh, Vector3(0.09 * k * bw, 0.24 * k, 0.09 * k * bw),
+		# Schulterstück als Keil statt als Klotz — gibt der Schulter eine
+		# abfallende Kante statt einer rechtwinkligen Ecke.
+		_prism(sh, Vector3(0.14 * k * bw, 0.12 * k, 0.13 * k * bw),
+			Vector3(0, 0.02 * k, 0), 0.5, trim)
+		# Gliedmaßen als sich verjüngende Zylinder: Oberarm kräftig, Ellenbogen
+		# schmal, Handgelenk dünn.
+		_cyl(sh, 0.052 * k * bw, 0.042 * k * bw, 0.25 * k,
 			Vector3(0, -0.13 * k, 0), cloth)
 		var elb := _joint(sh, "elbow_" + tag, Vector3(0, -0.25 * k, 0))
-		_box(elb, Vector3(0.08 * k * bw, 0.22 * k, 0.08 * k * bw),
+		_cyl(elb, 0.042 * k * bw, 0.033 * k * bw, 0.23 * k,
 			Vector3(0, -0.11 * k, 0), skin)
 		var hand := _joint(elb, "hand_" + tag, Vector3(0, -0.23 * k, 0))
-		_box(hand, Vector3(0.08 * k, 0.08 * k, 0.08 * k), Vector3(0, -0.03 * k, 0), skin)
+		_sphere(hand, 0.048 * k, Vector3(0, -0.03 * k, 0), 1.1, skin)
 
 		if floats:
 			continue
 		var hp := _joint(hips, "hip_" + tag, Vector3(0, -0.08 * k, 0.09 * k * bw * side))
-		_box(hp, Vector3(0.12 * k * bw, 0.30 * k, 0.12 * k * bw),
+		_cyl(hp, 0.068 * k * bw, 0.052 * k * bw, 0.32 * k,
 			Vector3(0, -0.16 * k, 0), legs)
 		var knee := _joint(hp, "knee_" + tag, Vector3(0, -0.32 * k, 0))
-		_box(knee, Vector3(0.10 * k * bw, 0.28 * k, 0.10 * k * bw),
+		_cyl(knee, 0.052 * k * bw, 0.040 * k * bw, 0.30 * k,
 			Vector3(0, -0.15 * k, 0), legs)
 		# Knieschutz — bricht das lange Bein in zwei lesbare Abschnitte.
 		_box(knee, Vector3(0.12 * k * bw, 0.07 * k, 0.13 * k * bw),
@@ -325,14 +370,12 @@ func build_quadruped(s: Dictionary) -> void:
 		_box(head, Vector3(0.05 * k, 0.05 * k, 0.05 * k), Vector3(0.20 * k, 0.05 * k, z * k), em)
 	_box(spine, Vector3(0.16 * k, 0.30 * k, 0.30 * k), Vector3(-0.02 * k, 0.05 * k, 0),
 		mat(s.get("trim", Color(0.9, 0.72, 0.25)), 0.4))
-	var i := 0
-	for x in [0.32, -0.30]:
-		for z in [-0.13, 0.13]:
-			var tag := "hip_%s" % ("l" if i % 2 == 0 else "r")
-			var hp := _joint(spine, tag if not joints.has(tag) else tag + str(i),
-				Vector3(x * k, -0.14 * k, z * k))
-			_box(hp, Vector3(0.12 * k, 0.44 * k, 0.12 * k), Vector3(0, -0.24 * k, 0), dark)
-			i += 1
+	# Beine einzeln benannt, damit die Vierbeiner-Tabelle sie ansprechen kann.
+	var names := [['leg_fl', 0.32, -0.13], ['leg_fr', 0.32, 0.13],
+		['leg_bl', -0.30, -0.13], ['leg_br', -0.30, 0.13]]
+	for e: Array in names:
+		var hp := _joint(spine, String(e[0]), Vector3(float(e[1]) * k, -0.14 * k, float(e[2]) * k))
+		_cyl(hp, 0.055 * k, 0.040 * k, 0.46 * k, Vector3(0, -0.24 * k, 0), dark)
 
 ## Spinnentier: Hinterleib, Vorderkörper, acht Beine, acht Augen.
 func build_spider(s: Dictionary) -> void:
@@ -574,15 +617,167 @@ const ANIMS := {
 	]},
 }
 
-static func frames_of(anim: String) -> int:
-	return ANIMS[anim]["frames"]
+## Eigene Tabellen je Bauform. Ein Schleim hat keine Schultern und eine Spinne
+## keine Beine im menschlichen Sinn — die gemeinsame Tabelle greift bei ihnen
+## nur zur Hälfte. Was hier steht, überschreibt sie.
+const FORM_ANIMS := {
+	"blob": {
+		# Wabern ist reines Stauchen: der Körper zieht sich zusammen und
+		# quillt wieder auseinander.
+		"idle": {"fps": 9, "loop": true, "frames": 14, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+			{"t": 0.35, "spine": [0, 0, 0, 1.10, 0.86, 1.08], "head": [-6, 0, 0]},
+			{"t": 0.70, "spine": [0, 0, 0, 0.93, 1.14, 0.95], "head": [5, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+		]},
+		# Zusammenziehen, dann nach vorn schnellen und breit aufklatschen.
+		"attack": {"fps": 14, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"t": 0.26, "spine": [0, 0, 0, 0.80, 1.30, 0.82], "hips": [0, 0, 0],
+				"head": [-16, 0, 0]},
+			{"t": 0.44, "spine": [0, 0, 0, 1.34, 0.70, 1.28], "hips": [16, 0, 0],
+				"head": [22, 0, 0]},
+			{"t": 0.66, "spine": [0, 0, 0, 0.94, 1.10, 0.96], "hips": [6, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
+		]},
+		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"t": 0.18, "spine": [0, 0, 0, 1.28, 0.72, 1.24], "hips": [-14, 0, 0]},
+			{"t": 0.52, "spine": [0, 0, 0, 0.90, 1.16, 0.92], "hips": [-5, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
+		]},
+		# Zerfließen statt Umfallen.
+		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"t": 0.22, "spine": [0, 0, 0, 0.88, 1.18, 0.90], "head": [-10, 0, 0]},
+			{"t": 0.60, "spine": [0, 0, 0, 1.40, 0.46, 1.34], "head": [18, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.62, 0.22, 1.54], "head": [26, 0, 0]},
+		]},
+		"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"t": 0.34, "spine": [0, 0, 0, 0.84, 1.26, 0.86], "head": [-14, 0, 0]},
+			{"t": 0.62, "spine": [0, 0, 0, 1.14, 0.90, 1.12], "head": [12, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+		]},
+	},
+	"quad": {
+		# Vierbeiner: Beine im Kreuzgang, Kopf senkt und hebt sich.
+		"idle": {"fps": 9, "loop": true, "frames": 14, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+			{"t": 0.5, "spine": [2, 0, 0], "head": [-5, 4, 0],
+				"leg_fl": [6, 0, 0], "leg_br": [-6, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+		]},
+		# Zuschnappen: ducken, vorschnellen, Kopf reißt hoch.
+		"attack": {"fps": 15, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+			{"t": 0.26, "spine": [10, 0, 0], "head": [16, 0, 0],
+				"leg_fl": [-26, 0, 0], "leg_fr": [-26, 0, 0]},
+			{"t": 0.46, "spine": [-16, 0, 0], "head": [-30, 0, 0], "hips": [-10, 0, 0],
+				"leg_fl": [34, 0, 0], "leg_fr": [34, 0, 0],
+				"leg_bl": [-22, 0, 0], "leg_br": [-22, 0, 0]},
+			{"t": 0.70, "spine": [6, 0, 0], "head": [10, 0, 0], "hips": [4, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+		]},
+		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.18, "spine": [-18, 0, 0], "head": [-24, 0, 0], "hips": [-12, 0, 0],
+				"leg_fl": [24, 0, 0], "leg_fr": [24, 0, 0]},
+			{"t": 0.55, "spine": [-6, 0, 0], "head": [-8, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0]},
+		]},
+		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.30, "spine": [-12, 0, 0], "head": [-18, 0, 0]},
+			{"t": 0.70, "spine": [0, 0, 46], "head": [10, 0, 30], "hips": [0, 0, 40],
+				"leg_fl": [40, 0, 0], "leg_fr": [40, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 74], "head": [14, 0, 50], "hips": [0, 0, 68],
+				"leg_fl": [56, 0, 0], "leg_fr": [56, 0, 0]},
+		]},
+		"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.35, "spine": [-14, 0, 0], "head": [-22, 0, 0], "hips": [-8, 0, 0]},
+			{"t": 0.65, "spine": [8, 0, 0], "head": [14, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+		]},
+	},
+	"spider": {
+		# Beine tasten abwechselnd — vier Paare, gegenläufig.
+		"idle": {"fps": 9, "loop": true, "frames": 16, "keys": [
+			{"t": 0.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
+				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
+			{"t": 0.5, "leg_0_-1": [12, 0, 0], "leg_1_1": [-10, 0, 0],
+				"leg_2_-1": [10, 0, 0], "leg_3_1": [-12, 0, 0], "spine": [3, 0, 0],
+				"head": [-5, 0, 0]},
+			{"t": 1.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
+				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
+		]},
+		# Aufbäumen auf den Hinterbeinen, dann zustoßen.
+		"attack": {"fps": 14, "loop": false, "frames": 14, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.30, "spine": [-24, 0, 0], "head": [-20, 0, 0], "hips": [-16, 0, 0],
+				"leg_0_-1": [-34, 0, 0], "leg_0_1": [-34, 0, 0],
+				"leg_1_-1": [-22, 0, 0], "leg_1_1": [-22, 0, 0]},
+			{"t": 0.52, "spine": [22, 0, 0], "head": [26, 0, 0], "hips": [14, 0, 0],
+				"leg_0_-1": [40, 0, 0], "leg_0_1": [40, 0, 0],
+				"leg_1_-1": [26, 0, 0], "leg_1_1": [26, 0, 0]},
+			{"t": 0.76, "spine": [6, 0, 0], "head": [8, 0, 0], "hips": [4, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+		]},
+		"hit": {"fps": 16, "loop": false, "frames": 10, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.18, "spine": [-20, 0, 0], "hips": [-14, 0, 0],
+				"leg_0_-1": [26, 0, 0], "leg_0_1": [26, 0, 0],
+				"leg_3_-1": [-20, 0, 0], "leg_3_1": [-20, 0, 0]},
+			{"t": 0.55, "spine": [-6, 0, 0], "hips": [-4, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0]},
+		]},
+		# Beine ziehen sich ein, der Leib sackt ab.
+		"down": {"fps": 11, "loop": false, "frames": 12, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"t": 0.30, "spine": [-14, 0, 0, 1.0, 1.0, 1.0],
+				"leg_0_-1": [-30, 0, 0], "leg_0_1": [-30, 0, 0]},
+			{"t": 0.70, "spine": [0, 0, 0, 1.10, 0.62, 1.08], "hips": [10, 0, 0],
+				"leg_0_-1": [64, 0, 0], "leg_0_1": [64, 0, 0],
+				"leg_1_-1": [58, 0, 0], "leg_1_1": [58, 0, 0],
+				"leg_2_-1": [52, 0, 0], "leg_2_1": [52, 0, 0],
+				"leg_3_-1": [46, 0, 0], "leg_3_1": [46, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0, 1.16, 0.40, 1.14], "hips": [16, 0, 0],
+				"leg_0_-1": [86, 0, 0], "leg_0_1": [86, 0, 0],
+				"leg_1_-1": [80, 0, 0], "leg_1_1": [80, 0, 0],
+				"leg_2_-1": [74, 0, 0], "leg_2_1": [74, 0, 0],
+				"leg_3_-1": [68, 0, 0], "leg_3_1": [68, 0, 0]},
+		]},
+		"roar": {"fps": 10, "loop": false, "frames": 14, "keys": [
+			{"t": 0.0, "spine": [0, 0, 0]},
+			{"t": 0.34, "spine": [-30, 0, 0], "head": [-34, 0, 0], "hips": [-20, 0, 0],
+				"leg_0_-1": [-44, 0, 0], "leg_0_1": [-44, 0, 0],
+				"leg_1_-1": [-30, 0, 0], "leg_1_1": [-30, 0, 0]},
+			{"t": 0.62, "spine": [-26, 0, 0], "head": [-30, 0, 0], "hips": [-18, 0, 0]},
+			{"t": 0.82, "spine": [16, 0, 0], "head": [18, 0, 0], "hips": [10, 0, 0]},
+			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+		]},
+	},
+}
+
+## Aktive Bauform — bestimmt, welche Tabelle bei `apply` gilt.
+var form := "human"
+
+static func table(form_name: String, anim: String) -> Dictionary:
+	var t: Dictionary = FORM_ANIMS.get(form_name, {})
+	if t.has(anim):
+		return t[anim]
+	return ANIMS.get(anim, ANIMS["idle"])
+
+static func frames_of(anim: String, form_name := "human") -> int:
+	return table(form_name, anim)["frames"]
 
 static func fps_of(anim: String) -> float:
 	return float(ANIMS[anim]["fps"])
 
 ## Setzt alle Gelenke auf die Pose zum Zeitpunkt des Frames.
 func apply(anim: String, frame: int) -> void:
-	var a: Dictionary = ANIMS[anim]
+	var a: Dictionary = table(form, anim)
 	var n: int = a["frames"]
 	var t := float(frame % n) / float(n) if a["loop"] \
 		else float(mini(frame, n - 1)) / float(n - 1)
@@ -596,11 +791,20 @@ func apply(anim: String, frame: int) -> void:
 	var f := clampf((t - float(k0["t"])) / span, 0.0, 1.0)
 	f = f * f * (3.0 - 2.0 * f)
 	for name: String in joints:
-		var e0 := _euler(k0.get(name, null))
-		var e1 := _euler(k1.get(name, null))
-		(joints[name] as Node3D).rotation_degrees = e0.lerp(e1, f)
+		var v0 = k0.get(name, null)
+		var v1 = k1.get(name, null)
+		var n3 := joints[name] as Node3D
+		n3.rotation_degrees = _euler(v0).lerp(_euler(v1), f)
+		# Einträge mit sechs Zahlen tragen hinten eine Skalierung. Kreaturen
+		# ohne Skelett — Schleim, Schwaden — bewegen sich fast nur darüber.
+		n3.scale = _scale(v0).lerp(_scale(v1), f)
 
 static func _euler(v) -> Vector3:
 	if v == null:
 		return Vector3.ZERO
 	return Vector3(v[0], v[1], v[2])
+
+static func _scale(v) -> Vector3:
+	if v == null or (v as Array).size() < 6:
+		return Vector3.ONE
+	return Vector3(v[3], v[4], v[5])
