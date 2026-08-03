@@ -639,208 +639,208 @@ func build_spider(s: Dictionary) -> void:
 ## bleiben in Ruhestellung — deshalb funktionieren dieselben Tabellen auch für
 ## Figuren, die gar keine Arme haben.
 const ANIMS := {
-	"idle": {"fps": 10, "loop": true, "frames": 24, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "shoulder_l": [-8, 0, 6],
+	"idle": {"fps": 14, "loop": true, "trans": 5, "keys": [
+		{"hold": 3, "t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "shoulder_l": [-8, 0, 6],
 			"elbow_r": [-28, 0, 0], "elbow_l": [-22, 0, 0], "weapon": [-14, 0, 0],
 			"head": [2, 0, 0], "braid": [4, 0, 0], "hips": [0, 0, 0]},
-		{"t": 0.5, "spine": [2.5, 0, 0], "shoulder_r": [13, 0, -8], "shoulder_l": [-11, 0, 8],
+		{"hold": 3, "t": 0.5, "spine": [2.5, 0, 0], "shoulder_r": [13, 0, -8], "shoulder_l": [-11, 0, 8],
 			"elbow_r": [-33, 0, 0], "elbow_l": [-26, 0, 0], "weapon": [-18, 0, 0],
 			"head": [4, 3, 0], "braid": [11, 0, 0], "hips": [-1.5, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "shoulder_l": [-8, 0, 6],
+		{"hold": 3, "t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "shoulder_l": [-8, 0, 6],
 			"elbow_r": [-28, 0, 0], "elbow_l": [-22, 0, 0], "weapon": [-14, 0, 0],
 			"head": [2, 0, 0], "braid": [4, 0, 0], "hips": [0, 0, 0]},
 	]},
-	"walk": {"fps": 11, "loop": true, "frames": 24, "keys": [
-		{"t": 0.0, "spine": [5, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [8, 0, 0],
+	"walk": {"fps": 16, "loop": true, "trans": 3, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [5, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [8, 0, 0],
 			"hip_l": [20, 0, 0], "knee_l": [-32, 0, 0], "shoulder_r": [24, 0, -7],
 			"shoulder_l": [-28, 0, 7], "elbow_r": [-36, 0, 0], "elbow_l": [-34, 0, 0],
 			"braid": [-10, 0, 0], "weapon": [-22, 0, 0]},
-		{"t": 0.25, "spine": [4, 0, 0], "hip_r": [-2, 0, 0], "knee_r": [-10, 0, 0],
+		{"hold": 2, "t": 0.25, "spine": [4, 0, 0], "hip_r": [-2, 0, 0], "knee_r": [-10, 0, 0],
 			"hip_l": [2, 0, 0], "knee_l": [-16, 0, 0], "shoulder_r": [2, 0, -7],
 			"shoulder_l": [-4, 0, 7], "elbow_r": [-30, 0, 0], "elbow_l": [-28, 0, 0],
 			"braid": [-4, 0, 0], "weapon": [-18, 0, 0], "hips": [-1, 0, 0]},
-		{"t": 0.5, "spine": [5, 0, 0], "hip_r": [20, 0, 0], "knee_r": [-32, 0, 0],
+		{"hold": 2, "t": 0.5, "spine": [5, 0, 0], "hip_r": [20, 0, 0], "knee_r": [-32, 0, 0],
 			"hip_l": [-24, 0, 0], "knee_l": [8, 0, 0], "shoulder_r": [-28, 0, -7],
 			"shoulder_l": [24, 0, 7], "elbow_r": [-34, 0, 0], "elbow_l": [-36, 0, 0],
 			"braid": [-10, 0, 0], "weapon": [-26, 0, 0]},
-		{"t": 0.75, "spine": [4, 0, 0], "hip_r": [2, 0, 0], "knee_r": [-16, 0, 0],
+		{"hold": 2, "t": 0.75, "spine": [4, 0, 0], "hip_r": [2, 0, 0], "knee_r": [-16, 0, 0],
 			"hip_l": [-2, 0, 0], "knee_l": [-10, 0, 0], "shoulder_r": [-4, 0, -7],
 			"shoulder_l": [2, 0, 7], "elbow_r": [-28, 0, 0], "elbow_l": [-30, 0, 0],
 			"braid": [-4, 0, 0], "weapon": [-18, 0, 0], "hips": [-1, 0, 0]},
-		{"t": 1.0, "spine": [5, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [8, 0, 0],
+		{"hold": 2, "t": 1.0, "spine": [5, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [8, 0, 0],
 			"hip_l": [20, 0, 0], "knee_l": [-32, 0, 0], "shoulder_r": [24, 0, -7],
 			"shoulder_l": [-28, 0, 7], "elbow_r": [-36, 0, 0], "elbow_l": [-34, 0, 0],
 			"braid": [-10, 0, 0], "weapon": [-22, 0, 0]},
 	]},
-	"run": {"fps": 14, "loop": true, "frames": 24, "keys": [
-		{"t": 0.0, "spine": [14, 0, 0], "hip_r": [-42, 0, 0], "knee_r": [22, 0, 0],
+	"run": {"fps": 20, "loop": true, "trans": 2, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [14, 0, 0], "hip_r": [-42, 0, 0], "knee_r": [22, 0, 0],
 			"hip_l": [34, 0, 0], "knee_l": [-58, 0, 0], "shoulder_r": [46, 0, -8],
 			"shoulder_l": [-52, 0, 8], "elbow_r": [-64, 0, 0], "elbow_l": [-70, 0, 0],
 			"braid": [-24, 0, 0], "head": [-8, 0, 0], "weapon": [-40, 0, 0]},
-		{"t": 0.25, "spine": [12, 0, 0], "hip_r": [-6, 0, 0], "knee_r": [-16, 0, 0],
+		{"hold": 1, "t": 0.25, "spine": [12, 0, 0], "hip_r": [-6, 0, 0], "knee_r": [-16, 0, 0],
 			"hip_l": [4, 0, 0], "knee_l": [-30, 0, 0], "shoulder_r": [6, 0, -8],
 			"shoulder_l": [-8, 0, 8], "elbow_r": [-48, 0, 0], "elbow_l": [-52, 0, 0],
 			"braid": [-10, 0, 0], "head": [-6, 0, 0], "weapon": [-30, 0, 0]},
-		{"t": 0.5, "spine": [14, 0, 0], "hip_r": [34, 0, 0], "knee_r": [-58, 0, 0],
+		{"hold": 2, "t": 0.5, "spine": [14, 0, 0], "hip_r": [34, 0, 0], "knee_r": [-58, 0, 0],
 			"hip_l": [-42, 0, 0], "knee_l": [22, 0, 0], "shoulder_r": [-52, 0, -8],
 			"shoulder_l": [46, 0, 8], "elbow_r": [-70, 0, 0], "elbow_l": [-64, 0, 0],
 			"braid": [-24, 0, 0], "head": [-8, 0, 0], "weapon": [-52, 0, 0]},
-		{"t": 0.75, "spine": [12, 0, 0], "hip_r": [4, 0, 0], "knee_r": [-30, 0, 0],
+		{"hold": 1, "t": 0.75, "spine": [12, 0, 0], "hip_r": [4, 0, 0], "knee_r": [-30, 0, 0],
 			"hip_l": [-6, 0, 0], "knee_l": [-16, 0, 0], "shoulder_r": [-8, 0, -8],
 			"shoulder_l": [6, 0, 8], "elbow_r": [-52, 0, 0], "elbow_l": [-48, 0, 0],
 			"braid": [-10, 0, 0], "head": [-6, 0, 0], "weapon": [-30, 0, 0]},
-		{"t": 1.0, "spine": [14, 0, 0], "hip_r": [-42, 0, 0], "knee_r": [22, 0, 0],
+		{"hold": 2, "t": 1.0, "spine": [14, 0, 0], "hip_r": [-42, 0, 0], "knee_r": [22, 0, 0],
 			"hip_l": [34, 0, 0], "knee_l": [-58, 0, 0], "shoulder_r": [46, 0, -8],
 			"shoulder_l": [-52, 0, 8], "elbow_r": [-64, 0, 0], "elbow_l": [-70, 0, 0],
 			"braid": [-24, 0, 0], "head": [-8, 0, 0], "weapon": [-40, 0, 0]},
 	]},
-	"attack": {"fps": 16, "loop": false, "frames": 18, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+	"attack": {"fps": 30, "loop": false, "trans": 1, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0], "head": [0, 0, 0]},
-		{"t": 0.30, "spine": [-16, -14, 0], "shoulder_r": [-118, 0, -20],
+		{"hold": 4, "t": 0.30, "spine": [-16, -14, 0], "shoulder_r": [-118, 0, -20],
 			"elbow_r": [-72, 0, 0], "weapon": [-30, 0, 0], "hips": [0, -10, 0],
 			"head": [-6, -8, 0], "braid": [-18, 0, 0], "hip_l": [-14, 0, 0]},
-		{"t": 0.40, "spine": [-20, -18, 0], "shoulder_r": [-132, 0, -22],
+		{"hold": 3, "t": 0.40, "spine": [-20, -18, 0], "shoulder_r": [-132, 0, -22],
 			"elbow_r": [-80, 0, 0], "weapon": [-34, 0, 0], "hips": [0, -13, 0],
 			"head": [-8, -10, 0], "braid": [-24, 0, 0], "hip_l": [-16, 0, 0]},
-		{"t": 0.55, "spine": [26, 16, 0], "shoulder_r": [66, 0, 4], "elbow_r": [-8, 0, 0],
+		{"hold": 1, "t": 0.55, "spine": [26, 16, 0], "shoulder_r": [66, 0, 4], "elbow_r": [-8, 0, 0],
 			"weapon": [8, 0, 0], "hips": [0, 12, 0], "head": [12, 8, 0],
 			"braid": [30, 0, 0], "hip_r": [-24, 0, 0], "knee_r": [18, 0, 0]},
-		{"t": 0.75, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
+		{"hold": 4, "t": 0.75, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
 			"weapon": [-2, 0, 0], "hips": [0, 7, 0], "head": [7, 5, 0],
 			"braid": [14, 0, 0], "hip_r": [-12, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0], "head": [0, 0, 0]},
 	]},
-	"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0]},
-		{"t": 0.18, "spine": [-26, 0, 0], "head": [-20, 0, 0], "shoulder_r": [-40, 0, -20],
+	"hit": {"fps": 30, "loop": false, "trans": 1, "keys": [
+		{"hold": 1, "t": 0.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 0.18, "spine": [-26, 0, 0], "head": [-20, 0, 0], "shoulder_r": [-40, 0, -20],
 			"shoulder_l": [34, 0, 20], "elbow_r": [-60, 0, 0], "hip_l": [-20, 0, 0],
 			"knee_l": [26, 0, 0], "braid": [-34, 0, 0], "hips": [-8, 0, 0]},
-		{"t": 0.55, "spine": [-9, 0, 0], "head": [-7, 0, 0], "shoulder_r": [-6, 0, -10],
+		{"hold": 3, "t": 0.55, "spine": [-9, 0, 0], "head": [-7, 0, 0], "shoulder_r": [-6, 0, -10],
 			"braid": [-12, 0, 0], "hips": [-3, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0]},
 	]},
-	"down": {"fps": 12, "loop": false, "frames": 18, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0]},
-		{"t": 0.25, "spine": [-14, 0, 0], "head": [-16, 0, 0], "hip_r": [-16, 0, 0],
+	"down": {"fps": 20, "loop": false, "trans": 2, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+		{"hold": 3, "t": 0.25, "spine": [-14, 0, 0], "head": [-16, 0, 0], "hip_r": [-16, 0, 0],
 			"knee_r": [30, 0, 0], "hips": [-6, 0, 0]},
-		{"t": 0.65, "spine": [34, 0, 0], "head": [26, 0, 0], "hip_r": [64, 0, 0],
+		{"hold": 3, "t": 0.65, "spine": [34, 0, 0], "head": [26, 0, 0], "hip_r": [64, 0, 0],
 			"knee_r": [86, 0, 0], "hip_l": [56, 0, 0], "knee_l": [78, 0, 0],
 			"shoulder_r": [58, 0, -30], "shoulder_l": [46, 0, 30], "hips": [26, 0, 0],
 			"braid": [44, 0, 0]},
-		{"t": 1.0, "spine": [52, 0, 0], "head": [34, 0, 0], "hip_r": [88, 0, 0],
+		{"hold": 6, "t": 1.0, "spine": [52, 0, 0], "head": [34, 0, 0], "hip_r": [88, 0, 0],
 			"knee_r": [104, 0, 0], "hip_l": [82, 0, 0], "knee_l": [98, 0, 0],
 			"shoulder_r": [72, 0, -36], "shoulder_l": [60, 0, 36], "hips": [62, 0, 0],
 			"braid": [58, 0, 0]},
 	]},
 	# Rückhand: der zweite Schlag der Kombo, aus der Gegenrichtung.
-	"attack2": {"fps": 16, "loop": false, "frames": 18, "keys": [
-		{"t": 0.0, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
+	"attack2": {"fps": 30, "loop": false, "trans": 1, "keys": [
+		{"hold": 1, "t": 0.0, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
 			"weapon": [-2, 0, 0], "hips": [0, 7, 0]},
-		{"t": 0.28, "spine": [22, 20, 0], "shoulder_r": [78, 0, 14], "elbow_r": [-14, 0, 0],
+		{"hold": 4, "t": 0.28, "spine": [22, 20, 0], "shoulder_r": [78, 0, 14], "elbow_r": [-14, 0, 0],
 			"weapon": [26, 0, 0], "hips": [0, 16, 0], "head": [10, 12, 0],
 			"braid": [26, 0, 0]},
-		{"t": 0.48, "spine": [-14, -20, 0], "shoulder_r": [-46, 0, -26],
+		{"hold": 1, "t": 0.48, "spine": [-14, -20, 0], "shoulder_r": [-46, 0, -26],
 			"elbow_r": [-34, 0, 0], "weapon": [-40, 0, 0], "hips": [0, -16, 0],
 			"head": [-8, -12, 0], "braid": [-30, 0, 0], "hip_l": [-20, 0, 0],
 			"knee_l": [16, 0, 0]},
-		{"t": 0.72, "spine": [-6, -10, 0], "shoulder_r": [-18, 0, -14],
+		{"hold": 4, "t": 0.72, "spine": [-6, -10, 0], "shoulder_r": [-18, 0, -14],
 			"elbow_r": [-30, 0, 0], "weapon": [-26, 0, 0], "hips": [0, -7, 0],
 			"braid": [-12, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0], "hips": [0, 0, 0]},
 	]},
 	# Zaubern: sammeln, aufrichten, Stab nach vorn entladen.
-	"cast": {"fps": 12, "loop": false, "frames": 20, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
-		{"t": 0.26, "spine": [12, 0, 0], "shoulder_r": [-24, 0, -14],
+	"cast": {"fps": 24, "loop": false, "trans": 2, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+		{"hold": 3, "t": 0.26, "spine": [12, 0, 0], "shoulder_r": [-24, 0, -14],
 			"elbow_r": [-58, 0, 0], "shoulder_l": [-20, 0, 14], "elbow_l": [-54, 0, 0],
 			"head": [8, 0, 0], "hip_r": [-12, 0, 0], "knee_r": [20, 0, 0],
 			"weapon": [-30, 0, 0]},
-		{"t": 0.46, "spine": [16, 0, 0], "shoulder_r": [-34, 0, -16],
+		{"hold": 4, "t": 0.46, "spine": [16, 0, 0], "shoulder_r": [-34, 0, -16],
 			"elbow_r": [-66, 0, 0], "shoulder_l": [-28, 0, 16], "elbow_l": [-60, 0, 0],
 			"head": [12, 0, 0], "hip_r": [-16, 0, 0], "knee_r": [26, 0, 0],
 			"weapon": [-38, 0, 0], "braid": [-16, 0, 0]},
-		{"t": 0.62, "spine": [-18, 0, 0], "shoulder_r": [-128, 0, -8],
+		{"hold": 2, "t": 0.62, "spine": [-18, 0, 0], "shoulder_r": [-128, 0, -8],
 			"elbow_r": [-8, 0, 0], "shoulder_l": [-40, 0, 20], "head": [-16, 0, 0],
 			"weapon": [12, 0, 0], "braid": [34, 0, 0], "hips": [-6, 0, 0]},
-		{"t": 0.82, "spine": [-8, 0, 0], "shoulder_r": [-96, 0, -8],
+		{"hold": 4, "t": 0.82, "spine": [-8, 0, 0], "shoulder_r": [-96, 0, -8],
 			"elbow_r": [-16, 0, 0], "head": [-8, 0, 0], "weapon": [4, 0, 0],
 			"braid": [16, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
 			"weapon": [-14, 0, 0]},
 	]},
 	# Zielen und schießen: Arm hoch, kurzer Rückstoß, halten.
-	"aim": {"fps": 14, "loop": false, "frames": 14, "keys": [
-		{"t": 0.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
-		{"t": 0.30, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
+	"aim": {"fps": 30, "loop": false, "trans": 1, "keys": [
+		{"hold": 2, "t": 0.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+		{"hold": 4, "t": 0.30, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
 			"spine": [-4, -8, 0], "head": [0, -6, 0], "weapon": [0, 0, 0]},
-		{"t": 0.46, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
+		{"hold": 3, "t": 0.46, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
 			"spine": [-4, -8, 0], "head": [0, -6, 0]},
-		{"t": 0.56, "shoulder_r": [-70, 0, -4], "elbow_r": [-18, 0, 0],
+		{"hold": 1, "t": 0.56, "shoulder_r": [-70, 0, -4], "elbow_r": [-18, 0, 0],
 			"spine": [-12, -8, 0], "hips": [-5, 0, 0], "head": [-6, -6, 0]},
-		{"t": 0.75, "shoulder_r": [-82, 0, -4], "elbow_r": [-8, 0, 0],
+		{"hold": 3, "t": 0.75, "shoulder_r": [-82, 0, -4], "elbow_r": [-8, 0, 0],
 			"spine": [-5, -8, 0]},
-		{"t": 1.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+		{"hold": 4, "t": 1.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
 	]},
 	# Decken: klein machen, Waffe quer vor den Körper.
-	"block": {"fps": 12, "loop": true, "frames": 14, "keys": [
-		{"t": 0.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
+	"block": {"fps": 12, "loop": true, "trans": 4, "keys": [
+		{"hold": 3, "t": 0.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
 			"elbow_r": [-84, 0, 0], "shoulder_l": [-30, 0, 30], "elbow_l": [-70, 0, 0],
 			"weapon": [64, 0, 0], "head": [10, 0, 0], "hip_r": [-22, 0, 0],
 			"knee_r": [34, 0, 0], "hip_l": [-14, 0, 0], "knee_l": [26, 0, 0],
 			"hips": [8, 0, 0]},
-		{"t": 0.5, "spine": [18, -6, 0], "shoulder_r": [-56, 0, -36],
+		{"hold": 3, "t": 0.5, "spine": [18, -6, 0], "shoulder_r": [-56, 0, -36],
 			"elbow_r": [-88, 0, 0], "shoulder_l": [-33, 0, 32], "elbow_l": [-73, 0, 0],
 			"weapon": [68, 0, 0], "head": [12, 0, 0], "hip_r": [-24, 0, 0],
 			"knee_r": [37, 0, 0], "hip_l": [-16, 0, 0], "knee_l": [29, 0, 0],
 			"hips": [10, 0, 0]},
-		{"t": 1.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
+		{"hold": 3, "t": 1.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
 			"elbow_r": [-84, 0, 0], "shoulder_l": [-30, 0, 30], "elbow_l": [-70, 0, 0],
 			"weapon": [64, 0, 0], "head": [10, 0, 0], "hip_r": [-22, 0, 0],
 			"knee_r": [34, 0, 0], "hip_l": [-14, 0, 0], "knee_l": [26, 0, 0],
 			"hips": [8, 0, 0]},
 	]},
 	# Drohen: aufrichten, vorlehnen, wieder sinken.
-	"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0]},
-		{"t": 0.30, "spine": [-16, 0, 0], "head": [-14, 0, 0],
+	"taunt": {"fps": 20, "loop": false, "trans": 2, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 0.30, "spine": [-16, 0, 0], "head": [-14, 0, 0],
 			"shoulder_r": [-30, 0, -24], "shoulder_l": [-26, 0, 24],
 			"elbow_r": [-46, 0, 0], "elbow_l": [-42, 0, 0], "hips": [-8, 0, 0]},
-		{"t": 0.55, "spine": [14, 0, 0], "head": [16, 0, 0],
+		{"hold": 3, "t": 0.55, "spine": [14, 0, 0], "head": [16, 0, 0],
 			"shoulder_r": [16, 0, -14], "shoulder_l": [12, 0, 14],
 			"elbow_r": [-24, 0, 0], "elbow_l": [-22, 0, 0], "hips": [8, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0]},
 	]},
 	# Brüllen: weit zurückbäumen, Kopf hoch, dann vorschnellen.
-	"roar": {"fps": 11, "loop": false, "frames": 20, "keys": [
-		{"t": 0.0, "spine": [0, 0, 0]},
-		{"t": 0.28, "spine": [-24, 0, 0], "head": [-30, 0, 0],
+	"roar": {"fps": 22, "loop": false, "trans": 2, "keys": [
+		{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 0.28, "spine": [-24, 0, 0], "head": [-30, 0, 0],
 			"shoulder_r": [-58, 0, -40], "shoulder_l": [-54, 0, 40],
 			"elbow_r": [-52, 0, 0], "elbow_l": [-48, 0, 0], "hips": [-12, 0, 0],
 			"hip_r": [-14, 0, 0], "hip_l": [-14, 0, 0]},
-		{"t": 0.52, "spine": [-28, 0, 0], "head": [-36, 0, 0],
+		{"hold": 5, "t": 0.52, "spine": [-28, 0, 0], "head": [-36, 0, 0],
 			"shoulder_r": [-66, 0, -46], "shoulder_l": [-62, 0, 46],
 			"elbow_r": [-56, 0, 0], "elbow_l": [-52, 0, 0], "hips": [-14, 0, 0]},
-		{"t": 0.72, "spine": [22, 0, 0], "head": [20, 0, 0],
+		{"hold": 2, "t": 0.72, "spine": [22, 0, 0], "head": [20, 0, 0],
 			"shoulder_r": [40, 0, -10], "shoulder_l": [36, 0, 10],
 			"elbow_r": [-18, 0, 0], "elbow_l": [-16, 0, 0], "hips": [14, 0, 0],
 			"hip_r": [-20, 0, 0], "knee_r": [26, 0, 0]},
-		{"t": 1.0, "spine": [0, 0, 0]},
+		{"hold": 4, "t": 1.0, "spine": [0, 0, 0]},
 	]},
-	"cheer": {"fps": 10, "loop": true, "frames": 18, "keys": [
-		{"t": 0.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
+	"cheer": {"fps": 16, "loop": true, "trans": 3, "keys": [
+		{"hold": 2, "t": 0.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
 			"weapon": [-16, 0, 0], "hips": [0, 0, 0], "spine": [-6, 0, 0]},
-		{"t": 0.25, "shoulder_r": [-152, 0, -18], "elbow_r": [-16, 0, 0],
+		{"hold": 2, "t": 0.25, "shoulder_r": [-152, 0, -18], "elbow_r": [-16, 0, 0],
 			"weapon": [-8, 0, 0], "hips": [-3, 0, 0], "spine": [-9, 0, 0],
 			"knee_r": [-16, 0, 0], "knee_l": [-16, 0, 0], "braid": [16, 0, 0]},
-		{"t": 0.5, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
+		{"hold": 2, "t": 0.5, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
 			"weapon": [-16, 0, 0], "hips": [0, 0, 0], "spine": [-6, 0, 0]},
-		{"t": 0.75, "shoulder_r": [-148, 0, -17], "elbow_r": [-19, 0, 0],
+		{"hold": 2, "t": 0.75, "shoulder_r": [-148, 0, -17], "elbow_r": [-19, 0, 0],
 			"weapon": [-11, 0, 0], "hips": [-2, 0, 0], "spine": [-8, 0, 0],
 			"knee_r": [-11, 0, 0], "knee_l": [-11, 0, 0], "braid": [11, 0, 0]},
-		{"t": 1.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
+		{"hold": 2, "t": 1.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],
 			"weapon": [-16, 0, 0], "hips": [0, 0, 0], "spine": [-6, 0, 0]},
 	]},
 }
@@ -852,138 +852,138 @@ const FORM_ANIMS := {
 	"blob": {
 		# Wabern ist reines Stauchen: der Körper zieht sich zusammen und
 		# quillt wieder auseinander.
-		"idle": {"fps": 9, "loop": true, "frames": 20, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
-			{"t": 0.35, "spine": [0, 0, 0, 1.10, 0.86, 1.08], "head": [-6, 0, 0]},
-			{"t": 0.70, "spine": [0, 0, 0, 0.93, 1.14, 0.95], "head": [5, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+		"idle": {"fps": 14, "loop": true, "trans": 5, "keys": [
+			{"hold": 3, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+			{"hold": 3, "t": 0.35, "spine": [0, 0, 0, 1.10, 0.86, 1.08], "head": [-6, 0, 0]},
+			{"hold": 3, "t": 0.70, "spine": [0, 0, 0, 0.93, 1.14, 0.95], "head": [5, 0, 0]},
+			{"hold": 3, "t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
 		]},
 		# Zusammenziehen, dann nach vorn schnellen und breit aufklatschen.
-		"attack": {"fps": 14, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
-			{"t": 0.26, "spine": [0, 0, 0, 0.80, 1.30, 0.82], "hips": [0, 0, 0],
+		"attack": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"hold": 4, "t": 0.26, "spine": [0, 0, 0, 0.80, 1.30, 0.82], "hips": [0, 0, 0],
 				"head": [-16, 0, 0]},
-			{"t": 0.44, "spine": [0, 0, 0, 1.34, 0.70, 1.28], "hips": [16, 0, 0],
+			{"hold": 3, "t": 0.44, "spine": [0, 0, 0, 1.34, 0.70, 1.28], "hips": [16, 0, 0],
 				"head": [22, 0, 0]},
-			{"t": 0.66, "spine": [0, 0, 0, 0.94, 1.10, 0.96], "hips": [6, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
+			{"hold": 1, "t": 0.66, "spine": [0, 0, 0, 0.94, 1.10, 0.96], "hips": [6, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
-			{"t": 0.18, "spine": [0, 0, 0, 1.28, 0.72, 1.24], "hips": [-14, 0, 0]},
-			{"t": 0.52, "spine": [0, 0, 0, 0.90, 1.16, 0.92], "hips": [-5, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
+		"hit": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 1, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"hold": 4, "t": 0.18, "spine": [0, 0, 0, 1.28, 0.72, 1.24], "hips": [-14, 0, 0]},
+			{"hold": 3, "t": 0.52, "spine": [0, 0, 0, 0.90, 1.16, 0.92], "hips": [-5, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "hips": [0, 0, 0]},
 		]},
 		# Zerfließen statt Umfallen.
-		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
-			{"t": 0.22, "spine": [0, 0, 0, 0.88, 1.18, 0.90], "head": [-10, 0, 0]},
-			{"t": 0.60, "spine": [0, 0, 0, 1.40, 0.46, 1.34], "head": [18, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.62, 0.22, 1.54], "head": [26, 0, 0]},
+		"down": {"fps": 20, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"hold": 3, "t": 0.22, "spine": [0, 0, 0, 0.88, 1.18, 0.90], "head": [-10, 0, 0]},
+			{"hold": 3, "t": 0.60, "spine": [0, 0, 0, 1.40, 0.46, 1.34], "head": [18, 0, 0]},
+			{"hold": 6, "t": 1.0, "spine": [0, 0, 0, 1.62, 0.22, 1.54], "head": [26, 0, 0]},
 		]},
-		"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
-			{"t": 0.34, "spine": [0, 0, 0, 0.84, 1.26, 0.86], "head": [-14, 0, 0]},
-			{"t": 0.62, "spine": [0, 0, 0, 1.14, 0.90, 1.12], "head": [12, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
+		"taunt": {"fps": 20, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"hold": 4, "t": 0.34, "spine": [0, 0, 0, 0.84, 1.26, 0.86], "head": [-14, 0, 0]},
+			{"hold": 3, "t": 0.62, "spine": [0, 0, 0, 1.14, 0.90, 1.12], "head": [12, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0], "head": [0, 0, 0]},
 		]},
 	},
 	"quad": {
 		# Vierbeiner: Beine im Kreuzgang, Kopf senkt und hebt sich.
-		"idle": {"fps": 9, "loop": true, "frames": 20, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
-			{"t": 0.5, "spine": [2, 0, 0], "head": [-5, 4, 0],
+		"idle": {"fps": 14, "loop": true, "trans": 5, "keys": [
+			{"hold": 3, "t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+			{"hold": 3, "t": 0.5, "spine": [2, 0, 0], "head": [-5, 4, 0],
 				"leg_fl": [6, 0, 0], "leg_br": [-6, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+			{"hold": 3, "t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
 		]},
 		# Zuschnappen: ducken, vorschnellen, Kopf reißt hoch.
-		"attack": {"fps": 15, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
-			{"t": 0.26, "spine": [10, 0, 0], "head": [16, 0, 0],
+		"attack": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+			{"hold": 4, "t": 0.26, "spine": [10, 0, 0], "head": [16, 0, 0],
 				"leg_fl": [-26, 0, 0], "leg_fr": [-26, 0, 0]},
-			{"t": 0.46, "spine": [-16, 0, 0], "head": [-30, 0, 0], "hips": [-10, 0, 0],
+			{"hold": 3, "t": 0.46, "spine": [-16, 0, 0], "head": [-30, 0, 0], "hips": [-10, 0, 0],
 				"leg_fl": [34, 0, 0], "leg_fr": [34, 0, 0],
 				"leg_bl": [-22, 0, 0], "leg_br": [-22, 0, 0]},
-			{"t": 0.70, "spine": [6, 0, 0], "head": [10, 0, 0], "hips": [4, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+			{"hold": 1, "t": 0.70, "spine": [6, 0, 0], "head": [10, 0, 0], "hips": [4, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.18, "spine": [-18, 0, 0], "head": [-24, 0, 0], "hips": [-12, 0, 0],
+		"hit": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 1, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 4, "t": 0.18, "spine": [-18, 0, 0], "head": [-24, 0, 0], "hips": [-12, 0, 0],
 				"leg_fl": [24, 0, 0], "leg_fr": [24, 0, 0]},
-			{"t": 0.55, "spine": [-6, 0, 0], "head": [-8, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0]},
+			{"hold": 3, "t": 0.55, "spine": [-6, 0, 0], "head": [-8, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0]},
 		]},
-		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.30, "spine": [-12, 0, 0], "head": [-18, 0, 0]},
-			{"t": 0.70, "spine": [0, 0, 46], "head": [10, 0, 30], "hips": [0, 0, 40],
+		"down": {"fps": 20, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 3, "t": 0.30, "spine": [-12, 0, 0], "head": [-18, 0, 0]},
+			{"hold": 3, "t": 0.70, "spine": [0, 0, 46], "head": [10, 0, 30], "hips": [0, 0, 40],
 				"leg_fl": [40, 0, 0], "leg_fr": [40, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 74], "head": [14, 0, 50], "hips": [0, 0, 68],
+			{"hold": 6, "t": 1.0, "spine": [0, 0, 74], "head": [14, 0, 50], "hips": [0, 0, 68],
 				"leg_fl": [56, 0, 0], "leg_fr": [56, 0, 0]},
 		]},
-		"taunt": {"fps": 10, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.35, "spine": [-14, 0, 0], "head": [-22, 0, 0], "hips": [-8, 0, 0]},
-			{"t": 0.65, "spine": [8, 0, 0], "head": [14, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
+		"taunt": {"fps": 20, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 4, "t": 0.35, "spine": [-14, 0, 0], "head": [-22, 0, 0], "hips": [-8, 0, 0]},
+			{"hold": 3, "t": 0.65, "spine": [8, 0, 0], "head": [14, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0]},
 		]},
 	},
 	"spider": {
 		# Beine tasten abwechselnd — vier Paare, gegenläufig.
-		"idle": {"fps": 9, "loop": true, "frames": 24, "keys": [
-			{"t": 0.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
+		"idle": {"fps": 14, "loop": true, "trans": 5, "keys": [
+			{"hold": 3, "t": 0.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
 				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
-			{"t": 0.5, "leg_0_-1": [12, 0, 0], "leg_1_1": [-10, 0, 0],
+			{"hold": 3, "t": 0.5, "leg_0_-1": [12, 0, 0], "leg_1_1": [-10, 0, 0],
 				"leg_2_-1": [10, 0, 0], "leg_3_1": [-12, 0, 0], "spine": [3, 0, 0],
 				"head": [-5, 0, 0]},
-			{"t": 1.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
+			{"hold": 3, "t": 1.0, "leg_0_-1": [0, 0, 0], "leg_1_1": [0, 0, 0],
 				"leg_2_-1": [0, 0, 0], "leg_3_1": [0, 0, 0], "spine": [0, 0, 0]},
 		]},
 		# Aufbäumen auf den Hinterbeinen, dann zustoßen.
-		"attack": {"fps": 14, "loop": false, "frames": 20, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.30, "spine": [-24, 0, 0], "head": [-20, 0, 0], "hips": [-16, 0, 0],
+		"attack": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 4, "t": 0.30, "spine": [-24, 0, 0], "head": [-20, 0, 0], "hips": [-16, 0, 0],
 				"leg_0_-1": [-34, 0, 0], "leg_0_1": [-34, 0, 0],
 				"leg_1_-1": [-22, 0, 0], "leg_1_1": [-22, 0, 0]},
-			{"t": 0.52, "spine": [22, 0, 0], "head": [26, 0, 0], "hips": [14, 0, 0],
+			{"hold": 3, "t": 0.52, "spine": [22, 0, 0], "head": [26, 0, 0], "hips": [14, 0, 0],
 				"leg_0_-1": [40, 0, 0], "leg_0_1": [40, 0, 0],
 				"leg_1_-1": [26, 0, 0], "leg_1_1": [26, 0, 0]},
-			{"t": 0.76, "spine": [6, 0, 0], "head": [8, 0, 0], "hips": [4, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+			{"hold": 1, "t": 0.76, "spine": [6, 0, 0], "head": [8, 0, 0], "hips": [4, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
 		]},
-		"hit": {"fps": 16, "loop": false, "frames": 14, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.18, "spine": [-20, 0, 0], "hips": [-14, 0, 0],
+		"hit": {"fps": 30, "loop": false, "trans": 1, "keys": [
+			{"hold": 1, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 4, "t": 0.18, "spine": [-20, 0, 0], "hips": [-14, 0, 0],
 				"leg_0_-1": [26, 0, 0], "leg_0_1": [26, 0, 0],
 				"leg_3_-1": [-20, 0, 0], "leg_3_1": [-20, 0, 0]},
-			{"t": 0.55, "spine": [-6, 0, 0], "hips": [-4, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0]},
+			{"hold": 3, "t": 0.55, "spine": [-6, 0, 0], "hips": [-4, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0]},
 		]},
 		# Beine ziehen sich ein, der Leib sackt ab.
-		"down": {"fps": 11, "loop": false, "frames": 18, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
-			{"t": 0.30, "spine": [-14, 0, 0, 1.0, 1.0, 1.0],
+		"down": {"fps": 20, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0, 1.0, 1.0, 1.0]},
+			{"hold": 3, "t": 0.30, "spine": [-14, 0, 0, 1.0, 1.0, 1.0],
 				"leg_0_-1": [-30, 0, 0], "leg_0_1": [-30, 0, 0]},
-			{"t": 0.70, "spine": [0, 0, 0, 1.10, 0.62, 1.08], "hips": [10, 0, 0],
+			{"hold": 3, "t": 0.70, "spine": [0, 0, 0, 1.10, 0.62, 1.08], "hips": [10, 0, 0],
 				"leg_0_-1": [64, 0, 0], "leg_0_1": [64, 0, 0],
 				"leg_1_-1": [58, 0, 0], "leg_1_1": [58, 0, 0],
 				"leg_2_-1": [52, 0, 0], "leg_2_1": [52, 0, 0],
 				"leg_3_-1": [46, 0, 0], "leg_3_1": [46, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0, 1.16, 0.40, 1.14], "hips": [16, 0, 0],
+			{"hold": 6, "t": 1.0, "spine": [0, 0, 0, 1.16, 0.40, 1.14], "hips": [16, 0, 0],
 				"leg_0_-1": [86, 0, 0], "leg_0_1": [86, 0, 0],
 				"leg_1_-1": [80, 0, 0], "leg_1_1": [80, 0, 0],
 				"leg_2_-1": [74, 0, 0], "leg_2_1": [74, 0, 0],
 				"leg_3_-1": [68, 0, 0], "leg_3_1": [68, 0, 0]},
 		]},
-		"roar": {"fps": 10, "loop": false, "frames": 20, "keys": [
-			{"t": 0.0, "spine": [0, 0, 0]},
-			{"t": 0.34, "spine": [-30, 0, 0], "head": [-34, 0, 0], "hips": [-20, 0, 0],
+		"roar": {"fps": 22, "loop": false, "trans": 2, "keys": [
+			{"hold": 2, "t": 0.0, "spine": [0, 0, 0]},
+			{"hold": 4, "t": 0.34, "spine": [-30, 0, 0], "head": [-34, 0, 0], "hips": [-20, 0, 0],
 				"leg_0_-1": [-44, 0, 0], "leg_0_1": [-44, 0, 0],
 				"leg_1_-1": [-30, 0, 0], "leg_1_1": [-30, 0, 0]},
-			{"t": 0.62, "spine": [-26, 0, 0], "head": [-30, 0, 0], "hips": [-18, 0, 0]},
-			{"t": 0.82, "spine": [16, 0, 0], "head": [18, 0, 0], "hips": [10, 0, 0]},
-			{"t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
+			{"hold": 5, "t": 0.62, "spine": [-26, 0, 0], "head": [-30, 0, 0], "hips": [-18, 0, 0]},
+			{"hold": 2, "t": 0.82, "spine": [16, 0, 0], "head": [18, 0, 0], "hips": [10, 0, 0]},
+			{"hold": 4, "t": 1.0, "spine": [0, 0, 0], "head": [0, 0, 0], "hips": [0, 0, 0]},
 		]},
 	},
 }
@@ -997,8 +997,46 @@ static func table(form_name: String, anim: String) -> Dictionary:
 		return t[anim]
 	return ANIMS.get(anim, ANIMS["idle"])
 
+## Bildplan einer Animation: je Bild [Pose A, Pose B, Mischanteil].
+##
+## Motion Twins Regel für Dead Cells lautet wörtlich: „I add interpolation
+## frames before or after the key frames. Never in-between." Bilder werden
+## also NICHT gleichmäßig zwischen zwei Posen verteilt — sie sammeln sich AUF
+## den Posen, und der Wechsel dazwischen geht schnell. Genau daraus entsteht
+## der Eindruck von Schlagkraft; gleichmäßiges Überblenden wirkt dagegen
+## teigig, egal wie viele Bilder man hineinsteckt.
+##
+## `hold` je Pose = wie lange sie steht, `trans` = wie schnell gewechselt wird.
+static func plan(form_name: String, anim: String) -> Array:
+	var a: Dictionary = table(form_name, anim)
+	var keys: Array = a["keys"]
+	var trans: int = a.get("trans", 2)
+	var out := []
+	for i in keys.size() - 1:
+		var hold: int = keys[i].get("hold", 1)
+		for _h in hold:
+			out.append([i, i, 0.0])
+		var t: int = keys[i].get("trans", trans)
+		for j in t:
+			# Scharfe Kurve: der Wechsel schiebt sich zum Ende hin zusammen,
+			# statt gleichmäßig durchzulaufen.
+			var f := float(j + 1) / float(t + 1)
+			out.append([i, i + 1, f * f * (3.0 - 2.0 * f)])
+	var last: int = keys[keys.size() - 1].get("hold", 1)
+	for _h in last:
+		out.append([keys.size() - 1, keys.size() - 1, 0.0])
+	return out
+
+static var _plans := {}
+
+static func _cached_plan(form_name: String, anim: String) -> Array:
+	var key := form_name + "/" + anim
+	if not _plans.has(key):
+		_plans[key] = plan(form_name, anim)
+	return _plans[key]
+
 static func frames_of(anim: String, form_name := "human") -> int:
-	return table(form_name, anim)["frames"]
+	return _cached_plan(form_name, anim).size()
 
 static func fps_of(anim: String) -> float:
 	return float(ANIMS[anim]["fps"])
@@ -1006,18 +1044,13 @@ static func fps_of(anim: String) -> float:
 ## Setzt alle Gelenke auf die Pose zum Zeitpunkt des Frames.
 func apply(anim: String, frame: int) -> void:
 	var a: Dictionary = table(form, anim)
-	var n: int = a["frames"]
-	var t := float(frame % n) / float(n) if a["loop"] \
-		else float(mini(frame, n - 1)) / float(n - 1)
 	var keys: Array = a["keys"]
-	var i := 0
-	while i < keys.size() - 2 and float(keys[i + 1]["t"]) < t:
-		i += 1
-	var k0: Dictionary = keys[i]
-	var k1: Dictionary = keys[mini(i + 1, keys.size() - 1)]
-	var span: float = maxf(float(k1["t"]) - float(k0["t"]), 0.0001)
-	var f := clampf((t - float(k0["t"])) / span, 0.0, 1.0)
-	f = f * f * (3.0 - 2.0 * f)
+	var pl := _cached_plan(form, anim)
+	var step: Array = pl[frame % pl.size()] if a["loop"] \
+		else pl[mini(frame, pl.size() - 1)]
+	var k0: Dictionary = keys[step[0]]
+	var k1: Dictionary = keys[step[1]]
+	var f: float = step[2]
 	for name: String in joints:
 		var v0 = k0.get(name, null)
 		var v1 = k1.get(name, null)
