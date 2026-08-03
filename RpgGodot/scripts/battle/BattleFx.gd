@@ -42,7 +42,7 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	var frames := create_tween().set_loops()
 	frames.tween_interval(0.06)
 	frames.tween_callback(func():
-		h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"])
+		h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"], h["data"]["id"])
 		s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "run"))
 	_ghost_trail(s, dur)
 	# In Laufrichtung lehnen, am Ziel aufrichten und abfedern.

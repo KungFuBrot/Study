@@ -239,9 +239,67 @@ static func _outline(img: Image) -> Image:
 
 static var _cache := {}
 
+## ---------- Gebackene 3D-Blätter ----------
+## Die Figuren werden nicht mehr gezeichnet, sondern als 3D-Skelett modelliert,
+## klein gerendert und als Sprite-Streifen abgelegt (siehe scripts/proto/).
+## Hier werden sie geladen und in Einzelbilder zerlegt. Fehlt ein Streifen,
+## fällt die Figur auf die alte 2D-Zeichnung zurück — dadurch bleibt das Spiel
+## auch dann lauffähig, wenn ein Blatt noch nicht gebacken ist.
+
+const BAKED := "res://assets/rig3d/"
+# Kampfanimation -> Streifen. Zauber und Zielen teilen sich die Angriffspose.
+const BAKED_ANIM := {
+	"idle": "idle", "walk": "walk", "run": "run", "attack": "attack",
+	"cast": "attack", "aim": "attack", "hit": "hit", "down": "down",
+	"cheer": "cheer",
+}
+static var _sheets := {}
+
+## Einzelbild aus einem Streifen als AtlasTexture (gecacht). null, wenn es
+## den Streifen nicht gibt.
+static func _baked(id: String, anim: String, frame: int, view := "") -> Texture2D:
+	var strip := "%s_%s%s" % [id, anim, "" if view == "" or view == "side" else "_" + view]
+	var w: int = HERO_W
+	var h: int = HERO_H
+	if MON_IDLE.has(id):
+		w = BOSS_W if is_boss(id) else MON_W
+		h = BOSS_H if is_boss(id) else MON_H
+	var sheet: Texture2D
+	if _sheets.has(strip):
+		sheet = _sheets[strip]
+	else:
+		var path := BAKED + strip + ".png"
+		sheet = load(path) if ResourceLoader.exists(path) else null
+		_sheets[strip] = sheet
+	if sheet == null:
+		return null
+	var n := maxi(int(sheet.get_width() / w), 1)
+	var key := "atlas_%s_%d" % [strip, frame % n]
+	if _cache.has(key):
+		return _cache[key]
+	var at := AtlasTexture.new()
+	at.atlas = sheet
+	at.region = Rect2((frame % n) * w, 0, w, h)
+	_cache[key] = at
+	return at
+
+## Frameanzahl eines gebackenen Streifens (0, wenn nicht vorhanden).
+static func baked_frames(id: String, anim: String, view := "") -> int:
+	var t := _baked(id, anim, 0, view)
+	if t == null:
+		return 0
+	var strip := "%s_%s%s" % [id, anim, "" if view == "" or view == "side" else "_" + view]
+	var w: int = HERO_W
+	if MON_IDLE.has(id):
+		w = BOSS_W if is_boss(id) else MON_W
+	return maxi(int((_sheets[strip] as Texture2D).get_width() / w), 1)
+
 ## Held im Kampf. anim siehe ANIMS: idle, walk, run, attack, cast, aim, hit,
 ## down, cheer. Seitenansicht.
 static func battle(id: String, frame := 0, anim := "idle") -> Texture2D:
+	var b := _baked(id, BAKED_ANIM.get(anim, "idle"), frame)
+	if b != null:
+		return b
 	return _figure(id, anim, frame, "side")
 
 ## Dieselbe Figur für die Erkundung. Der Aufrufer stellt sie auf Maßstab 0.5,
@@ -249,7 +307,11 @@ static func battle(id: String, frame := 0, anim := "idle") -> Texture2D:
 ## der doppelten Pixeldichte und derselben Zeichnung wie im Kampf.
 ## dir: "side" | "down" (zum Betrachter) | "up" (von hinten).
 static func field(id: String, walking: bool, frame := 0, dir := "side") -> Texture2D:
-	return _figure(id, "walk" if walking else "idle", frame, dir)
+	var anim := "walk" if walking else "idle"
+	var b := _baked(id, anim, frame, dir)
+	if b != null:
+		return b
+	return _figure(id, anim, frame, dir)
 
 static func _figure(id: String, anim: String, frame: int, view: String) -> Texture2D:
 	var key := "f_%s_%s_%d_%s" % [id, anim, frame, view]
@@ -704,8 +766,15 @@ static func pose_at(anim: String, frame: int) -> Dictionary:
 		out[k] = lerpf(a0, a1, f)
 	return out
 
-## Frameanzahl einer Animation (für Aufrufer, die durchtakten).
-static func anim_frames(anim: String) -> int:
+## Frameanzahl einer Animation (für Aufrufer, die durchtakten). Mit `id` wird
+## die Länge des gebackenen 3D-Streifens zurückgegeben, sonst die der
+## 2D-Tabelle — die 3D-Streifen haben mehr Bilder, weil Zwischenbilder dort
+## nichts kosten.
+static func anim_frames(anim: String, id := "") -> int:
+	if id != "":
+		var n := baked_frames(id, BAKED_ANIM.get(anim, "idle"))
+		if n > 0:
+			return n
 	return ANIMS.get(anim, ANIMS["idle"])["frames"]
 
 static func anim_fps(anim: String) -> float:
@@ -938,8 +1007,12 @@ const MON_FORCE := {
 	"boss": 0.8, "boss2": 0.85, "boss3": 0.9, "boss4": 0.75,
 }
 
-## Frameanzahl einer Kreaturen-Animation.
-static func mon_frames(anim: String) -> int:
+## Frameanzahl einer Kreaturen-Animation. Mit `id` gilt der gebackene Streifen.
+static func mon_frames(anim: String, id := "") -> int:
+	if id != "":
+		var n := baked_frames(id, "attack" if anim == "taunt" else anim)
+		if n > 0:
+			return n
 	if anim == "idle" or not MON_ANIMS.has(anim):
 		return MON_FRAMES
 	return MON_ANIMS[anim]["frames"]
@@ -970,6 +1043,10 @@ static func _mon_pose(anim: String, frame: int) -> Dictionary:
 
 ## Monster oder Boss. anim: "idle" | "attack" | "hit" | "down".
 static func monster(id: String, frame := 0, anim := "idle") -> Texture2D:
+	# "taunt" hat kein eigenes 3D-Blatt und teilt sich den Angriff.
+	var b := _baked(id, "attack" if anim == "taunt" else anim, frame)
+	if b != null:
+		return b
 	var key := "m_%s_%s_%d" % [id, anim, frame]
 	if _cache.has(key):
 		return _cache[key]

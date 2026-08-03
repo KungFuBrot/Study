@@ -55,6 +55,31 @@ Neue geteilte Helfer gehören nach `BattleFx` (visuell) bzw. `BattleBase` (Zusta
 Gegner, Props). Alle Aufrufe von außen laufen über `SpriteFactory.*`
 (statische Vererbung).
 
+### 3D-zu-Pixel-Pipeline (`scripts/proto/`) — Quelle aller Figuren
+
+Seit dem Stilwechsel werden Figuren **nicht mehr gezeichnet**, sondern als
+3D-Gelenkskelett modelliert, orthografisch sehr klein und ohne Kantenglättung
+gerendert und als Sprite-Streifen nach `assets/rig3d/` gebacken (Verfahren von
+Motion Twin / Dead Cells). `RigFactory` lädt die Streifen und schneidet die
+Einzelbilder heraus; fehlt ein Streifen, fällt die Figur automatisch auf die
+alte 2D-Zeichnung zurück.
+
+| Datei | Inhalt |
+|---|---|
+| `proto/Rig3D.gd` | Bauformen (Humanoid parametriert, Blob, Vierbeiner, Spinne) + Animationstabellen als Gelenkwinkel |
+| `proto/Figures3D.gd` | Bauplan jeder Spielfigur, Leinwandgrößen, Kameragrößen |
+| `proto/Proto3D.gd` | Backvorgang: SubViewport, Dreipunktlicht, Farbstufen, Kontur |
+
+**Neu backen** (Godot NICHT headless starten — headless hat kein Rendergerät):
+```powershell
+$env:PROTO3D = "$PWD\assets\rig3d"; godot --path .
+```
+Danach `--headless --editor --quit`, damit die neuen PNGs importiert werden.
+
+Kein Skinning: jeder Körperteil ist ein starres Mesh an einem Gelenk-Node.
+Leinwandgrößen (Held 32x56, Monster 52x52, Boss 112x128) sind identisch zum
+alten 2D-Rig — deshalb blieb die gesamte Kampf- und Feldaufstellung unberührt.
+
 **`scripts/sprites/RigFactory.gd` steht daneben, nicht in der Kette.** Dort
 werden ALLE Kampffiguren gezeichnet — Helden, 13 Monster, 4 Bosse, Dorf-NPCs:
 Körperteil-Karte → Schattierung je Glied über dessen eigene Ausdehnung →

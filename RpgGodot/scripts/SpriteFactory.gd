@@ -648,7 +648,7 @@ static func enemy_has_anim(id: String) -> bool:
 ## die Helden, dieselbe Pixelgröße auf dem Bildschirm.
 ## anim: "idle" | "attack" | "hit" | "down".
 static func enemy_frame(id: String, frame: int, anim := "idle") -> Texture2D:
-	return RigFactory.monster(id, frame % RigFactory.mon_frames(anim), anim)
+	return RigFactory.monster(id, frame % RigFactory.mon_frames(anim, id), anim)
 
 ## Ist dieser Gegner ein großes Boss-Sprite (32x36 statt 16x16)?
 static func enemy_is_big(id: String) -> bool:

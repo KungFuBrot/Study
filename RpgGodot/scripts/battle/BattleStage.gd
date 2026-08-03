@@ -904,7 +904,7 @@ func _start_idle_animations() -> void:
 			var anim: String = e.get("anim", "idle")
 			if not e["alive"] and anim != "down":
 				return
-			e["frame"] = (e["frame"] + 1) % RigFactory.mon_frames(anim)
+			e["frame"] = (e["frame"] + 1) % RigFactory.mon_frames(anim, e["id"])
 			var tex := SpriteFactory.enemy_frame(e["id"], e["frame"], anim)
 			(e["sprite"] as Sprite2D).texture = tex
 			if is_instance_valid(e["refl"]):
@@ -912,7 +912,7 @@ func _start_idle_animations() -> void:
 	for h in heroes:
 		_unit_ticker(randf_range(0.13, 0.19), func():
 			if h["data"]["hp"] > 0:
-				h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"])
+				h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"], h["data"]["id"])
 				(h["sprite"] as Sprite2D).texture = \
 					SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"]))
 	# Drohgebärde: alle paar Sekunden richtet sich eine wartende Kreatur auf

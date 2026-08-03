@@ -912,7 +912,7 @@ func _process(delta: float) -> void:
 	anim_accum += delta
 	if anim_accum >= 0.14:
 		anim_accum -= 0.14
-		anim_frame = (anim_frame + 1) % 8
+		anim_frame = (anim_frame + 1) % 16
 		if is_instance_valid(player):
 			_update_sprites()
 	if state == "move" and not moving:
