@@ -97,6 +97,15 @@ func build_humanoid(s: Dictionary) -> void:
 		Vector3(0, 0.32 * k, 0), cloth)
 	_box(spine, Vector3(0.21 * k * bw, 0.05 * k, 0.29 * k * bw),
 		Vector3(0, 0.0, 0), trim)
+	# Feindetail, das erst bei der doppelten Auflösung ankommt: Gürtelschnalle,
+	# Brustriemen, Kragen. Jedes davon ist nur ein Kasten, aber es sind genau
+	# diese Kanten, an denen das Licht bricht.
+	_box(spine, Vector3(0.06 * k, 0.06 * k, 0.07 * k),
+		Vector3(0.10 * k * bw, 0.0, 0), mat(Color(0.86, 0.72, 0.32), 0.4))
+	_box(spine, Vector3(0.05 * k, 0.30 * k, 0.05 * k),
+		Vector3(0.11 * k * bw, 0.22 * k, 0.09 * k * bw), trim)
+	_box(spine, Vector3(0.20 * k * bw, 0.05 * k, 0.31 * k * bw),
+		Vector3(-0.01 * k, 0.44 * k, 0), trim)
 
 	var neck := _joint(spine, "neck", Vector3(0, 0.48 * k, 0))
 	_box(neck, Vector3(0.09 * k, 0.06 * k, 0.10 * k), Vector3(0, 0.02 * k, 0), skin)
@@ -127,8 +136,16 @@ func build_humanoid(s: Dictionary) -> void:
 		var knee := _joint(hp, "knee_" + tag, Vector3(0, -0.32 * k, 0))
 		_box(knee, Vector3(0.10 * k * bw, 0.28 * k, 0.10 * k * bw),
 			Vector3(0, -0.15 * k, 0), legs)
+		# Knieschutz — bricht das lange Bein in zwei lesbare Abschnitte.
+		_box(knee, Vector3(0.12 * k * bw, 0.07 * k, 0.13 * k * bw),
+			Vector3(0.02 * k, 0.0, 0), boots)
 		var ankle := _joint(knee, "ankle_" + tag, Vector3(0, -0.30 * k, 0))
 		_box(ankle, Vector3(0.19 * k, 0.08 * k, 0.11 * k), Vector3(0.04 * k, -0.04 * k, 0), boots)
+		# Stiefelschaft mit Umschlag
+		_box(ankle, Vector3(0.12 * k * bw, 0.16 * k, 0.13 * k * bw),
+			Vector3(0, 0.08 * k, 0), boots)
+		_box(ankle, Vector3(0.14 * k * bw, 0.05 * k, 0.15 * k * bw),
+			Vector3(0, 0.17 * k, 0), trim)
 
 	if floats:
 		# Schwebende Wesen laufen nach unten in Schwaden aus statt Beine zu
@@ -180,14 +197,24 @@ func _build_head_extras(head: Node3D, s: Dictionary, k: float, hs: float,
 	if s.has("beard"):
 		_box(head, Vector3(0.13 * k, 0.16 * k, 0.17 * k),
 			Vector3(0.06 * k, 0.02 * k, 0), mat(s["beard"]))
-	# Augen: zwei kleine leuchtende Würfel. Bei den meisten Monstern ist das
-	# das einzige Gesichtsmerkmal, das bei dieser Größe überhaupt ankommt.
+	# Gesicht. Bei doppelter Auflösung reichen die Pixel für Brauenwulst und
+	# Nase — vorher waren zwei Augenwürfel alles, was ankam.
 	var eye_col: Color = s.get("eyes", Color(0.10, 0.08, 0.12))
 	var glow: float = s.get("eye_glow", 0.0)
 	var em := mat(eye_col, 0.6, glow)
+	var skin_c: Color = s.get("skin", Color(0.9, 0.74, 0.58))
 	for z in [-0.055, 0.055]:
 		_box(head, Vector3(0.03 * k, 0.035 * k, 0.045 * k),
 			Vector3(0.10 * k * hs, 0.13 * k * hs, z * k), em)
+	if not s.has("faceless"):
+		# Brauenwulst wirft einen Schatten auf die Augen — das gibt dem
+		# Gesicht Tiefe statt aufgemalter Punkte.
+		_box(head, Vector3(0.035 * k, 0.03 * k, 0.17 * k * hs),
+			Vector3(0.095 * k * hs, 0.175 * k * hs, 0), mat(skin_c.darkened(0.18)))
+		_box(head, Vector3(0.04 * k, 0.05 * k, 0.04 * k),
+			Vector3(0.11 * k * hs, 0.09 * k * hs, 0), mat(skin_c.lightened(0.08)))
+		_box(head, Vector3(0.02 * k, 0.02 * k, 0.07 * k),
+			Vector3(0.10 * k * hs, 0.035 * k * hs, 0), mat(skin_c.darkened(0.30)))
 
 ## Gegenstand in der vorderen Hand (bzw. auf dem Rücken).
 func _build_prop(s: Dictionary, k: float, trim: StandardMaterial3D) -> void:
@@ -435,6 +462,101 @@ const ANIMS := {
 			"knee_r": [104, 0, 0], "hip_l": [82, 0, 0], "knee_l": [98, 0, 0],
 			"shoulder_r": [72, 0, -36], "shoulder_l": [60, 0, 36], "hips": [62, 0, 0],
 			"braid": [58, 0, 0]},
+	]},
+	# Rückhand: der zweite Schlag der Kombo, aus der Gegenrichtung.
+	"attack2": {"fps": 16, "loop": false, "frames": 12, "keys": [
+		{"t": 0.0, "spine": [16, 10, 0], "shoulder_r": [44, 0, 0], "elbow_r": [-20, 0, 0],
+			"weapon": [-2, 0, 0], "hips": [0, 7, 0]},
+		{"t": 0.28, "spine": [22, 20, 0], "shoulder_r": [78, 0, 14], "elbow_r": [-14, 0, 0],
+			"weapon": [26, 0, 0], "hips": [0, 16, 0], "head": [10, 12, 0],
+			"braid": [26, 0, 0]},
+		{"t": 0.48, "spine": [-14, -20, 0], "shoulder_r": [-46, 0, -26],
+			"elbow_r": [-34, 0, 0], "weapon": [-40, 0, 0], "hips": [0, -16, 0],
+			"head": [-8, -12, 0], "braid": [-30, 0, 0], "hip_l": [-20, 0, 0],
+			"knee_l": [16, 0, 0]},
+		{"t": 0.72, "spine": [-6, -10, 0], "shoulder_r": [-18, 0, -14],
+			"elbow_r": [-30, 0, 0], "weapon": [-26, 0, 0], "hips": [0, -7, 0],
+			"braid": [-12, 0, 0]},
+		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+			"weapon": [-14, 0, 0], "hips": [0, 0, 0]},
+	]},
+	# Zaubern: sammeln, aufrichten, Stab nach vorn entladen.
+	"cast": {"fps": 12, "loop": false, "frames": 14, "keys": [
+		{"t": 0.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+		{"t": 0.26, "spine": [12, 0, 0], "shoulder_r": [-24, 0, -14],
+			"elbow_r": [-58, 0, 0], "shoulder_l": [-20, 0, 14], "elbow_l": [-54, 0, 0],
+			"head": [8, 0, 0], "hip_r": [-12, 0, 0], "knee_r": [20, 0, 0],
+			"weapon": [-30, 0, 0]},
+		{"t": 0.46, "spine": [16, 0, 0], "shoulder_r": [-34, 0, -16],
+			"elbow_r": [-66, 0, 0], "shoulder_l": [-28, 0, 16], "elbow_l": [-60, 0, 0],
+			"head": [12, 0, 0], "hip_r": [-16, 0, 0], "knee_r": [26, 0, 0],
+			"weapon": [-38, 0, 0], "braid": [-16, 0, 0]},
+		{"t": 0.62, "spine": [-18, 0, 0], "shoulder_r": [-128, 0, -8],
+			"elbow_r": [-8, 0, 0], "shoulder_l": [-40, 0, 20], "head": [-16, 0, 0],
+			"weapon": [12, 0, 0], "braid": [34, 0, 0], "hips": [-6, 0, 0]},
+		{"t": 0.82, "spine": [-8, 0, 0], "shoulder_r": [-96, 0, -8],
+			"elbow_r": [-16, 0, 0], "head": [-8, 0, 0], "weapon": [4, 0, 0],
+			"braid": [16, 0, 0]},
+		{"t": 1.0, "spine": [0, 0, 0], "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0],
+			"weapon": [-14, 0, 0]},
+	]},
+	# Zielen und schießen: Arm hoch, kurzer Rückstoß, halten.
+	"aim": {"fps": 14, "loop": false, "frames": 10, "keys": [
+		{"t": 0.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+		{"t": 0.30, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
+			"spine": [-4, -8, 0], "head": [0, -6, 0], "weapon": [0, 0, 0]},
+		{"t": 0.46, "shoulder_r": [-84, 0, -4], "elbow_r": [-6, 0, 0],
+			"spine": [-4, -8, 0], "head": [0, -6, 0]},
+		{"t": 0.56, "shoulder_r": [-70, 0, -4], "elbow_r": [-18, 0, 0],
+			"spine": [-12, -8, 0], "hips": [-5, 0, 0], "head": [-6, -6, 0]},
+		{"t": 0.75, "shoulder_r": [-82, 0, -4], "elbow_r": [-8, 0, 0],
+			"spine": [-5, -8, 0]},
+		{"t": 1.0, "shoulder_r": [10, 0, -6], "elbow_r": [-28, 0, 0]},
+	]},
+	# Decken: klein machen, Waffe quer vor den Körper.
+	"block": {"fps": 12, "loop": true, "frames": 10, "keys": [
+		{"t": 0.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
+			"elbow_r": [-84, 0, 0], "shoulder_l": [-30, 0, 30], "elbow_l": [-70, 0, 0],
+			"weapon": [64, 0, 0], "head": [10, 0, 0], "hip_r": [-22, 0, 0],
+			"knee_r": [34, 0, 0], "hip_l": [-14, 0, 0], "knee_l": [26, 0, 0],
+			"hips": [8, 0, 0]},
+		{"t": 0.5, "spine": [18, -6, 0], "shoulder_r": [-56, 0, -36],
+			"elbow_r": [-88, 0, 0], "shoulder_l": [-33, 0, 32], "elbow_l": [-73, 0, 0],
+			"weapon": [68, 0, 0], "head": [12, 0, 0], "hip_r": [-24, 0, 0],
+			"knee_r": [37, 0, 0], "hip_l": [-16, 0, 0], "knee_l": [29, 0, 0],
+			"hips": [10, 0, 0]},
+		{"t": 1.0, "spine": [16, -6, 0], "shoulder_r": [-52, 0, -34],
+			"elbow_r": [-84, 0, 0], "shoulder_l": [-30, 0, 30], "elbow_l": [-70, 0, 0],
+			"weapon": [64, 0, 0], "head": [10, 0, 0], "hip_r": [-22, 0, 0],
+			"knee_r": [34, 0, 0], "hip_l": [-14, 0, 0], "knee_l": [26, 0, 0],
+			"hips": [8, 0, 0]},
+	]},
+	# Drohen: aufrichten, vorlehnen, wieder sinken.
+	"taunt": {"fps": 10, "loop": false, "frames": 12, "keys": [
+		{"t": 0.0, "spine": [0, 0, 0]},
+		{"t": 0.30, "spine": [-16, 0, 0], "head": [-14, 0, 0],
+			"shoulder_r": [-30, 0, -24], "shoulder_l": [-26, 0, 24],
+			"elbow_r": [-46, 0, 0], "elbow_l": [-42, 0, 0], "hips": [-8, 0, 0]},
+		{"t": 0.55, "spine": [14, 0, 0], "head": [16, 0, 0],
+			"shoulder_r": [16, 0, -14], "shoulder_l": [12, 0, 14],
+			"elbow_r": [-24, 0, 0], "elbow_l": [-22, 0, 0], "hips": [8, 0, 0]},
+		{"t": 1.0, "spine": [0, 0, 0]},
+	]},
+	# Brüllen: weit zurückbäumen, Kopf hoch, dann vorschnellen.
+	"roar": {"fps": 11, "loop": false, "frames": 14, "keys": [
+		{"t": 0.0, "spine": [0, 0, 0]},
+		{"t": 0.28, "spine": [-24, 0, 0], "head": [-30, 0, 0],
+			"shoulder_r": [-58, 0, -40], "shoulder_l": [-54, 0, 40],
+			"elbow_r": [-52, 0, 0], "elbow_l": [-48, 0, 0], "hips": [-12, 0, 0],
+			"hip_r": [-14, 0, 0], "hip_l": [-14, 0, 0]},
+		{"t": 0.52, "spine": [-28, 0, 0], "head": [-36, 0, 0],
+			"shoulder_r": [-66, 0, -46], "shoulder_l": [-62, 0, 46],
+			"elbow_r": [-56, 0, 0], "elbow_l": [-52, 0, 0], "hips": [-14, 0, 0]},
+		{"t": 0.72, "spine": [22, 0, 0], "head": [20, 0, 0],
+			"shoulder_r": [40, 0, -10], "shoulder_l": [36, 0, 10],
+			"elbow_r": [-18, 0, 0], "elbow_l": [-16, 0, 0], "hips": [14, 0, 0],
+			"hip_r": [-20, 0, 0], "knee_r": [26, 0, 0]},
+		{"t": 1.0, "spine": [0, 0, 0]},
 	]},
 	"cheer": {"fps": 10, "loop": true, "frames": 12, "keys": [
 		{"t": 0.0, "shoulder_r": [-140, 0, -16], "elbow_r": [-24, 0, 0],

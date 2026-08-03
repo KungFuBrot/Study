@@ -12,10 +12,16 @@ const STEP_TIME := 0.18
 # jetzt etwas größer, gut anderthalb Kacheln hoch wie in klassischen JRPGs.
 # Der Versatz wird aus dem Maßstab abgeleitet, damit die Füße unabhängig davon
 # auf dem Kachelboden stehen und die Figur mittig über der Kachel sitzt.
-const FIELD_CHAR_SCALE := 0.62
-const CHAR_OFFSET := Vector2(6.0 / FIELD_CHAR_SCALE - 16.0, 16.0 / FIELD_CHAR_SCALE - 56.0)
-# Verkleinerung des thronenden Bosses auf der Karte (Rig-Boss ist 112x128).
-const FIELD_BOSS_SCALE := 0.30
+const FIELD_CHAR_SCALE := 0.62 / RigFactory.BAKE
+# Halbe Sprite-Breite und volle Höhe der gebackenen Figur — daraus ergibt sich
+# der Versatz, damit die Füße auf dem Kachelboden stehen und die Figur mittig
+# über der Kachel sitzt, unabhängig vom Maßstab.
+const SPR_HALF_W := RigFactory.HERO_W * RigFactory.BAKE / 2.0
+const SPR_H := RigFactory.HERO_H * RigFactory.BAKE
+const CHAR_OFFSET := Vector2(6.0 / FIELD_CHAR_SCALE - SPR_HALF_W,
+	16.0 / FIELD_CHAR_SCALE - SPR_H)
+# Verkleinerung des thronenden Bosses auf der Karte.
+const FIELD_BOSS_SCALE := 0.30 / RigFactory.BAKE
 
 # Feld-Bosse: welcher Boss in welchem Dungeon thront (bis sein Flag gesetzt ist).
 const FIELD_BOSSES := {

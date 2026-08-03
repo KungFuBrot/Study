@@ -23,7 +23,7 @@ const MON_H := 52
 const BOSS_W := 112
 const BOSS_H := 128
 ## Einheitlicher Kampf-Maßstab aller Figuren (siehe BattleStage).
-const BATTLE_SCALE := 2.0
+const BATTLE_SCALE := 1.0
 
 # Schattierungsleiter: Anteil Licht → Farbstufe. Vier Stufen reichen für
 # Pixel-Art; mehr wirkt matschig, weniger flach.
@@ -247,11 +247,14 @@ static var _cache := {}
 ## auch dann lauffähig, wenn ein Blatt noch nicht gebacken ist.
 
 const BAKED := "res://assets/rig3d/"
-# Kampfanimation -> Streifen. Zauber und Zielen teilen sich die Angriffspose.
+## Die gebackenen Leinwände sind doppelt so groß wie die alten 2D-Leinwände;
+## BATTLE_SCALE gleicht das aus, damit die Figuren gleich groß bleiben.
+const BAKE := 2
 const BAKED_ANIM := {
 	"idle": "idle", "walk": "walk", "run": "run", "attack": "attack",
-	"cast": "attack", "aim": "attack", "hit": "hit", "down": "down",
-	"cheer": "cheer",
+	"attack2": "attack2", "cast": "cast", "aim": "aim", "block": "block",
+	"hit": "hit", "down": "down", "cheer": "cheer", "roar": "roar",
+	"taunt": "taunt",
 }
 static var _sheets := {}
 
@@ -259,11 +262,11 @@ static var _sheets := {}
 ## den Streifen nicht gibt.
 static func _baked(id: String, anim: String, frame: int, view := "") -> Texture2D:
 	var strip := "%s_%s%s" % [id, anim, "" if view == "" or view == "side" else "_" + view]
-	var w: int = HERO_W
-	var h: int = HERO_H
+	var w: int = HERO_W * BAKE
+	var h: int = HERO_H * BAKE
 	if MON_IDLE.has(id):
-		w = BOSS_W if is_boss(id) else MON_W
-		h = BOSS_H if is_boss(id) else MON_H
+		w = (BOSS_W if is_boss(id) else MON_W) * BAKE
+		h = (BOSS_H if is_boss(id) else MON_H) * BAKE
 	var sheet: Texture2D
 	if _sheets.has(strip):
 		sheet = _sheets[strip]
@@ -289,9 +292,9 @@ static func baked_frames(id: String, anim: String, view := "") -> int:
 	if t == null:
 		return 0
 	var strip := "%s_%s%s" % [id, anim, "" if view == "" or view == "side" else "_" + view]
-	var w: int = HERO_W
+	var w: int = HERO_W * BAKE
 	if MON_IDLE.has(id):
-		w = BOSS_W if is_boss(id) else MON_W
+		w = (BOSS_W if is_boss(id) else MON_W) * BAKE
 	return maxi(int((_sheets[strip] as Texture2D).get_width() / w), 1)
 
 ## Held im Kampf. anim siehe ANIMS: idle, walk, run, attack, cast, aim, hit,

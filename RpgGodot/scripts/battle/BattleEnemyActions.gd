@@ -277,6 +277,7 @@ func _boss_aoe(e: Dictionary, targets: Array) -> void:
 	var st := _style()
 	var theme: String = boss_def.get("theme", "toxic")
 	_say("%s winds up — %s!" % [e["name"], boss_def["aoe_name"]])
+	_epose(e, "roar", 1.5)   # Aufbäumen statt bloßem Vorschnellen
 	# Große Bühne wie bei den Ultimates: Welt abdunkeln, Namensbanner,
 	# Themen-Funken laufen in den Boss ein, dann Entfesselung mit Stoßwelle.
 	var dim := _dim_world(0.4)

@@ -126,11 +126,14 @@ const F := {
 		"eye_glow": 2.8},
 }
 
-## Leinwandgröße je Klasse — identisch zu dem, was das Spiel schon erwartet.
+## Leinwandgröße je Klasse. Doppelt so groß wie die alten 2D-Leinwände; das
+## Spiel zeigt sie dafür auf Maßstab 1 statt 2 an — gleiche Bildschirmgröße,
+## vierfache Pixelmenge. Auflösung ist der größte Hebel für Detail, und
+## Dead Cells' Figuren sind mit rund 100 px auch deutlich größer als 56.
 const CANVAS := {
-	HERO: Vector2i(32, 56),
-	MON: Vector2i(52, 52),
-	BOSS: Vector2i(112, 128),
+	HERO: Vector2i(64, 112),
+	MON: Vector2i(104, 104),
+	BOSS: Vector2i(224, 256),
 }
 
 ## Bildhöhe der orthografischen Kamera je Klasse (in Metern).
@@ -138,9 +141,10 @@ const CAM_SIZE := {HERO: 2.10, MON: 2.00, BOSS: 3.30}
 
 ## Welche Animationen je Klasse gebacken werden.
 const ANIMS := {
-	HERO: ["idle", "walk", "run", "attack", "hit", "down", "cheer"],
-	MON: ["idle", "attack", "hit", "down"],
-	BOSS: ["idle", "attack", "hit", "down"],
+	HERO: ["idle", "walk", "run", "attack", "attack2", "cast", "aim", "block",
+		"hit", "down", "cheer"],
+	MON: ["idle", "attack", "taunt", "hit", "down"],
+	BOSS: ["idle", "attack", "roar", "hit", "down"],
 }
 
 ## Feldansichten (nur Figuren, die auf der Karte auftauchen).

@@ -52,6 +52,7 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	# Schlag 2: Rückhand — sofern der Gegner noch steht. Kurzer Rücksprung,
 	# dann reißt die Klinge in der Gegenrichtung durch.
 	if e["alive"]:
+		_pose(h, "attack2", 0.55)   # Rückhand aus der Gegenrichtung
 		var hop := create_tween()
 		hop.tween_property(s, "position:x", strike_pos.x + 26.0, 0.10) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -92,7 +93,7 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 	_cast_circle(s.position + Vector2(0, 40), color)
 	# Wirkpose: Stab nach vorn, Stein glüht auf — hält über die ganze
 	# Sammelphase, die je nach Zauber gut eine Sekunde dauert.
-	_pose(h, "attack", 1.4)
+	_pose(h, "cast", 1.6)
 	_anim_cast(s)
 	if sfx == "summon":
 		_chant(s, 1.1)  # der Zauberer murmelt die Beschwörungsformel

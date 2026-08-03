@@ -346,6 +346,8 @@ func _hero_turn(h: Dictionary) -> bool:
 ## Schild bleibt als Anzeige vor ihm stehen.
 func _defend(h: Dictionary) -> void:
 	h["defending"] = true
+	# Deckungspose hält bis zum nächsten eigenen Zug.
+	_pose(h, "block", 6.0)
 	_say("%s takes cover — the next hit will be softened." % h["data"]["name"])
 	AudioManager.play_sfx("charge")
 	var s: Sprite2D = h["sprite"]
