@@ -209,6 +209,13 @@ func build_humanoid(s: Dictionary) -> void:
 	var k: float = h / 1.70                       # Grundskalierung
 	var bw: float = s.get("build", 1.0)           # Massigkeit
 	var hs: float = s.get("head", 1.0)            # Kopfgröße
+	# Erst diese vier Regler erzeugen wirklich verschiedene Silhouetten. Nur
+	# an der Gesamthöhe zu drehen reicht nicht: 1.62 gegen 1.70 sieht niemand.
+	var sw: float = s.get("shoulder", 1.0)        # Schulterbreite, unabhängig von der Masse
+	var al: float = s.get("arm", 1.0)             # Armlänge
+	var ll: float = s.get("leg", 1.0)             # Beinlänge
+	var tl: float = s.get("torso", 1.0)           # Rumpflänge
+	var sink: float = s.get("sink", 0.0)          # Kopf sinkt zwischen die Schultern
 	var skin := mat(s.get("skin", Color(0.9, 0.74, 0.58)))
 	var cloth := mat(s.get("cloth", Color(0.5, 0.2, 0.2)))
 	var trim := mat(s.get("trim", Color(0.8, 0.72, 0.5)))
@@ -217,7 +224,7 @@ func build_humanoid(s: Dictionary) -> void:
 	var hair := mat(s.get("hair", Color(0.5, 0.35, 0.15)))
 	var floats: bool = s.get("float", false)
 
-	var y_hip := 0.88 * k
+	var y_hip := 0.88 * k * ll
 	var hips := _joint(self, "hips", Vector3(0, y_hip, 0))
 	_box(hips, Vector3(0.20 * k * bw, 0.16 * k, 0.30 * k * bw),
 		Vector3(0, -0.02 * k, 0), legs if not floats else cloth)
@@ -225,10 +232,10 @@ func build_humanoid(s: Dictionary) -> void:
 	var spine := _joint(hips, "spine", Vector3(0, 0.06 * k, 0))
 	# Taille rund und verjüngt, Brust kantig — so bekommt der Rumpf eine
 	# Kerbe statt eines durchgehenden Quaders.
-	_cyl(spine, 0.105 * k * bw, 0.088 * k * bw, 0.22 * k,
-		Vector3(0, 0.10 * k, 0), cloth)
-	_box(spine, Vector3(0.23 * k * bw, 0.24 * k, 0.34 * k * bw),
-		Vector3(0, 0.32 * k, 0), cloth)
+	_cyl(spine, 0.105 * k * bw, 0.088 * k * bw, 0.22 * k * tl,
+		Vector3(0, 0.10 * k * tl, 0), cloth)
+	_box(spine, Vector3(0.23 * k * bw * sw, 0.24 * k * tl, 0.34 * k * bw * sw),
+		Vector3(0, 0.32 * k * tl, 0), cloth)
 	_box(spine, Vector3(0.21 * k * bw, 0.05 * k, 0.29 * k * bw),
 		Vector3(0, 0.0, 0), trim)
 	# Feindetail, das erst bei der doppelten Auflösung ankommt: Gürtelschnalle,
@@ -241,7 +248,7 @@ func build_humanoid(s: Dictionary) -> void:
 	_box(spine, Vector3(0.20 * k * bw, 0.05 * k, 0.31 * k * bw),
 		Vector3(-0.01 * k, 0.44 * k, 0), trim)
 
-	var neck := _joint(spine, "neck", Vector3(0, 0.48 * k, 0))
+	var neck := _joint(spine, "neck", Vector3(0, (0.48 * tl - sink * 0.10) * k, 0))
 	_cyl(neck, 0.045 * k, 0.05 * k, 0.08 * k, Vector3(0, 0.02 * k, 0), skin, 6)
 	var head := _joint(neck, "head", Vector3(0, 0.06 * k, 0))
 	# Rundes Schädeldach auf kantigem Kiefer: der Kopf war als reiner Würfel
@@ -263,30 +270,30 @@ func build_humanoid(s: Dictionary) -> void:
 	for side in [-1, 1]:
 		var tag := "l" if side < 0 else "r"
 		var sh := _joint(spine, "shoulder_" + tag,
-			Vector3(0, 0.40 * k, 0.15 * k * bw * side))
+			Vector3(0, 0.40 * k * tl, 0.15 * k * bw * sw * side))
 		# Schulterstück als Keil statt als Klotz — gibt der Schulter eine
 		# abfallende Kante statt einer rechtwinkligen Ecke.
 		_prism(sh, Vector3(0.14 * k * bw, 0.12 * k, 0.13 * k * bw),
 			Vector3(0, 0.02 * k, 0), 0.5, trim)
 		# Gliedmaßen mit Profil statt linearem Kegel: der Oberarm hat einen
 		# Muskelbauch, der Ellenbogen zieht sich zusammen.
-		_limb_tube(sh, 0.25 * k, 0.055 * k * bw, [0.86, 1.0, 0.94, 0.76], cloth)
-		var elb := _joint(sh, "elbow_" + tag, Vector3(0, -0.25 * k, 0))
-		_limb_tube(elb, 0.23 * k, 0.044 * k * bw, [0.84, 0.98, 0.86, 0.66], skin)
-		var hand := _joint(elb, "hand_" + tag, Vector3(0, -0.23 * k, 0))
+		_limb_tube(sh, 0.25 * k * al, 0.055 * k * bw, [0.86, 1.0, 0.94, 0.76], cloth)
+		var elb := _joint(sh, "elbow_" + tag, Vector3(0, -0.25 * k * al, 0))
+		_limb_tube(elb, 0.23 * k * al, 0.044 * k * bw, [0.84, 0.98, 0.86, 0.66], skin)
+		var hand := _joint(elb, "hand_" + tag, Vector3(0, -0.23 * k * al, 0))
 		_sphere(hand, 0.048 * k, Vector3(0, -0.03 * k, 0), 1.1, skin)
 
 		if floats:
 			continue
 		var hp := _joint(hips, "hip_" + tag, Vector3(0, -0.08 * k, 0.09 * k * bw * side))
 		# Oberschenkel kräftig oben, schmal am Knie; Wade mit Bauch.
-		_limb_tube(hp, 0.32 * k, 0.072 * k * bw, [0.92, 1.0, 0.88, 0.70], legs)
-		var knee := _joint(hp, "knee_" + tag, Vector3(0, -0.32 * k, 0))
-		_limb_tube(knee, 0.30 * k, 0.056 * k * bw, [0.80, 1.0, 0.82, 0.58], legs)
+		_limb_tube(hp, 0.32 * k * ll, 0.072 * k * bw, [0.92, 1.0, 0.88, 0.70], legs)
+		var knee := _joint(hp, "knee_" + tag, Vector3(0, -0.32 * k * ll, 0))
+		_limb_tube(knee, 0.30 * k * ll, 0.056 * k * bw, [0.80, 1.0, 0.82, 0.58], legs)
 		# Knieschutz — bricht das lange Bein in zwei lesbare Abschnitte.
 		_box(knee, Vector3(0.12 * k * bw, 0.07 * k, 0.13 * k * bw),
 			Vector3(0.02 * k, 0.0, 0), boots)
-		var ankle := _joint(knee, "ankle_" + tag, Vector3(0, -0.30 * k, 0))
+		var ankle := _joint(knee, "ankle_" + tag, Vector3(0, -0.30 * k * ll, 0))
 		_box(ankle, Vector3(0.19 * k, 0.08 * k, 0.11 * k), Vector3(0.04 * k, -0.04 * k, 0), boots)
 		# Stiefelschaft mit Umschlag
 		_box(ankle, Vector3(0.12 * k * bw, 0.16 * k, 0.13 * k * bw),
