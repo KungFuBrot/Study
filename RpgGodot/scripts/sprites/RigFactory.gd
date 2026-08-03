@@ -39,9 +39,23 @@ static var _detail: Dictionary  # Vector2i -> Color (Feindetails über der Schat
 static var W := HERO_W
 static var H := HERO_H
 
-static func _begin(w: int, h: int) -> void:
+## Verformungs-Kontext: alle Zeichen-Primitiven laufen durch _tp(). Damit
+## bekommt jede Figur Atmen, Wabern und Federn, ohne dass ihre Zeichenfunktion
+## davon etwas wissen muss — der Unterschied zwischen „Standbild mit Zucken"
+## und „lebt".
+static var _ctx_squash := 0.0
+static var _ctx_shift := Vector2.ZERO
+static var _foot := 51.0
+
+static func _tp(p: Vector2) -> Vector2:
+	return _sq(p, _ctx_squash) + _ctx_shift
+
+static func _begin(w: int, h: int, foot := -1.0) -> void:
 	W = w
 	H = h
+	_foot = foot if foot > 0.0 else float(h) - 5.0
+	_ctx_squash = 0.0
+	_ctx_shift = Vector2.ZERO
 	_parts = PackedInt32Array()
 	_parts.resize(W * H)
 	_parts.fill(0)
@@ -59,35 +73,65 @@ static func _put(x: int, y: int, id: int) -> void:
 	_parts[y * W + x] = id
 
 static func _rect(x0: int, y0: int, w: int, h: int, id: int) -> void:
-	for y in range(y0, y0 + h):
-		for x in range(x0, x0 + w):
+	var a := _tp(Vector2(x0, y0))
+	var b := _tp(Vector2(x0 + w, y0 + h))
+	for y in range(int(round(a.y)), int(round(b.y))):
+		for x in range(int(round(a.x)), int(round(b.x))):
 			_put(x, y, id)
 
+# Achtung: cx/cy laufen durch die Verformung, die Radien werden mitskaliert.
 static func _ell(cx: float, cy: float, rx: float, ry: float, id: int) -> void:
-	for y in range(int(floor(cy - ry)), int(ceil(cy + ry)) + 1):
-		for x in range(int(floor(cx - rx)), int(ceil(cx + rx)) + 1):
-			var dx := (x - cx) / maxf(rx, 0.01)
-			var dy := (y - cy) / maxf(ry, 0.01)
+	var c := _tp(Vector2(cx, cy))
+	var srx: float = rx * (1.0 + _ctx_squash * 0.006)
+	var sry: float = ry * (1.0 - _ctx_squash * 0.010)
+	for y in range(int(floor(c.y - sry)), int(ceil(c.y + sry)) + 1):
+		for x in range(int(floor(c.x - srx)), int(ceil(c.x + srx)) + 1):
+			var dx := (x - c.x) / maxf(srx, 0.01)
+			var dy := (y - c.y) / maxf(sry, 0.01)
 			if dx * dx + dy * dy <= 1.0:
 				_put(x, y, id)
 
 ## Glied: Strecke mit Radius — die Grundform für Arme, Beine, Klingen.
+## Die Endpunkte gehen durch _ell und damit ebenfalls durch die Verformung.
 static func _limb(a: Vector2, b: Vector2, r: float, id: int) -> void:
 	var steps := int(ceil(a.distance_to(b))) * 2 + 1
 	for i in steps + 1:
 		var p := a.lerp(b, float(i) / float(steps))
 		_ell(p.x, p.y, r, r, id)
 
+## Kegelstumpf zwischen zwei Punkten: wie _limb, aber der Radius wandert von
+## r0 auf r1. Damit lassen sich Rümpfe und Umhänge kippen — _taper kann das
+## nicht, es zeichnet nur waagerechte Zeilen.
+static func _cone(a: Vector2, b: Vector2, r0: float, r1: float, id: int) -> void:
+	var steps := int(ceil(a.distance_to(b))) * 2 + 1
+	for i in steps + 1:
+		var f := float(i) / float(steps)
+		var p := a.lerp(b, f)
+		var r: float = lerpf(r0, r1, f)
+		_ell(p.x, p.y, r, r, id)
+
+## Stauchen/Strecken um die Standfläche. squash in Prozent: positiv drückt die
+## Figur zusammen und macht sie breiter (Aufprall), negativ streckt sie.
+static func _sq(p: Vector2, squash: float) -> Vector2:
+	if is_zero_approx(squash):
+		return p
+	var cx := float(W) * 0.5
+	return Vector2(cx + (p.x - cx) * (1.0 + squash * 0.006),
+		_foot + (p.y - _foot) * (1.0 - squash * 0.010))
+
 ## Sich verjüngender Rumpf: Zeile für Zeile von w0 auf w1.
 static func _taper(cx: float, y0: int, y1: int, w0: float, w1: float, id: int) -> void:
 	for y in range(y0, y1 + 1):
 		var t := float(y - y0) / maxf(float(y1 - y0), 1.0)
 		var hw: float = lerpf(w0, w1, t) * 0.5
-		for x in range(int(round(cx - hw)), int(round(cx + hw)) + 1):
-			_put(x, y, id)
+		var l := _tp(Vector2(cx - hw, y))
+		var r := _tp(Vector2(cx + hw, y))
+		for x in range(int(round(l.x)), int(round(r.x)) + 1):
+			_put(x, int(round(l.y)), id)
 
 static func _dot(x: int, y: int, c: Color) -> void:
-	_detail[Vector2i(x, y)] = c
+	var p := _tp(Vector2(x, y))
+	_detail[Vector2i(int(round(p.x)), int(round(p.y)))] = c
 
 # --- Ausgabe ----------------------------------------------------------------
 
@@ -167,44 +211,38 @@ static func _outline(img: Image) -> Image:
 
 static var _cache := {}
 
-## Held im Kampf. frame 0/1 = ruhiges Atmen (die obere Hälfte hebt sich 1 Px).
-## pose: "idle" | "run" | "attack" | "aim" | "hit" — Seitenansicht.
-static func battle(id: String, frame := 0, pose := "idle") -> Texture2D:
-	var lift := 0 if frame % 2 == 0 else -1
-	var swing: int = GAIT[frame % 4] if pose == "run" else 0
-	return _figure(id, lift, swing, pose, "side")
-
-# Beinausschlag der Laufanimation über vier Frames.
-const GAIT := [0, 2, 0, -2]
+## Held im Kampf. anim siehe ANIMS: idle, walk, run, attack, cast, aim, hit,
+## down, cheer. Seitenansicht.
+static func battle(id: String, frame := 0, anim := "idle") -> Texture2D:
+	return _figure(id, anim, frame, "side")
 
 ## Dieselbe Figur für die Erkundung. Der Aufrufer stellt sie auf Maßstab 0.5,
 ## dann steht sie so groß auf der Karte wie früher das 16x28-Sprite — nur mit
 ## der doppelten Pixeldichte und derselben Zeichnung wie im Kampf.
 ## dir: "side" | "down" (zum Betrachter) | "up" (von hinten).
 static func field(id: String, walking: bool, frame := 0, dir := "side") -> Texture2D:
-	var lift := 0 if frame % 2 == 0 else -1
-	var swing: int = GAIT[frame % 4] if walking else 0
-	return _figure(id, lift, swing, "idle", dir)
+	return _figure(id, "walk" if walking else "idle", frame, dir)
 
-static func _figure(id: String, lift: int, swing: int, pose: String, view: String) -> Texture2D:
-	var key := "f_%s_%d_%d_%s_%s" % [id, lift, swing, pose, view]
+static func _figure(id: String, anim: String, frame: int, view: String) -> Texture2D:
+	var key := "f_%s_%s_%d_%s" % [id, anim, frame, view]
 	if _cache.has(key):
 		return _cache[key]
 	_begin(HERO_W, HERO_H)
+	var p := pose_at(anim, frame)
 	var back := view == "up"
 	match id:
 		"milo":
-			if view == "side": _milo(lift, swing, pose)
-			else: _milo_front(lift, swing, back)
+			if view == "side": _milo(p)
+			else: _milo_front(p, back)
 		"rax":
-			if view == "side": _rax(lift, swing, pose)
-			else: _rax_front(lift, swing, back)
-		"npc_elder": _npc(lift, swing, view, NPC_LOOK["npc_elder"])
-		"npc_kid": _npc(lift, swing, view, NPC_LOOK["npc_kid"])
-		"npc_shop": _npc(lift, swing, view, NPC_LOOK["npc_shop"])
+			if view == "side": _rax(p)
+			else: _rax_front(p, back)
+		"npc_elder": _npc(p, view, NPC_LOOK["npc_elder"])
+		"npc_kid": _npc(p, view, NPC_LOOK["npc_kid"])
+		"npc_shop": _npc(p, view, NPC_LOOK["npc_shop"])
 		_:
-			if view == "side": _serena(lift, swing, pose)
-			else: _serena_front(lift, swing, back)
+			if view == "side": _serena(p)
+			else: _serena_front(p, back)
 	var t := ImageTexture.create_from_image(_render())
 	_cache[key] = t
 	return t
@@ -219,7 +257,11 @@ const NPC_LOOK := {
 		"trim": Color(0.94, 0.90, 0.72), "old": false},
 }
 
-static func _npc(lift: int, swing: int, view: String, look: Dictionary) -> void:
+static func _npc(p: Dictionary, view: String, look: Dictionary) -> void:
+	# Dorfbewohner stehen und gehen nur — sie greifen die Posenwerte für
+	# Atmen und Schritt ab, brauchen aber keine Kampfposen.
+	var lift := int(round(p["body"]))
+	var swing := int(round(p["leg_f"]))
 	if view == "side":
 		_villager(lift, swing, look["hair"], look["cloth"], look["trim"], look["old"])
 	else:
@@ -255,7 +297,7 @@ static func _villager(lift: int, swing: int, hair_c: Color, cloth_c: Color,
 
 # Helen: Schwertkämpferin. Roter Waffenrock mit heller Borte, blondes
 # Haar im Zopf, Schwert in der vorderen Hand.
-static func _serena(lift: int, swing: int, pose := "idle") -> void:
+static func _serena(p: Dictionary) -> void:
 	var skin := _part(Color(0.94, 0.76, 0.61), 0.5, 0.5)
 	var hair := _part(Color(0.86, 0.66, 0.24), 0.6, 0.4)
 	var cloth := _part(Color(0.70, 0.16, 0.19), 0.5, 0.5)
@@ -264,70 +306,90 @@ static func _serena(lift: int, swing: int, pose := "idle") -> void:
 	var boot := _part(Color(0.24, 0.17, 0.12), 0.7, 0.3)
 	var steel := _part(Color(0.74, 0.78, 0.84), 0.85, 0.15)
 	var grip := _part(Color(0.32, 0.21, 0.13), 0.8, 0.2)
-
 	var leather := _part(Color(0.46, 0.31, 0.19), 0.75, 0.25)
 	var cloth_shade := Color(0.70, 0.16, 0.19).darkened(0.34)
-	# Beine zuerst — Rumpf und Arme legen sich darüber.
-	_limb(Vector2(13, 37), Vector2(12 - swing, 49), 2.6, pants)
-	_limb(Vector2(18, 37), Vector2(20 + swing, 49), 2.6, pants)
-	_ell(12 - swing, 51, 3.4, 2.7, boot)
-	_ell(20 + swing, 51, 3.4, 2.7, boot)
-	# Hinterer Arm
-	_limb(Vector2(14, 23 + lift), Vector2(10, 32 + lift), 2.3, cloth)
-	# Rumpf
-	_taper(16, 21 + lift, 34 + lift, 15, 12, cloth)
-	_rect(10, 34 + lift, 13, 3, trim)         # Borte am Saum
-	_rect(10, 27 + lift, 13, 2, leather)      # Gürtel
-	_dot(16, 27 + lift, Color(0.96, 0.82, 0.36))
-	_dot(16, 28 + lift, Color(0.72, 0.58, 0.22))
-	# Falten: zwei dunkle Senkrechte brechen die glatte Stofffläche.
-	for fy in range(29 + lift, 34 + lift):
-		_dot(13, fy, cloth_shade)
-		_dot(19, fy, cloth_shade)
-	# Kopf
-	_ell(15, 13 + lift, 6.8, 6.8, hair)
-	_limb(Vector2(9, 14 + lift), Vector2(7, 25 + lift), 2.3, hair)  # Zopf
-	_ell(18, 14 + lift, 4.8, 5.6, skin)
-	_ell(18, 9 + lift, 5.2, 2.5, hair)        # Pony
-	_dot(20, 14 + lift, Color(0.16, 0.12, 0.16))
-	_dot(21, 14 + lift, Color(0.16, 0.12, 0.16))
-	_dot(20, 13 + lift, Color(0.62, 0.46, 0.28))  # Braue
-	_dot(21, 13 + lift, Color(0.62, 0.46, 0.28))
-	_dot(21, 17 + lift, Color(0.80, 0.56, 0.47))  # Mundschatten
-	# Schulterstück auf der vorderen Seite — gibt der Silhouette eine Schulter.
-	_ell(20, 23 + lift, 3.6, 2.6, leather)
-	# Vorderer Arm und Schwert. Die Pose bestimmt, wohin Hand und Klinge zeigen:
-	# Ruhe senkrecht, Lauf tief nach hinten, Angriff waagerecht nach vorn,
-	# Treffer nach hinten hochgerissen.
-	var hand := Vector2(25, 31 + lift)
-	var tip := Vector2(28, 7 + lift)
-	match pose:
-		"run":
-			hand = Vector2(23, 33 + lift)
-			tip = Vector2(14, 44 + lift)
-		"attack", "aim":
-			hand = Vector2(27, 26 + lift)
-			tip = Vector2(31, 8 + lift)
-		"hit":
-			hand = Vector2(22, 28 + lift)
-			tip = Vector2(14, 12 + lift)
-	_limb(Vector2(19, 24 + lift), hand - Vector2(1, 1), 2.2, cloth)
-	# Erst der Griff, dann die Hand darüber — sonst verschwindet die Faust.
+
+	var sq: float = p["squash"]
+	var dy: float = p["body"]
+	var lean: float = p["lean"]
+	# Die Hüfte ist der Drehpunkt: alles darüber kippt mit `lean`, die Beine
+	# bleiben am Boden. So entsteht Gewicht statt eines starren Verschiebens.
+	# Hüfte, Brust, Kopf. Achtung: _cone/_limb sind Kapseln, sie ragen um den
+	# Radius über die Endpunkte hinaus — die Punkte liegen deshalb weiter innen
+	# als die sichtbare Silhouette.
+	var hip := _sq(Vector2(16, 33 + dy), sq)
+	var chest := _sq(_rot(Vector2(16, 26 + dy), hip, lean), sq)
+	var neck := _sq(_rot(Vector2(17, 20 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(16, 12 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(20, 24 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(13, 24 + dy), hip, lean), sq)
+	var turn: float = p["turn"]
+
+	# Beine: Fuß wandert, Knie folgt zur Hälfte.
+	var foot_b := _sq(Vector2(12 - p["leg_b"], 48), sq)
+	var foot_f := _sq(Vector2(20 + p["leg_f"], 48), sq)
+	_limb(hip + Vector2(-2, 3), foot_b, 2.5, pants)
+	_limb(hip + Vector2(3, 3), foot_f, 2.5, pants)
+	_ell(foot_b.x, foot_b.y + 2, 3.3, 2.6, boot)
+	_ell(foot_f.x, foot_f.y + 2, 3.3, 2.6, boot)
+
+	# Hinterer Arm um die Schulter gedreht
+	var hand_b := _rot(sh_b + Vector2(-3, 9), sh_b, p["arm_b"])
+	_limb(sh_b, hand_b, 2.3, cloth)
+
+	# Rumpf: unten Taille, oben Schultern.
+	_cone(hip, chest, 5.8, 6.8, cloth)
+	# Saumborte als flaches Band am unteren Rand des Waffenrocks
+	var hem := hip + Vector2(0, 4)
+	_limb(hem + Vector2(-5, 0), hem + Vector2(5, 0), 1.3, trim)
+	var belt := hip.lerp(chest, 0.45)
+	_limb(belt + Vector2(-5.5, 0), belt + Vector2(5.5, 0), 1.1, leather)
+	_dot(int(belt.x), int(belt.y), Color(0.96, 0.82, 0.36))
+	# Falten laufen mit dem Rumpf mit
+	for i in 4:
+		var f := hip.lerp(chest, 0.10 + i * 0.16)
+		_dot(int(f.x) - 3, int(f.y), cloth_shade)
+		_dot(int(f.x) + 3, int(f.y), cloth_shade)
+	# Schulterstück
+	_ell(sh_f.x, sh_f.y - 1, 3.4, 2.5, leather)
+	_limb(neck + Vector2(-2, 0), neck + Vector2(1, 0), 1.8, skin)
+
+	# Kopf. Der Zopf hängt mit `sway` nach — Nachlauf verkauft Bewegung mehr
+	# als jede zusätzliche Gliedmaße.
+	# Haarmasse liegt HINTER dem Gesicht, das Gesicht tritt klar hervor, das
+	# Pony deckt nur die Stirn. Vorher verschluckte das Haar den halben Kopf.
+	_ell(head.x - 2, head.y, 6.2, 6.6, hair)
+	var braid := head + Vector2(-6 - p["sway"], 2)
+	_limb(head + Vector2(-5, 1), braid + Vector2(-1, 11), 2.2, hair)
+	_ell(head.x + 3 + turn, head.y + 1, 5.0, 5.6, skin)
+	_ell(head.x + 1, head.y - 4.5, 5.4, 2.3, hair)
+	var ex := int(round(head.x + 5 + turn))
+	var ey := int(round(head.y + 1))
+	_dot(ex, ey, Color(0.16, 0.12, 0.16))
+	_dot(ex + 1, ey, Color(0.16, 0.12, 0.16))
+	_dot(ex, ey - 1, Color(0.58, 0.42, 0.24))
+	_dot(ex + 1, ey - 1, Color(0.58, 0.42, 0.24))
+	_dot(ex, ey + 3, Color(0.80, 0.56, 0.47))
+
+	# Vorderer Arm und Schwert: der Arm dreht um die Schulter, die Klinge
+	# zusätzlich um die Hand — dadurch holt sie aus und zieht durch.
+	var hand := _rot(sh_f + Vector2(4, 8), sh_f, p["arm_f"])
+	var tip := _rot(hand + Vector2(3, -24), hand, p["wpn"] + p["arm_f"] * 0.4)
+	_limb(sh_f, hand, 2.2, cloth)
 	var grip_end := hand + (hand - tip).normalized() * 4.0
 	_limb(hand, grip_end, 1.3, grip)
 	_ell(hand.x, hand.y, 2.3, 2.0, skin)
+	var across := (tip - hand).orthogonal().normalized() * 3.5
 	var guard := hand.lerp(tip, 0.10)
-	_limb(guard + (tip - hand).orthogonal().normalized() * 3.5,
-		guard - (tip - hand).orthogonal().normalized() * 3.5, 0.8, steel)
+	_limb(guard + across, guard - across, 0.8, steel)
 	_limb(hand.lerp(tip, 0.12), tip, 1.4, steel)
-	# Schneide: eine helle Linie entlang der Klinge lässt den Stahl glänzen.
 	var edge := (tip - hand).orthogonal().normalized()
 	for i in 20:
-		var p := hand.lerp(tip, 0.15 + 0.85 * float(i) / 19.0) + edge
-		_dot(int(round(p.x)), int(round(p.y)), Color(0.94, 0.96, 1.0))
+		var q := hand.lerp(tip, 0.15 + 0.85 * float(i) / 19.0) + edge
+		_dot(int(round(q.x)), int(round(q.y)), Color(0.94, 0.96, 1.0))
 
 # Janosch: Magier. Blauer Umhang, spitzer Hut, Stab mit grünem Stein.
-static func _milo(lift: int, swing: int, pose := "idle") -> void:
+static func _milo(p: Dictionary) -> void:
 	var skin := _part(Color(0.92, 0.75, 0.60), 0.5, 0.5)
 	var hair := _part(Color(0.32, 0.26, 0.44), 0.6, 0.4)
 	var robe := _part(Color(0.21, 0.30, 0.66), 0.5, 0.5)
@@ -335,113 +397,267 @@ static func _milo(lift: int, swing: int, pose := "idle") -> void:
 	var trim := _part(Color(0.72, 0.76, 0.94), 0.7, 0.3)
 	var wood := _part(Color(0.44, 0.30, 0.17), 0.85, 0.15)
 	var gem := _part(Color(0.35, 0.88, 0.45), 0.5, 0.5)
-
 	var robe_shade := Color(0.21, 0.30, 0.66).darkened(0.36)
 	var beard := _part(Color(0.62, 0.62, 0.70), 0.6, 0.4)
 
-	_limb(Vector2(14, 40), Vector2(13 - swing, 49), 2.4, robe)
-	_limb(Vector2(19, 40), Vector2(20 + swing, 49), 2.4, robe)
-	_ell(13 - swing, 51, 3.2, 2.5, hair)
-	_ell(20 + swing, 51, 3.2, 2.5, hair)
-	_limb(Vector2(14, 24 + lift), Vector2(10, 33 + lift), 2.2, robe)
-	# Umhang fällt nach unten breiter aus — der Magier steht auf einem Kegel.
-	_taper(16, 22 + lift, 48, 14, 21, robe)
-	_rect(6, 47, 21, 2, trim)
-	_rect(10, 28 + lift, 13, 1, trim)
-	# Faltenwurf: drei Senkrechte, nach unten auseinanderlaufend.
-	for fy in range(30 + lift, 47):
-		var spread := float(fy - 30 - lift) / 17.0
-		_dot(16 - int(round(3 + spread * 4)), fy, robe_shade)
-		_dot(16 + int(round(3 + spread * 4)), fy, robe_shade)
+	var sq: float = p["squash"]
+	var dy: float = p["body"]
+	var lean: float = p["lean"]
+	var hip := _sq(Vector2(16, 36 + dy), sq)
+	var chest := _sq(_rot(Vector2(16, 25 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(16, 16 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(20, 26 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(12, 26 + dy), hip, lean), sq)
+	var turn: float = p["turn"]
+
+	# Beine schauen nur unten aus der Kutte
+	_limb(Vector2(14, 41), Vector2(13 - p["leg_b"], 49), 2.4, robe)
+	_limb(Vector2(19, 41), Vector2(20 + p["leg_f"], 49), 2.4, robe)
+	_ell(13 - p["leg_b"], 51, 3.2, 2.5, hair)
+	_ell(20 + p["leg_f"], 51, 3.2, 2.5, hair)
+	_limb(sh_b, _rot(sh_b + Vector2(-4, 8), sh_b, p["arm_b"]), 2.2, robe)
+	# Kutte als gekippter Kegel; der Saum bleibt am Boden, das Wehen kommt
+	# über `sway`.
+	_cone(_sq(Vector2(16 + p["sway"] * 0.6, 47), sq), chest, 10.5, 7.0, robe)
+	_limb(Vector2(6, 47), Vector2(26, 47), 1.0, trim)
+	var belt := hip.lerp(chest, 0.35)
+	_limb(belt + Vector2(-6, 0), belt + Vector2(6, 0), 0.8, trim)
+	for i in 6:
+		var f := _sq(Vector2(16, 30 + i * 3), sq)
+		var spread := 3.0 + float(i) * 0.9
+		_dot(int(f.x - spread + p["sway"] * 0.4), int(f.y), robe_shade)
+		_dot(int(f.x + spread + p["sway"] * 0.4), int(f.y), robe_shade)
 	# Kopf mit Hut und Bart
-	_ell(17, 16 + lift, 5.0, 5.6, skin)
-	_ell(15, 13 + lift, 6.2, 4.2, hair)
-	# Bart nur am Kinn — er soll das Gesicht rahmen, nicht zudecken.
-	_ell(18, 22 + lift, 3.2, 2.6, beard)
-	_rect(9, 11 + lift, 16, 2, hat)           # Krempe
-	_taper(16, 3 + lift, 11 + lift, 3, 13, hat)
-	_dot(20, 16 + lift, Color(0.13, 0.10, 0.15))
-	_dot(21, 16 + lift, Color(0.13, 0.10, 0.15))
-	_dot(20, 15 + lift, Color(0.55, 0.50, 0.58))
-	_dot(21, 15 + lift, Color(0.55, 0.50, 0.58))
-	# Stab. Beim Zaubern wird er nach vorn gestreckt und der Stein glüht auf.
-	var foot := Vector2(23, 31 + lift)
-	var head := Vector2(26, 9 + lift)
-	var glow := 0.0
-	match pose:
-		"run":
-			foot = Vector2(21, 33 + lift)
-			head = Vector2(28, 13 + lift)
-		"attack", "aim":
-			foot = Vector2(24, 26 + lift)
-			head = Vector2(31, 14 + lift)
-			glow = 1.0
-		"hit":
-			foot = Vector2(20, 30 + lift)
-			head = Vector2(13, 16 + lift)
-	_limb(foot, head, 1.4, wood)
-	_ell(foot.x + 2, foot.y + 1, 2.1, 2.1, skin)
-	_ell(head.x, head.y - 2, 2.9 + glow, 2.9 + glow, gem)
-	_dot(int(head.x) - 1, int(head.y) - 3, Color(0.82, 1.0, 0.86))
-	if glow > 0.0:
+	_ell(head.x + 1 + turn, head.y, 5.0, 5.6, skin)
+	_ell(head.x - 1, head.y - 3, 6.2, 4.2, hair)
+	_ell(head.x + 2 + turn, head.y + 6, 3.2, 2.6, beard)
+	_limb(head + Vector2(-7, -5), head + Vector2(9, -5), 1.0, hat)
+	_cone(_sq(_rot(Vector2(16 + p["sway"] * 1.2, 3 + dy), hip, lean), sq),
+		head + Vector2(0, -5), 1.5, 6.5, hat)
+	_dot(int(head.x + 4 + turn), int(head.y), Color(0.13, 0.10, 0.15))
+	_dot(int(head.x + 5 + turn), int(head.y), Color(0.13, 0.10, 0.15))
+	_dot(int(head.x + 4 + turn), int(head.y - 1), Color(0.55, 0.50, 0.58))
+	_dot(int(head.x + 5 + turn), int(head.y - 1), Color(0.55, 0.50, 0.58))
+	# Stab dreht mit der Hand; der Stein glüht, wenn der Arm ausschlägt.
+	var hand := _rot(sh_f + Vector2(3, 6), sh_f, p["arm_f"])
+	var tip := _rot(hand + Vector2(3, -22), hand, p["wpn"] + p["arm_f"] * 0.5)
+	_limb(hand + (hand - tip).normalized() * 8.0, tip, 1.4, wood)
+	_ell(hand.x, hand.y, 2.1, 2.1, skin)
+	var glow: float = clampf(absf(p["arm_f"]) / 30.0, 0.0, 1.0)
+	_ell(tip.x, tip.y, 2.9 + glow, 2.9 + glow, gem)
+	_dot(int(tip.x) - 1, int(tip.y) - 1, Color(0.82, 1.0, 0.86))
+	if glow > 0.35:
 		for i in 6:
 			var ang := TAU * float(i) / 6.0
-			_dot(int(head.x + cos(ang) * 6.0), int(head.y - 2 + sin(ang) * 6.0),
-				Color(0.62, 1.0, 0.70))
+			_dot(int(tip.x + cos(ang) * (5.0 + glow * 2.0)),
+				int(tip.y + sin(ang) * (5.0 + glow * 2.0)), Color(0.62, 1.0, 0.70))
 
 # Wally: Roboter. Kastenkörper mit Kern, Visierkopf, Panzerplatten.
-static func _rax(lift: int, swing: int, pose := "idle") -> void:
+static func _rax(p: Dictionary) -> void:
 	var shell := _part(Color(0.62, 0.64, 0.68), 0.55, 0.45)
 	var dark := _part(Color(0.30, 0.31, 0.35), 0.7, 0.3)
 	var visor := _part(Color(0.35, 0.82, 0.90), 0.6, 0.4)
 	var core := _part(Color(0.98, 0.55, 0.16), 0.5, 0.5)
 	var barrel := _part(Color(0.44, 0.45, 0.50), 0.85, 0.15)
-
 	var seam := Color(0.22, 0.23, 0.27)
-	_rect(11 - swing, 37, 5, 12, dark)
-	_rect(18 + swing, 37, 5, 12, dark)
-	_rect(9 - swing, 49, 8, 5, shell)         # Standfüße
-	_rect(17 + swing, 49, 8, 5, shell)
-	_limb(Vector2(12, 25 + lift), Vector2(8, 34 + lift), 2.4, dark)
-	_rect(10, 22 + lift, 15, 16, shell)       # Rumpfkasten
-	_rect(10, 22 + lift, 15, 2, dark)         # Brustplatte
-	_rect(10, 36 + lift, 15, 2, dark)
-	# Plattenfugen — ohne sie ist der Rumpf eine leere graue Fläche.
-	for sy in range(25 + lift, 36 + lift):
+
+	var sq: float = p["squash"]
+	var dy: float = p["body"]
+	var lean: float = p["lean"]
+	var hip := _sq(Vector2(17, 37 + dy), sq)
+	var chest := _sq(_rot(Vector2(17, 26 + dy), hip, lean), sq)
+	var head := _sq(_rot(Vector2(17, 14 + dy + p["head"]), hip, lean), sq)
+	var sh_f := _sq(_rot(Vector2(22, 26 + dy), hip, lean), sq)
+	var sh_b := _sq(_rot(Vector2(12, 26 + dy), hip, lean), sq)
+	var turn: float = p["turn"]
+	var by := int(round(dy))
+
+	# Teleskopbeine
+	_rect(11 - int(round(p["leg_b"])), 37, 5, 12, dark)
+	_rect(18 + int(round(p["leg_f"])), 37, 5, 12, dark)
+	_rect(9 - int(round(p["leg_b"])), 49, 8, 5, shell)
+	_rect(17 + int(round(p["leg_f"])), 49, 8, 5, shell)
+	_limb(sh_b, _rot(sh_b + Vector2(-4, 9), sh_b, p["arm_b"]), 2.4, dark)
+	# Rumpfkasten kippt mit
+	_cone(hip, chest, 8.0, 8.0, shell)
+	_rect(10, 22 + by, 15, 2, dark)
+	_rect(10, 36 + by, 15, 2, dark)
+	for sy in range(25 + by, 36 + by):
 		_dot(13, sy, seam)
 		_dot(22, sy, seam)
-	_ell(17, 30 + lift, 3.6, 3.6, dark)
-	_ell(17, 30 + lift, 2.2, 2.2, core)
-	_dot(16, 29 + lift, Color(1.0, 0.86, 0.55))  # Glut im Kern
-	# Schulterplatte auf der vorderen Seite
-	_ell(22, 25 + lift, 3.4, 2.6, shell)
-	# Kopf
-	_rect(12, 9 + lift, 11, 10, shell)
-	_rect(13, 12 + lift, 9, 3, visor)
-	_dot(14, 12 + lift, Color(0.82, 0.98, 1.0))  # Reflex auf dem Visier
-	_dot(15, 12 + lift, Color(0.82, 0.98, 1.0))
-	_rect(16, 6 + lift, 2, 4, dark)           # Antenne
-	_dot(17, 5 + lift, Color(1.0, 0.42, 0.30))
-	_rect(15, 19 + lift, 5, 3, dark)          # Hals
-	# Vorderer Arm mit Lauf. Beim Zielen geht der Arm hoch und waagerecht,
-	# beim Treffer reißt es ihn zurück.
-	var elbow := Vector2(26, 31 + lift)
-	var muzzle := Vector2(30, 31 + lift)
-	match pose:
-		"aim", "attack":
-			elbow = Vector2(26, 27 + lift)
-			muzzle = Vector2(31, 27 + lift)
-		"run":
-			elbow = Vector2(25, 33 + lift)
-			muzzle = Vector2(28, 35 + lift)
-		"hit":
-			elbow = Vector2(24, 33 + lift)
-			muzzle = Vector2(26, 38 + lift)
-	_limb(Vector2(21, 26 + lift), elbow, 2.4, shell)
+	# Kern pulsiert mit dem Atem — der Roboter „lebt" über sein Licht.
+	var pulse: float = 0.6 + absf(dy) * 0.5 + absf(p["arm_f"]) / 60.0
+	_ell(17, 30 + by, 3.6, 3.6, dark)
+	_ell(17, 30 + by, 2.0 + pulse * 0.8, 2.0 + pulse * 0.8, core)
+	_dot(16, 29 + by, Color(1.0, 0.86, 0.55))
+	_ell(sh_f.x, sh_f.y - 1, 3.4, 2.6, shell)
+	# Kopf: Visier wandert mit `turn` — er schaut sich um.
+	_rect(int(head.x) - 5, int(head.y) - 5, 11, 10, shell)
+	_rect(int(head.x) - 4 + int(round(turn)), int(head.y) - 2, 9, 3, visor)
+	_dot(int(head.x) - 3 + int(round(turn)), int(head.y) - 2, Color(0.82, 0.98, 1.0))
+	_dot(int(head.x) - 2 + int(round(turn)), int(head.y) - 2, Color(0.82, 0.98, 1.0))
+	_rect(int(head.x) - 1, int(head.y) - 9 - int(round(p["sway"])), 2, 4, dark)
+	_dot(int(head.x), int(head.y) - 10 - int(round(p["sway"])), Color(1.0, 0.42, 0.30))
+	_rect(int(head.x) - 2, int(head.y) + 5, 5, 3, dark)
+	# Waffenarm dreht um die Schulter
+	var elbow := _rot(sh_f + Vector2(4, 5), sh_f, p["arm_f"])
+	var muzzle := _rot(elbow + Vector2(5, 0), elbow, p["arm_f"] * 0.5 + p["wpn"])
+	_limb(sh_f, elbow, 2.4, shell)
 	_limb(elbow, muzzle, 1.7, barrel)
-	_dot(int(muzzle.x), int(muzzle.y), Color(0.18, 0.18, 0.22))  # Mündung
-	if pose == "aim" or pose == "attack":
+	_dot(int(muzzle.x), int(muzzle.y), Color(0.18, 0.18, 0.22))
+	if p["arm_f"] < -20.0:
 		_dot(int(muzzle.x) + 1, int(muzzle.y), Color(1.0, 0.80, 0.40))
+
+# --- Animationsschicht -------------------------------------------------------
+## Zwischen „Figur zeichnen" und „Animation" liegt eine Handvoll Posenwerte.
+## Eine Animation verändert nur diese Zahlen über Keyframes; die
+## Zeichenfunktion wertet sie aus. Dadurch kostet eine neue Animation ein paar
+## Zeilen Tabelle statt einer neuen Zeichnung.
+##
+## Gebacken wird bewusst Bild für Bild: gedrehte Pixel-Art wird bei 32x56
+## matschig, gebackene Frames bleiben scharf.
+
+## Ruhestellung. Alle Werte sind Versätze in Pixeln bzw. Winkel in Grad; 0
+## heißt „wie gezeichnet".
+const POSE_ZERO := {
+	"body": 0.0,     # ganze Figur hoch/runter (Atmen, Sprung, Einknicken)
+	"lean": 0.0,     # Oberkörper nach vorn (+) / hinten (-)
+	"head": 0.0,     # Kopf zusätzlich zum Körper
+	"arm_f": 0.0,    # vorderer Arm / Waffenhand: Winkel um die Schulter
+	"arm_b": 0.0,    # hinterer Arm
+	"leg_f": 0.0,    # vorderes Bein: Versatz nach vorn
+	"leg_b": 0.0,    # hinteres Bein
+	"wpn": 0.0,      # Waffe zusätzlich zum Arm
+	"sway": 0.0,     # Haar, Umhang, Schwaden — Nachlauf der Bewegung
+	"squash": 0.0,   # Stauchen (+) / Strecken (-) in Prozent
+	"turn": 0.0,     # Kopf dreht zur Seite (Unruhe, Zucken)
+}
+
+## Animationstabelle. `frames` = gebackene Einzelbilder, `fps` = Abspieltempo,
+## `keys` = Stützstellen über t=0..1. Fehlende Werte bleiben bei 0.
+## Die Werte sind bewusst klein: die Figuren sind 32 px breit, da wirkt schon
+## ein Pixel Versatz.
+const ANIMS := {
+	# Ruhig atmen, Gewicht verlagern, gelegentlich der Kopf — nie ganz still.
+	"idle": {"fps": 7, "frames": 8, "loop": true, "keys": [
+		{"t": 0.00, "body": 0.0, "sway": 0.0, "turn": 0.0},
+		{"t": 0.25, "body": -1.0, "sway": 0.5, "arm_f": -3.0},
+		{"t": 0.50, "body": -1.0, "sway": 0.9, "turn": 0.6},
+		{"t": 0.75, "body": 0.0, "sway": 0.4, "arm_f": 2.0},
+		{"t": 1.00, "body": 0.0, "sway": 0.0, "turn": 0.0},
+	]},
+	# Gehen: Beine im Gegentakt, Körper hebt sich im Schrittwechsel.
+	"walk": {"fps": 9, "frames": 8, "loop": true, "keys": [
+		{"t": 0.00, "leg_f": 2.5, "leg_b": -2.5, "body": 0.0, "arm_f": -10.0, "arm_b": 10.0},
+		{"t": 0.25, "leg_f": 0.0, "leg_b": 0.0, "body": -1.0, "arm_f": 0.0, "arm_b": 0.0},
+		{"t": 0.50, "leg_f": -2.5, "leg_b": 2.5, "body": 0.0, "arm_f": 10.0, "arm_b": -10.0},
+		{"t": 0.75, "leg_f": 0.0, "leg_b": 0.0, "body": -1.0, "arm_f": 0.0, "arm_b": 0.0},
+		{"t": 1.00, "leg_f": 2.5, "leg_b": -2.5, "body": 0.0, "arm_f": -10.0, "arm_b": 10.0},
+	]},
+	# Rennen: weiter ausgreifend, vorgelehnt, tiefer.
+	"run": {"fps": 12, "frames": 8, "loop": true, "keys": [
+		{"t": 0.00, "leg_f": 4.0, "leg_b": -4.0, "lean": 3.0, "body": 1.0,
+			"arm_f": -22.0, "arm_b": 22.0, "sway": 1.4},
+		{"t": 0.25, "leg_f": 0.0, "leg_b": 0.0, "lean": 3.0, "body": -2.0,
+			"arm_f": 0.0, "arm_b": 0.0, "sway": 0.8},
+		{"t": 0.50, "leg_f": -4.0, "leg_b": 4.0, "lean": 3.0, "body": 1.0,
+			"arm_f": 22.0, "arm_b": -22.0, "sway": 1.4},
+		{"t": 0.75, "leg_f": 0.0, "leg_b": 0.0, "lean": 3.0, "body": -2.0,
+			"arm_f": 0.0, "arm_b": 0.0, "sway": 0.8},
+		{"t": 1.00, "leg_f": 4.0, "leg_b": -4.0, "lean": 3.0, "body": 1.0,
+			"arm_f": -22.0, "arm_b": 22.0, "sway": 1.4},
+	]},
+	# Schlag: ausholen (langsam), durchziehen (schnell), nachfedern.
+	"attack": {"fps": 14, "frames": 10, "loop": false, "keys": [
+		{"t": 0.00, "wpn": 0.0, "lean": 0.0},
+		{"t": 0.30, "wpn": -55.0, "lean": -6.0, "arm_f": -25.0, "body": -1.0, "sway": -1.2},
+		{"t": 0.42, "wpn": -62.0, "lean": -8.0, "arm_f": -30.0, "squash": -3.0},
+		{"t": 0.58, "wpn": 75.0, "lean": 9.0, "arm_f": 35.0, "leg_f": 3.0, "squash": 4.0, "sway": 2.4},
+		{"t": 0.78, "wpn": 52.0, "lean": 5.0, "arm_f": 22.0, "leg_f": 1.5, "sway": 1.0},
+		{"t": 1.00, "wpn": 0.0, "lean": 0.0},
+	]},
+	# Zaubern: sammeln, aufrichten, entladen.
+	"cast": {"fps": 11, "frames": 10, "loop": false, "keys": [
+		{"t": 0.00, "arm_f": 0.0, "body": 0.0},
+		{"t": 0.30, "arm_f": -18.0, "body": 1.0, "squash": 4.0, "lean": -4.0},
+		{"t": 0.55, "arm_f": -30.0, "body": 2.0, "squash": 6.0, "sway": -1.0},
+		{"t": 0.70, "arm_f": 40.0, "body": -3.0, "squash": -5.0, "lean": 6.0, "sway": 2.5},
+		{"t": 0.85, "arm_f": 30.0, "body": -1.0, "sway": 1.2},
+		{"t": 1.00, "arm_f": 0.0, "body": 0.0},
+	]},
+	# Zielen: Arm hoch, kurzer Rückstoß.
+	"aim": {"fps": 12, "frames": 6, "loop": false, "keys": [
+		{"t": 0.00, "arm_f": 0.0},
+		{"t": 0.35, "arm_f": -34.0, "lean": -2.0},
+		{"t": 0.55, "arm_f": -34.0, "lean": -2.0},
+		{"t": 0.65, "arm_f": -28.0, "lean": -6.0, "body": -1.0, "squash": 3.0},
+		{"t": 1.00, "arm_f": -34.0, "lean": -2.0},
+	]},
+	# Treffer: zurückgerissen, dann fangen.
+	"hit": {"fps": 14, "frames": 6, "loop": false, "keys": [
+		{"t": 0.00, "lean": 0.0},
+		{"t": 0.20, "lean": -14.0, "body": -2.0, "arm_f": -20.0, "arm_b": -16.0,
+			"leg_b": -2.0, "sway": -2.5, "squash": -4.0},
+		{"t": 0.55, "lean": -6.0, "body": 0.0, "arm_f": -8.0, "sway": -1.0},
+		{"t": 1.00, "lean": 0.0},
+	]},
+	# Zusammenbrechen: einknicken, nach hinten kippen, liegen bleiben.
+	"down": {"fps": 9, "frames": 8, "loop": false, "keys": [
+		{"t": 0.00, "lean": 0.0},
+		{"t": 0.25, "lean": 8.0, "body": 2.0, "squash": 8.0, "head": 2.0},
+		{"t": 0.60, "lean": -20.0, "body": 6.0, "squash": 14.0, "arm_f": -40.0,
+			"arm_b": -30.0, "sway": -3.0},
+		{"t": 1.00, "lean": -26.0, "body": 9.0, "squash": 18.0, "arm_f": -50.0,
+			"arm_b": -40.0, "sway": -3.0},
+	]},
+	# Sieg: Waffe hoch, zweimal auffedern.
+	"cheer": {"fps": 9, "frames": 10, "loop": true, "keys": [
+		{"t": 0.00, "arm_f": -50.0, "wpn": -20.0, "body": 0.0},
+		{"t": 0.25, "arm_f": -58.0, "wpn": -26.0, "body": -3.0, "squash": -4.0, "sway": 1.6},
+		{"t": 0.50, "arm_f": -50.0, "wpn": -20.0, "body": 0.0, "squash": 3.0},
+		{"t": 0.75, "arm_f": -56.0, "wpn": -24.0, "body": -2.0, "squash": -3.0, "sway": 1.2},
+		{"t": 1.00, "arm_f": -50.0, "wpn": -20.0, "body": 0.0},
+	]},
+}
+
+## Posenwerte einer Animation zum Frame `frame`.
+static func pose_at(anim: String, frame: int) -> Dictionary:
+	var a: Dictionary = ANIMS.get(anim, ANIMS["idle"])
+	var n: int = a["frames"]
+	var t := float(frame % n) / float(n) if a["loop"] else \
+		float(mini(frame, n - 1)) / float(n - 1)
+	var keys: Array = a["keys"]
+	# Stützstellen links und rechts von t suchen.
+	var i := 0
+	while i < keys.size() - 2 and float(keys[i + 1]["t"]) < t:
+		i += 1
+	var k0: Dictionary = keys[i]
+	var k1: Dictionary = keys[mini(i + 1, keys.size() - 1)]
+	var span: float = maxf(float(k1["t"]) - float(k0["t"]), 0.0001)
+	var f := clampf((t - float(k0["t"])) / span, 0.0, 1.0)
+	f = f * f * (3.0 - 2.0 * f)  # weich ein- und ausblenden
+	var out := {}
+	for k: String in POSE_ZERO:
+		var a0: float = k0.get(k, 0.0)
+		var a1: float = k1.get(k, 0.0)
+		out[k] = lerpf(a0, a1, f)
+	return out
+
+## Frameanzahl einer Animation (für Aufrufer, die durchtakten).
+static func anim_frames(anim: String) -> int:
+	return ANIMS.get(anim, ANIMS["idle"])["frames"]
+
+static func anim_fps(anim: String) -> float:
+	return float(ANIMS.get(anim, ANIMS["idle"])["fps"])
+
+static func anim_loops(anim: String) -> bool:
+	return ANIMS.get(anim, ANIMS["idle"])["loop"]
+
+# Punkt um `pivot` drehen — für Arme, Waffen, Beine.
+static func _rot(p: Vector2, pivot: Vector2, deg: float) -> Vector2:
+	if is_zero_approx(deg):
+		return p
+	return pivot + (p - pivot).rotated(deg_to_rad(deg))
 
 # --- Front- und Rückansicht (nur Erkundung) ---------------------------------
 # Beim Blick nach oben/unten steht die Figur symmetrisch: beide Arme sichtbar,
@@ -458,7 +674,9 @@ static func _face(cx: int, cy: int, back: bool, brow: Color) -> void:
 	_dot(cx + 2, cy - 1, brow)
 	_dot(cx, cy + 3, brow.darkened(0.2))
 
-static func _serena_front(lift: int, swing: int, back: bool) -> void:
+static func _serena_front(p: Dictionary, back: bool) -> void:
+	var lift := int(round(p["body"]))
+	var swing := int(round(p["leg_f"]))
 	var skin := _part(Color(0.94, 0.76, 0.61), 0.5, 0.5)
 	var hair := _part(Color(0.86, 0.66, 0.24), 0.6, 0.4)
 	var cloth := _part(Color(0.70, 0.16, 0.19), 0.5, 0.5)
@@ -486,7 +704,9 @@ static func _serena_front(lift: int, swing: int, back: bool) -> void:
 	if back:
 		_limb(Vector2(21, 32 + lift), Vector2(26, 12 + lift), 1.4, steel)
 
-static func _milo_front(lift: int, swing: int, back: bool) -> void:
+static func _milo_front(p: Dictionary, back: bool) -> void:
+	var lift := int(round(p["body"]))
+	var swing := int(round(p["leg_f"]))
 	var skin := _part(Color(0.92, 0.75, 0.60), 0.5, 0.5)
 	var hair := _part(Color(0.32, 0.26, 0.44), 0.6, 0.4)
 	var robe := _part(Color(0.21, 0.30, 0.66), 0.5, 0.5)
@@ -511,7 +731,9 @@ static func _milo_front(lift: int, swing: int, back: bool) -> void:
 	_limb(Vector2(25, 34 + lift), Vector2(26, 12 + lift), 1.4, wood)
 	_ell(26, 10 + lift, 2.7, 2.7, gem)
 
-static func _rax_front(lift: int, swing: int, back: bool) -> void:
+static func _rax_front(p: Dictionary, back: bool) -> void:
+	var lift := int(round(p["body"]))
+	var swing := int(round(p["leg_f"]))
 	var shell := _part(Color(0.62, 0.64, 0.68), 0.55, 0.45)
 	var dark := _part(Color(0.30, 0.31, 0.35), 0.7, 0.3)
 	var visor := _part(Color(0.35, 0.82, 0.90), 0.6, 0.4)
@@ -567,17 +789,53 @@ static func _villager_front(lift: int, swing: int, hair_c: Color, cloth_c: Color
 # --- Gegner ------------------------------------------------------------------
 
 const BOSSES := ["boss", "boss2", "boss3", "boss4"]
+## Frames der Monster-Eigenbewegung. Acht statt vier: bei vier Bildern wirkt
+## ein Wabern wie ein Ruckeln.
+const MON_FRAMES := 8
 
 static func is_boss(id: String) -> bool:
 	return BOSSES.has(id)
 
-## Monster oder Boss. frame 0-3 = ruhiges Atmen.
+## Eigenbewegung je Kreatur: Amplitude des Wabern/Stauchens, der Höhendrift
+## und die Phasenverschiebung. Erst dadurch bekommt jedes Monster einen
+## eigenen Rhythmus — vorher zuckten alle im selben Takt um einen Pixel.
+## squash = wie stark es sich zusammenzieht, drift = wie weit es schwebt,
+## hover = schwebt frei (Drift beidseitig statt nur nach oben).
+const MON_IDLE := {
+	"schlammschleim": {"squash": 11.0, "drift": 1.0, "phase": 0.0},
+	"qualmgeist": {"squash": 3.5, "drift": 3.0, "phase": 0.3, "hover": true},
+	"muellgnom": {"squash": 4.0, "drift": 1.0, "phase": 0.6},
+	"gierschlund": {"squash": 9.0, "drift": 1.5, "phase": 0.15},
+	"paragraphengeist": {"squash": 2.5, "drift": 3.5, "phase": 0.45, "hover": true},
+	"zinshund": {"squash": 5.0, "drift": 1.5, "phase": 0.8},
+	"hetzer": {"squash": 5.5, "drift": 1.0, "phase": 0.1},
+	"wutgeist": {"squash": 8.0, "drift": 2.0, "phase": 0.55},
+	"schlaeger": {"squash": 4.5, "drift": 1.0, "phase": 0.35},
+	"hassprediger": {"squash": 3.0, "drift": 1.5, "phase": 0.7},
+	"hohlgaenger": {"squash": 2.0, "drift": 1.0, "phase": 0.2},
+	"grauschemen": {"squash": 3.0, "drift": 4.0, "phase": 0.5, "hover": true},
+	"namenlose": {"squash": 1.5, "drift": 0.5, "phase": 0.9},
+	"boss": {"squash": 5.0, "drift": 2.0, "phase": 0.0},
+	"boss2": {"squash": 6.5, "drift": 2.0, "phase": 0.25},
+	"boss3": {"squash": 4.5, "drift": 2.5, "phase": 0.5},
+	"boss4": {"squash": 3.0, "drift": 3.0, "phase": 0.75, "hover": true},
+}
+
+## Monster oder Boss, frame 0..MON_FRAMES-1.
 static func monster(id: String, frame := 0) -> Texture2D:
 	var key := "m_%s_%d" % [id, frame]
 	if _cache.has(key):
 		return _cache[key]
 	var big := is_boss(id)
-	_begin(BOSS_W if big else MON_W, BOSS_H if big else MON_H)
+	_begin(BOSS_W if big else MON_W, BOSS_H if big else MON_H,
+		127.0 if big else 51.0)
+	# Eigenbewegung als Kontext setzen — die Zeichenfunktionen unten wissen
+	# nichts davon, alle Primitiven laufen ohnehin durch die Verformung.
+	var mv: Dictionary = MON_IDLE.get(id, {"squash": 4.0, "drift": 1.0, "phase": 0.0})
+	var ph := TAU * (float(frame % MON_FRAMES) / float(MON_FRAMES) + float(mv["phase"]))
+	_ctx_squash = float(mv["squash"]) * sin(ph)
+	var d := float(mv["drift"])
+	_ctx_shift = Vector2(0, -d * (0.5 + 0.5 * sin(ph * (1.0 if mv.get("hover", false) else 2.0))))
 	var f := frame % 4
 	match id:
 		"schlammschleim": _slime(f)

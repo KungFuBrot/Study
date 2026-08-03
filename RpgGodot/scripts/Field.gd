@@ -65,20 +65,20 @@ var hud: Label
 
 # Dunkle Karten: Grundlicht + Laternenfarbe + Wandschmuck (Fackel/Kristall).
 const LIGHTING := {
-	# Die Grundfarbe tönt, sie verdunkelt kaum noch: die Stimmung tragen
-	# Vignette, Punktlichter und Farbgrading — ein Dungeon, in dem man den
-	# Boden nicht sieht, ist nicht atmosphärisch, sondern unlesbar.
+	# Unheimlich heißt nicht schwarz: das Grundlicht bleibt so hoch, dass man
+	# den Boden liest, aber es ist kalt und entsättigt. Die Bedrohung kommt aus
+	# dem Kontrast — enge, farbige Lichtinseln in einer fahlen Umgebung.
 	# Schlotwerk: giftgrüner Dunst, Schleim trieft von den Wänden.
-	"dungeon": {"ambient": Color(0.78, 0.92, 0.70), "lantern": Color(0.85, 1.0, 0.60),
+	"dungeon": {"ambient": Color(0.52, 0.64, 0.50), "lantern": Color(0.72, 1.0, 0.52),
 		"wall_prop": "goo", "light": Color(0.55, 0.95, 0.35)},
 	# Konzernturm: kaltes Marmorlicht mit goldenen Kronleuchter-Kristallen.
-	"dungeon2": {"ambient": Color(0.88, 0.84, 0.72), "lantern": Color(1.0, 0.92, 0.65),
+	"dungeon2": {"ambient": Color(0.60, 0.58, 0.54), "lantern": Color(1.0, 0.88, 0.55),
 		"wall_prop": "crystal", "light": Color(1.0, 0.85, 0.45)},
 	# Hassfestung: rote Banner, glutrote Fackelschächte.
-	"dungeon3": {"ambient": Color(0.86, 0.62, 0.58), "lantern": Color(1.0, 0.72, 0.45),
+	"dungeon3": {"ambient": Color(0.58, 0.44, 0.44), "lantern": Color(1.0, 0.62, 0.34),
 		"wall_prop": "banner_red", "light": Color(1.0, 0.42, 0.22)},
 	# Die Leere: fahles, farbloses Dämmerlicht, kalte graue Kristallsplitter.
-	"dungeon4": {"ambient": Color(0.74, 0.78, 0.86), "lantern": Color(0.78, 0.82, 0.90),
+	"dungeon4": {"ambient": Color(0.50, 0.54, 0.62), "lantern": Color(0.70, 0.76, 0.90),
 		"wall_prop": "crystal", "light": Color(0.70, 0.78, 0.90)},
 }
 
@@ -115,8 +115,10 @@ func _add_lighting() -> void:
 	if not LIGHTING.has(map_id):
 		# Auch Tageslicht-Karten leicht abdunkeln — gedecktere, realistischere
 		# Grundstimmung statt Bilderbuch-Helligkeit.
+		# Auch draußen kein Bilderbuchtag: kühl und leicht entsättigt, damit
+		# das Tal bedrückt wirkt statt freundlich.
 		var soft := CanvasModulate.new()
-		soft.color = Color(0.94, 0.92, 0.95)
+		soft.color = Color(0.80, 0.80, 0.88)
 		add_child(soft)
 		return
 	var cfg: Dictionary = LIGHTING[map_id]
@@ -857,7 +859,7 @@ func _process(delta: float) -> void:
 	anim_accum += delta
 	if anim_accum >= 0.14:
 		anim_accum -= 0.14
-		anim_frame = (anim_frame + 1) % 4
+		anim_frame = (anim_frame + 1) % 8
 		if is_instance_valid(player):
 			_update_sprites()
 	if state == "move" and not moving:
@@ -991,7 +993,9 @@ func _build_ui() -> void:
 	grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(grade)
 	var vig := TextureRect.new()
-	vig.texture = SpriteFactory.vignette(240, 135, 0.34)
+	# Kräftige Vignette: sie drückt die Ränder zu und lenkt den Blick auf die
+	# Figur — das trägt die unheimliche Stimmung, ohne die Mitte zu verdunkeln.
+	vig.texture = SpriteFactory.vignette(240, 135, 0.55)
 	vig.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.set_anchors_preset(Control.PRESET_FULL_RECT)

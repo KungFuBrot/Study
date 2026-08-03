@@ -635,7 +635,7 @@ static func _boss2_img() -> Image:
 	return img
 
 ## Gegner-Sprites kommen aus dem CC0-Pack (4 animierte Frames pro Monster).
-const ENEMY_FRAMES := 4
+const ENEMY_FRAMES := RigFactory.MON_FRAMES
 
 static func enemy(id: String) -> Texture2D:
 	return enemy_frame(id, 0)

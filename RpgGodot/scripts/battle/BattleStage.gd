@@ -18,7 +18,9 @@ const STAGE_LIFT := {
 	"floor_top": 1.8, "floor_bottom": 1.8, "stone": 1.35,
 	# Grundlicht: seit die Figuren aus dem Rig kommen (eigene, teils dunkle
 	# Farben statt heller DTII-Grautöne) war die alte Abdunklung zu viel.
-	"ambient": 1.28,
+	# Etwas zurückgenommen für die düstere Grundstimmung — die Figuren stehen
+	# jetzt in engen Lichtinseln statt in gleichmäßiger Helligkeit.
+	"ambient": 1.05,
 }
 
 ## Farbstimmung des Schauplatzes, angehoben (Schlotwerk giftgrün,
@@ -906,7 +908,7 @@ func _start_idle_animations() -> void:
 	for h in heroes:
 		_unit_ticker(randf_range(0.13, 0.19), func():
 			if h["data"]["hp"] > 0:
-				h["frame"] = (h["frame"] + 1) % 4
+				h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"])
 				(h["sprite"] as Sprite2D).texture = \
 					SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"]))
 	var glint_timer := Timer.new()
