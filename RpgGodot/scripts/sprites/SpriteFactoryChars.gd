@@ -132,6 +132,11 @@ static func character(id: String, dir: String, frame: int) -> Texture2D:
 ## auf FIELD_SCALE, damit sie auf der Karte so groß steht wie früher das
 ## 16x28-Sprite — bei doppelter Pixeldichte.
 static func field_char(id: String, walking: bool, frame: int, dir := "side") -> Texture2D:
+	# Vorschau: Karte und Kampf zeigen dieselben Figuren.
+	if LpcMock.active():
+		var l := LpcMock.field(id, walking, frame, dir)
+		if l != null:
+			return l
 	return RigFactory.field(id, walking, frame, dir)
 
 ## (Alt, ungenutzt) prozedurale Feldfigur aus Row-Art.

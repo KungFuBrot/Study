@@ -49,6 +49,17 @@ const HERO_ANIM := {
 ## geschlossenem Helm gebaut, alles auf kaltes Metall umgefaerbt, auch die Haut.
 const HERO_FILES := {"serena": "serena", "milo": "milo", "rax": "rax"}
 
+## Zusaetzlich fuers Feld: die drei Dorfbewohner (nur Stehen und Gehen).
+const FIELD_FILES := {
+	"serena": "serena", "milo": "milo", "rax": "rax",
+	"npc_elder": "npc_elder", "npc_kid": "npc_kid", "npc_shop": "npc_shop",
+}
+
+## Feld-Blickrichtungen auf LPC-Zeilen. Das Feld spiegelt die Seitenansicht
+## selbst (Field setzt flip_h bei facing.x < 0), also liefern wir die
+## Rechts-Zeile; "up" ist der Ruecken, "down" das Gesicht.
+const FIELD_ROW := {"side": 3, "up": 0, "down": 2}
+
 ## Gegner: fertig gebackene Streifen in enemies/<id>.png, ein Bild neben dem
 ## anderen. Die Zellbreite ergibt sich aus Breite/Bilderzahl, die Hoehe ist die
 ## Bildhoehe — deshalb genuegt hier die Bilderzahl. Wer nur ein Bild hat, kommt
@@ -129,3 +140,13 @@ static func monster(id: String, frame: int) -> Texture2D:
 ## Bilderzahl des Streifens (0, wenn der Gegner nicht umgestellt ist).
 static func monster_frames(id: String) -> int:
 	return int(ENEMY_FRAMES.get(id, 0))
+
+## Figur auf der Karte. dir: "side" | "up" | "down".
+static func field(id: String, walking: bool, frame: int, dir: String) -> Texture2D:
+	var f: String = FIELD_FILES.get(id, "")
+	if f == "":
+		return null
+	var sheet := "walk" if walking else "idle"
+	var cols := 9 if walking else 2
+	var row: int = int(FIELD_ROW.get(dir, 3))
+	return _cut("heroes/%s_%s.png" % [f, sheet], (frame % cols) * CELL, row * CELL, CELL, CELL)

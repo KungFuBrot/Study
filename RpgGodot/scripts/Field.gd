@@ -20,6 +20,7 @@ const SPR_HALF_W := RigFactory.HERO_W * RigFactory.BAKE / 2.0
 const SPR_H := RigFactory.HERO_H * RigFactory.BAKE
 const CHAR_OFFSET := Vector2(6.0 / FIELD_CHAR_SCALE - SPR_HALF_W,
 	16.0 / FIELD_CHAR_SCALE - SPR_H)
+
 # Verkleinerung des thronenden Bosses auf der Karte.
 const FIELD_BOSS_SCALE := 0.30 / RigFactory.BAKE
 
@@ -726,7 +727,7 @@ func _spawn_npcs() -> void:
 		var s := Sprite2D.new()
 		s.texture = SpriteFactory.character(npc["id"], "down", 0)
 		s.centered = false
-		s.offset = CHAR_OFFSET
+		s.offset = _char_offset(s.texture)
 		s.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 		s.position = Vector2(npc["pos"].x * TILE + 2, npc["pos"].y * TILE)
 		s.z_index = 5
@@ -802,21 +803,21 @@ func _spawn_party() -> void:
 	follower2_tile = player_tile
 	player = Sprite2D.new()
 	player.centered = false
-	player.offset = CHAR_OFFSET
+	player.offset = _char_offset(player.texture)
 	player.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	player.z_index = 10
 	add_child(player)
 	_attach_drop_shadow(player)
 	follower = Sprite2D.new()
 	follower.centered = false
-	follower.offset = CHAR_OFFSET
+	follower.offset = _char_offset(follower.texture)
 	follower.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	follower.z_index = 9
 	add_child(follower)
 	_attach_drop_shadow(follower)
 	follower2 = Sprite2D.new()
 	follower2.centered = false
-	follower2.offset = CHAR_OFFSET
+	follower2.offset = _char_offset(follower2.texture)
 	follower2.scale = Vector2(FIELD_CHAR_SCALE, FIELD_CHAR_SCALE)
 	follower2.z_index = 8
 	add_child(follower2)
@@ -888,6 +889,16 @@ func _step_squash(s: Sprite2D) -> void:
 		.set_trans(Tween.TRANS_SINE)
 	tw.tween_property(s, "scale", base, STEP_TIME * 0.65) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## Derselbe Versatz wie CHAR_OFFSET, aber aus der Textur gerechnet statt aus den
+## Rig-Konstanten. Noetig, seit Figuren auch aus anderen Quellen kommen koennen
+## (LPC-Vorschau, andere Leinwandgroesse) — sonst haengen sie neben der Kachel
+## oder schweben darueber.
+func _char_offset(tex: Texture2D) -> Vector2:
+	if tex == null:
+		return CHAR_OFFSET
+	return Vector2(6.0 / FIELD_CHAR_SCALE - tex.get_width() / 2.0,
+		16.0 / FIELD_CHAR_SCALE - tex.get_height())
 
 func _dir_name(d: Vector2i) -> String:
 	if d.y > 0: return "down"

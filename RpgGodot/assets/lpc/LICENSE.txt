@@ -87,6 +87,10 @@ Stand 2026-08-04:
   Wutgeist glueht rot, die Kreaturen der Leere sind entsaettigt und kuehl
   abgetoent. Abgeleitete Werke, daher CC-BY-SA 3.0.
 
+- assets/lpc/heroes/npc_*.png: BEARBEITET. Die drei Dorfbewohner ebenso aus
+  Generator-Ebenen zusammengesetzt und eingefaerbt (Aeltester mit grauem Haar,
+  Kind mit rotem Hemd, Haendlerin mit Schuerze). Abgeleitete Werke, CC-BY-SA 3.0.
+
 Jede weitere Bearbeitung ist hier zu vermerken.
 
 
