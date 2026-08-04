@@ -45,6 +45,7 @@ var settings_panel: PanelContainer
 var credits_panel: PanelContainer
 var pad_label: Label
 var debug_label: Label
+var style_label: Label
 var settings_index := 0
 var ui: CanvasLayer
 var _locked := false
@@ -352,6 +353,10 @@ func _build_ui() -> void:
 	debug_label.add_theme_font_size_override("font_size", 18)
 	debug_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(debug_label)
+	style_label = Label.new()
+	style_label.add_theme_font_size_override("font_size", 18)
+	style_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	svb.add_child(style_label)
 	var shint := Label.new()
 	shint.text = "↑↓: Select   ·   Z: Toggle   ·   X: Back"
 	shint.add_theme_font_size_override("font_size", 15)
@@ -365,7 +370,7 @@ func _build_ui() -> void:
 	shint2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	svb.add_child(shint2)
 	var shint3 := Label.new()
-	shint3.text = "Debug mode: all abilities and dungeons available right away"
+	shint3.text = "Debug: everything unlocked  ·  Art preview: work-in-progress LPC graphics"
 	shint3.add_theme_font_size_override("font_size", 13)
 	shint3.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
 	shint3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -414,6 +419,10 @@ func _refresh_settings_labels() -> void:
 	debug_label.text = "%sDebug mode:  %s" % [dcur, "ON" if GameState.debug_mode else "OFF"]
 	debug_label.add_theme_color_override("font_color",
 		Color(0.55, 1.0, 0.6) if GameState.debug_mode else Color(1.0, 0.55, 0.5))
+	var scur := "> " if settings_index == 2 else "   "
+	style_label.text = "%sArt preview (LPC):  %s" % [scur, "ON" if GameState.lpc_preview else "OFF"]
+	style_label.add_theme_color_override("font_color",
+		Color(0.55, 1.0, 0.6) if GameState.lpc_preview else Color(1.0, 0.55, 0.5))
 
 func _label(text: String, size: int, color: Color, y: float) -> Label:
 	var l := Label.new()
@@ -452,15 +461,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if settings_panel.visible:
 		if event.is_action_pressed("move_up") or event.is_action_pressed("move_down"):
 			AudioManager.play_sfx("menu")
-			settings_index = (settings_index + 1) % 2
+			settings_index = (settings_index + 1) % 3
 			_refresh_settings_labels()
 		elif event.is_action_pressed("confirm"):
 			# Ausgewählte Einstellung umschalten (sofort angewendet + gespeichert)
 			AudioManager.play_sfx("buy")
 			if settings_index == 0:
 				GameState.set_touch_pad(not GameState.touch_pad)
-			else:
+			elif settings_index == 1:
 				GameState.set_debug_mode(not GameState.debug_mode)
+			else:
+				GameState.set_lpc_preview(not GameState.lpc_preview)
 			_refresh_settings_labels()
 		elif event.is_action_pressed("cancel"):
 			AudioManager.play_sfx("menu")

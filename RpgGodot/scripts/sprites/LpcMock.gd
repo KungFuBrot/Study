@@ -46,13 +46,17 @@ const MON_SHEETS := {
 
 static var _cache := {}
 static var _sheets := {}
-static var _on := -1
+static var _env := -1
 
-## Ist der Mock eingeschaltet? Einmal ermitteln, danach gemerkt.
+## Ist die Vorschau eingeschaltet? Entweder per Umgebungsvariable (Screenshot-
+## Laeufe am Rechner) oder ueber den Menuepunkt — Letzteres ist der einzige Weg
+## im Web-Export, wo es keine Umgebungsvariablen gibt. Der Menue-Schalter wird
+## bei JEDEM Aufruf gelesen, damit er sofort wirkt; nur die Umgebungsvariable
+## wird gemerkt.
 static func active() -> bool:
-	if _on < 0:
-		_on = 1 if OS.get_environment("LPCMOCK") != "" else 0
-	return _on == 1
+	if _env < 0:
+		_env = 1 if OS.get_environment("LPCMOCK") != "" else 0
+	return _env == 1 or GameState.lpc_preview
 
 static func _sheet(file: String) -> Texture2D:
 	if _sheets.has(file):

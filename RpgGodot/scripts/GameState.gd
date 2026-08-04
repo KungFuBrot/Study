@@ -165,6 +165,10 @@ const ENCOUNTERS := {
 ## Nutzer-Einstellungen (überleben Neustarts via user://settings.cfg).
 var touch_pad := true  # Bildschirm-Tasten (D-Pad) anzeigen — Standard: an
 var debug_mode := false  # schaltet alle Fähigkeiten und Dungeons frei — Standard: aus
+## Vorschau auf den geplanten LPC-Grafikstil (siehe docs/lpc-umstellung-plan.md).
+## Als Schalter im Menü, damit man sie auch auf dem Handy ansehen kann — im
+## Web-Export gibt es keine Umgebungsvariablen.
+var lpc_preview := false
 
 func _ready() -> void:
 	_load_settings()
@@ -175,12 +179,14 @@ func _load_settings() -> void:
 	if cfg.load("user://settings.cfg") == OK:
 		touch_pad = cfg.get_value("input", "touch_pad", true)
 		debug_mode = cfg.get_value("debug", "enabled", false)
+		lpc_preview = cfg.get_value("style", "lpc_preview", false)
 
 func _save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load("user://settings.cfg")  # bestehende Werte bewahren
 	cfg.set_value("input", "touch_pad", touch_pad)
 	cfg.set_value("debug", "enabled", debug_mode)
+	cfg.set_value("style", "lpc_preview", lpc_preview)
 	cfg.save("user://settings.cfg")
 
 func set_touch_pad(value: bool) -> void:
@@ -193,6 +199,10 @@ func set_touch_pad(value: bool) -> void:
 
 func set_debug_mode(value: bool) -> void:
 	debug_mode = value
+	_save_settings()
+
+func set_lpc_preview(value: bool) -> void:
+	lpc_preview = value
 	_save_settings()
 
 ## Kompletter Neustart (nach dem Abspann): alles zurück auf Anfang.
