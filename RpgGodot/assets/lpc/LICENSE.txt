@@ -38,16 +38,36 @@ Hinweis: Assets von Lanea Zimmerman (Sharm) und Stephen Challener (Redshrike)
 stehen laut CREDITS-LPC-original.txt zusaetzlich unter OGA-BY 3.0 zur Verfuegung.
 
 
+Weitere Quelle: Universal LPC Spritesheet Character Generator
+-------------------------------------------------------------
+
+Die Blaetter in heroes/ stammen aus dem Universal-LPC-Generator, ebenfalls
+CC-BY-SA 3.0 / GPL 3.0:
+https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator
+
+Genutzte Ebenen je Figur: body/bodies (Koerper), legs/pants (Hose),
+torso/clothes/longsleeve (Oberteil), head/heads/human (Kopf), hair (Haare).
+Die Urheberschaft der Einzelteile ist im Generator-Repository unter
+CREDITS.csv dokumentiert; massgeblich sind auch dort Stephen Challener
+(Redshrike) und die uebrigen LPC-Beitragenden.
+
+
 Vorgenommene Aenderungen
 ------------------------
 
-Stand 2026-08-04 (Mock-Stadium): keine Bildbearbeitung. Die Dateien liegen
-unveraendert im Original. Das Spiel schneidet zur Laufzeit Einzelbilder aus den
-Blaettern heraus (AtlasTexture) und skaliert sie — das veraendert die Dateien
-nicht.
+Stand 2026-08-04:
 
-Jede spaetere Bearbeitung (Umfaerben, Zuschneiden, neu zusammengesetzte
-Streifen) ist hier zu vermerken.
+- assets/lpc/people/ und assets/lpc/monsters/: unveraendert im Original. Das
+  Spiel schneidet zur Laufzeit Einzelbilder heraus (AtlasTexture) und skaliert
+  sie — das veraendert die Dateien nicht.
+
+- assets/lpc/heroes/serena_*.png und milo_*.png: BEARBEITET. Aus den oben
+  genannten Generator-Ebenen uebereinandergelegt und eingefaerbt — Hose und
+  Oberteil per Multiplikation (die Vorlagen sind weiss), Haare ueber eine
+  Helligkeitsrampe auf Blond umgesetzt (Multiplikation kann nur abdunkeln, die
+  Vorlage ist rot). Als abgeleitete Werke stehen sie unter CC-BY-SA 3.0.
+
+Jede weitere Bearbeitung ist hier zu vermerken.
 
 
 Noch offen

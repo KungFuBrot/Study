@@ -16,26 +16,29 @@ const CELL := 64          # Heldenraster
 const ROW_LEFT := 1
 
 ## Blatt, Spaltenzahl und ob die Bildfolge laeuft oder auf dem letzten Bild haelt.
-## ACHTUNG: Die LPC-Basisblaetter female_* zeigen den NACKTEN Grundkoerper —
-## Kleidung, Haare und Waffen sind bei LPC eigene Ebenen, die uebereinander
-## gelegt werden. Fuer den Mock nehmen wir deshalb "princess.png", eine fertig
-## angezogene Figur. Sie bringt allerdings nur den Laufzyklus mit, darum leihen
-## sich Angriff, Zauber und Treffer hier einzelne Laufbilder. Es geht in diesem
-## Stadium um den STIL, nicht um die richtige Bewegung; die vollstaendigen
-## angezogenen Saetze liefert erst der Universal-LPC-Generator.
-const HERO_SHEETS := {
-	"idle":    {"file": "people/princess.png", "cols": 9, "hold": 0},
-	"walk":    {"file": "people/princess.png", "cols": 9, "hold": -1},
-	"run":     {"file": "people/princess.png", "cols": 9, "hold": -1},
-	"attack":  {"file": "people/princess.png", "cols": 9, "hold": 5},
-	"attack2": {"file": "people/princess.png", "cols": 9, "hold": 7},
-	"cast":    {"file": "people/princess.png", "cols": 9, "hold": 3},
-	"aim":     {"file": "people/princess.png", "cols": 9, "hold": 3},
-	"block":   {"file": "people/princess.png", "cols": 9, "hold": 0},
-	"cheer":   {"file": "people/princess.png", "cols": 9, "hold": 2},
-	"hit":     {"file": "people/princess.png", "cols": 9, "hold": 6},
-	"down":    {"file": "people/princess.png", "cols": 9, "hold": 4},
+## Helden-Blaetter, aus den Generator-Ebenen zusammengesetzt und umgefaerbt
+## (Werkzeug siehe docs/lpc-umstellung-plan.md): Koerper, Beine, Oberteil, KOPF
+## (eigene Ebene!) und Haare. Dateien liegen als heroes/<id>_<anim>.png.
+##
+## "cols" = Spalten des Blattes, "row" = Zeile (1 = nach links, wie unsere
+## Blickrichtung); "hurt" hat nur EINE Zeile, deshalb row 0. "hold" haelt ein
+## festes Bild, -1 laesst die Folge laufen.
+const HERO_ANIM := {
+	"idle":    {"sheet": "idle", "cols": 2, "row": 1, "hold": -1},
+	"walk":    {"sheet": "walk", "cols": 9, "row": 1, "hold": -1},
+	"run":     {"sheet": "run", "cols": 8, "row": 1, "hold": -1},
+	"attack":  {"sheet": "slash", "cols": 6, "row": 1, "hold": -1},
+	"attack2": {"sheet": "thrust", "cols": 8, "row": 1, "hold": -1},
+	"cast":    {"sheet": "spellcast", "cols": 7, "row": 1, "hold": -1},
+	"aim":     {"sheet": "spellcast", "cols": 7, "row": 1, "hold": 4},
+	"block":   {"sheet": "combat_idle", "cols": 2, "row": 1, "hold": -1},
+	"cheer":   {"sheet": "spellcast", "cols": 7, "row": 1, "hold": 2},
+	"hit":     {"sheet": "hurt", "cols": 6, "row": 0, "hold": -1},
+	"down":    {"sheet": "hurt", "cols": 6, "row": 0, "hold": 5},
 }
+
+## Welche unserer Helden schon ein LPC-Blatt haben.
+const HERO_FILES := {"serena": "serena", "milo": "milo"}
 
 ## Monster: eigene Zellgroessen, weil jedes Blatt anders geschnitten ist.
 const MON_SHEETS := {
@@ -79,16 +82,19 @@ static func _cut(file: String, x: int, y: int, w: int, h: int) -> Texture2D:
 	_cache[key] = at
 	return at
 
-## Heldin im Kampf. Gibt null zurueck, wenn die Pose nicht abgebildet ist —
-## dann faellt der Aufrufer auf das bisherige Rig zurueck.
-static func hero(frame: int, anim: String) -> Texture2D:
-	var d: Dictionary = HERO_SHEETS.get(anim, {})
+## Held*in im Kampf. Gibt null zurueck, wenn Figur oder Pose (noch) nicht
+## abgebildet sind — dann faellt der Aufrufer auf das bisherige Rig zurueck.
+static func hero(id: String, frame: int, anim: String) -> Texture2D:
+	var f: String = HERO_FILES.get(id, "")
+	if f == "":
+		return null
+	var d: Dictionary = HERO_ANIM.get(anim, {})
 	if d.is_empty():
 		return null
 	var cols: int = d["cols"]
 	var hold: int = d["hold"]
-	var col: int = frame % cols if hold < 0 else hold
-	return _cut(d["file"], col * CELL, ROW_LEFT * CELL, CELL, CELL)
+	var col: int = frame % cols if hold < 0 else mini(hold, cols - 1)
+	return _cut("heroes/%s_%s.png" % [f, d["sheet"]], col * CELL, int(d["row"]) * CELL, CELL, CELL)
 
 ## Monster im Kampf (nur Leerlauf; Angriff/Treffer/Sturz macht weiterhin die
 ## Verformung in BattleFx, LPC liefert dafuer keine Bilder).
