@@ -27,9 +27,10 @@ func _damage_hero(target: Dictionary, dmg: int) -> void:
 		# Gefallene wippen nicht mehr — sonst „atmet" der Ohnmächtige weiter.
 		_pause_bob(target)
 		_end_defend(target)  # Schild verschwindet mit dem Ohnmächtigen
+		# Zusammensacken als eigene Pose — früher kippte das Sprite starr um 90°.
+		_play_once(target, "down", 0.45)
 		var faint := create_tween()
 		faint.tween_property(target["sprite"], "modulate", Color(0.4, 0.4, 0.55, 0.6), 0.4)
-		faint.parallel().tween_property(target["sprite"], "rotation", -PI / 2, 0.4)
 
 func _damage_enemy(e: Dictionary, dmg: int) -> void:
 	e["hp"] -= dmg

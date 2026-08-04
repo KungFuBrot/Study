@@ -90,8 +90,10 @@ ist ein Pixel bei allen Figuren gleich groß. `SpriteFactoryChars.field_char` /
 `hero_battle_frame` und `SpriteFactory.enemy_frame` reichen nur noch dorthin
 durch. DTII liefert seither ausschließlich Kacheln und Requisiten.
 
-Offen im Rig: Lauf-/Angriffs-/Trefferposen im Kampf (es gibt nur Atmen) und
-Blickrichtungen im Feld (nur Seitenansicht).
+Der Posen-Bestand steht: Helden idle/walk/run/attack/attack2/cast/aim/block/
+hit/down/cheer (im Feld zusätzlich `_up`/`_down` als Blickrichtung), Kreaturen
+idle/attack/hit/down/taunt, Bosse zusätzlich roar. Der Kampf setzt sie über
+`_pose` (Helden) bzw. `_epose` (Gegner); `_sprint` schaltet auf "run".
 
 ### Gelände-Übergänge (`SpriteFactoryLib.edge_overlay`)
 

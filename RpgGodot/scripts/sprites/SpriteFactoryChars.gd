@@ -312,6 +312,11 @@ static func robot_battle(frame: int) -> Texture2D:
 static func robot_battle_pose(pose: String, frame: int) -> Texture2D:
 	if pose != "run" and pose != "aim":
 		pose = "idle"
+	# Wally kommt wie alle anderen aus dem Rig; nur wenn dort ein Streifen
+	# fehlt, greift die alte 28x28-Zeichnung darunter.
+	var rig := RigFactory.battle("rax", frame, pose)
+	if rig != null:
+		return rig
 	var key := "robot_b_%s_%d" % [pose, frame % 4]
 	if _cache.has(key):
 		return _cache[key]

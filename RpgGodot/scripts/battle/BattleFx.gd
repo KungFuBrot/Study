@@ -394,6 +394,25 @@ func _pose(h: Dictionary, name: String, dur := 0.30) -> void:
 		(h["sprite"] as Sprite2D).texture = \
 			SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle"))
 
+## Spielt eine Heldenpose EINMAL durch; das letzte Bild bleibt stehen.
+## Für den Zusammenbruch gedacht: der Idle-Ticker rührt Gefallene nicht mehr an,
+## also taktet die Bildfolge hier selbst.
+func _play_once(h: Dictionary, name: String, dur := 0.42) -> void:
+	if h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	h["anim"] = name
+	var n: int = maxi(RigFactory.anim_frames(name, h["data"]["id"]), 1)
+	var tw := create_tween()
+	tw.tween_method(_play_once_step.bind(h, name, n), 0.0, float(n - 1), dur)
+
+func _play_once_step(f: float, h: Dictionary, name: String, n: int) -> void:
+	if not is_instance_valid(h["sprite"]) or h.get("anim", "") != name:
+		return
+	var i: int = clampi(int(round(f)), 0, n - 1)
+	h["frame"] = i
+	(h["sprite"] as Sprite2D).texture = \
+		SpriteFactory.hero_battle_frame(h["data"]["id"], i, name)
+
 ## Dasselbe für Gegner. Sie haben kein Skelett, ihre Animation läuft über
 ## Stauchen, Vorschnellen und Kippen (siehe RigFactory.MON_ANIMS).
 ## "down" bleibt stehen — der Zusammenbruch fällt nicht auf idle zurück.

@@ -975,6 +975,11 @@ func _restore_if_revived(hero: Dictionary) -> void:
 	if hero["data"]["hp"] <= 0:
 		return
 	var s: Sprite2D = hero["sprite"]
+	if hero.get("anim", "idle") == "down":
+		# Aus der Zusammenbruch-Pose zurück auf die Beine.
+		hero["anim"] = "idle"
+		hero["frame"] = 0
+		s.texture = SpriteFactory.hero_battle_frame(hero["data"]["id"], 0, "idle")
 	if absf(s.rotation) > 0.01 or s.modulate.a < 0.95:
 		var tw := create_tween()
 		tw.tween_property(s, "rotation", 0.0, 0.35) \

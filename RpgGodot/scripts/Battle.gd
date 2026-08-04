@@ -547,6 +547,7 @@ func _victory() -> void:
 		if h["data"]["hp"] <= 0:
 			continue
 		_pause_bob(h)
+		_pose(h, "cheer", 1.4)   # Arme hoch, solange die Sprünge laufen
 		var s: Sprite2D = h["sprite"]
 		var base: Vector2 = s.get_meta("base_scale", s.scale)
 		var home_y: float = h["home"].y
