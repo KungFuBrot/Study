@@ -27,13 +27,15 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 	snap.tween_property(s, "scale", base, 0.10) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await snap.finished
+	# Minigun hervorholen — sie liefert auch den Punkt, an dem es blitzt.
+	var gun := _rax_equip(h, "minigun", Vector2(-34, 2))
 	# Gesamtschaden wie beim Nahkampf, nur minimal stärker (Signaturangriff).
 	var rounds := 14
 	var total: int = maxi(int(d["atk"] * randf_range(1.0, 1.3)) - e["def"], rounds)
 	for i in rounds:
 		if not e["alive"] or not is_instance_valid(es):
 			break
-		var muzzle: Vector2 = s.position + Vector2(-52, -6)
+		var muzzle: Vector2 = _rax_muzzle(gun)
 		var target: Vector2 = es.position + Vector2(randf_range(-12, 12), randf_range(-18, 18))
 		_muzzle_flash(muzzle, (target - muzzle).angle())
 		_fire_bullet(muzzle, target)
@@ -42,6 +44,11 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 		var jit := create_tween()
 		jit.tween_property(s, "position:x", fire_pos.x + 6.0, 0.03)
 		jit.tween_property(s, "position:x", fire_pos.x, 0.05)
+		if is_instance_valid(gun):
+			# Die Waffe ruckt mit — sonst schwebt sie ruhig neben dem Rückstoß.
+			var gj := gun.create_tween()
+			gj.tween_property(gun, "position:x", gun.position.x + 5.0, 0.03)
+			gj.tween_property(gun, "position:x", gun.position.x, 0.05)
 		if i % 4 == 3:
 			_shake(es)
 			_shake_camera(0.5)
@@ -49,6 +56,7 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 	# Ausklang, dann der gesammelte Schaden als eine Zahl (eine Todesprüfung).
 	_flash_screen(Color(1.0, 0.8, 0.4, 0.12))
 	_shake_camera(1.2)
+	_rax_stow(gun)
 	if e["alive"]:
 		await _damage_enemy(e, total)
 	# Zurück in die Reihe.
@@ -224,7 +232,8 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.6, 0.2))
 	h["anim"] = "aim"
 	_hero_tex(h, "aim")
-	AudioManager.play_sfx("charge")
+	# Raketenwerfer schultern — aus seinem Rohr kommen die Raketen.
+	var tube := _rax_equip(h, "launcher", Vector2(-32, -2))
 	await get_tree().create_timer(0.4).timeout
 	var alive := []
 	for e in enemies:
@@ -235,12 +244,20 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 			if not e["alive"]:
 				continue
 			var aim: Vector2 = e["sprite"].position + Vector2(randf_range(-16, 16), randf_range(-14, 14))
-			_launch_rocket(_cannon_muzzle(s), aim)
+			var mz := _rax_muzzle(tube)
+			_muzzle_flash(mz, (aim - mz).angle())
+			_launch_rocket(mz, aim)
 			AudioManager.play_sfx("rocket")
+			if is_instance_valid(tube):
+				# Rückstoß des Rohrs nach hinten
+				var rk := tube.create_tween()
+				rk.tween_property(tube, "position:x", tube.position.x + 7.0, 0.05)
+				rk.tween_property(tube, "position:x", tube.position.x, 0.09)
 			await get_tree().create_timer(0.09).timeout
 		await get_tree().create_timer(0.18).timeout
 	# Warten, bis auch die langsamen Raketen eingeschlagen sind.
 	await get_tree().create_timer(0.8).timeout
+	_rax_stow(tube)
 	h["anim"] = "idle"
 	_hero_tex(h, "idle")
 	for e in alive:
@@ -270,11 +287,30 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	for e in alive:
 		center += (e["sprite"] as Sprite2D).position
 	center /= alive.size()
+	# Er baut eine Startrampe auf; von ihr steigt die Bombe in den Himmel, bevor
+	# sie weiter oben die Flugbahn übernimmt.
+	var ramp := _rax_equip(h, "ramp", Vector2(-40, 22))
+	await get_tree().create_timer(0.35).timeout
+	if is_instance_valid(ramp):
+		var lift := Sprite2D.new()
+		lift.texture = SpriteFactory.bomb(0)
+		lift.scale = Vector2(2.0, 2.0)
+		lift.position = _rax_muzzle(ramp)
+		lift.rotation = -0.95
+		add_child(lift)
+		AudioManager.play_sfx("rocket")
+		var lt := create_tween()
+		lt.tween_property(lift, "position", lift.position + Vector2(150, -260), 0.55) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		lt.parallel().tween_property(lift, "modulate:a", 0.0, 0.55)
+		lt.tween_callback(lift.queue_free)
+		await lt.finished
 	# Zielerfassung + Warnton
 	for e in alive:
 		_crosshair(e["sprite"].position)
 	AudioManager.play_sfx("alarm")
 	await get_tree().create_timer(0.4).timeout
+	_rax_stow(ramp)
 	# Kino-Einschub: Der Blick schwenkt hinauf in den Himmel (Wolken, Vögel),
 	# die Bombe saust quer durchs Bild, dann zurück zum Schlachtfeld — und der
 	# Sprengkopf stürzt auf die Gegner.
@@ -684,11 +720,19 @@ func _ultimate_rax(h: Dictionary) -> void:
 	for e in enemies:
 		if e["alive"]:
 			alive.append(e)
+	# Er holt ein Funkgerät hervor und spricht die Zielkoordinaten hinauf —
+	# die Anzeige blinkt im Takt, dann kommt die Antwort von oben.
+	var radio := _rax_equip(h, "radio", Vector2(-22, -6))
+	if is_instance_valid(radio):
+		var blink := radio.create_tween().set_loops(4)
+		blink.tween_property(radio, "modulate", Color(1.5, 1.7, 1.8), 0.14)
+		blink.tween_property(radio, "modulate", Color.WHITE, 0.14)
 	# Phase 1: Fadenkreuze erfassen die Gegner und verschwinden wieder.
 	for e in alive:
 		_crosshair(e["sprite"].position)
 	AudioManager.play_sfx("charge")
 	await get_tree().create_timer(1.05).timeout
+	_rax_stow(radio)
 	# Phase 2: Der Strahl fährt von oben herab und zieht eine 8 übers Gegnerfeld.
 	var fr: Dictionary = _enemy_field_rect(alive)
 	var cx: float = fr["cx"]

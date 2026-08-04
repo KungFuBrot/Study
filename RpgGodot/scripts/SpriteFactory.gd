@@ -682,6 +682,98 @@ static func circle(radius: int, color: Color) -> Texture2D:
 
 ## Leuchtspur-Geschoss (MG-Kugel): kleine, längliche Kugel, heller Kern innen,
 ## nach außen ins Orange auslaufend — additiv gezeichnet wirkt sie glühend.
+## ---------- Wallys Waffen (selbst gezeichnet) ----------
+## Fuer jede Kampfaktion ein eigenes Geraet. Alle blicken nach RECHTS; die
+## Kampfszene spiegelt Wally, dadurch zeigen sie zum Gegner. RAX_MUZZLE nennt
+## den Punkt, an dem das Geschoss austritt (Texturkoordinaten, Ursprung oben
+## links) — daran haengen Muendungsfeuer und Geschossbahn.
+const RAX_MUZZLE := {
+	"minigun": Vector2(37, 8),
+	"launcher": Vector2(34, 6),
+	"radio": Vector2(6, 2),
+	"ramp": Vector2(30, 4),
+}
+
+## Farbwelt aller Geraete: dunkles Gehaeuse, Lichtkante oben, cyan Energie.
+const RAX_DARK := Color(0.11, 0.13, 0.17)
+const RAX_MID := Color(0.31, 0.35, 0.42)
+const RAX_LIT := Color(0.60, 0.66, 0.75)
+const RAX_GLOW := Color(0.45, 0.95, 1.0)
+const RAX_WARN := Color(1.0, 0.62, 0.18)
+
+static func _box(img: Image, x0: int, y0: int, x1: int, y1: int, c: Color) -> void:
+	for y in range(maxi(y0, 0), mini(y1 + 1, img.get_height())):
+		for x in range(maxi(x0, 0), mini(x1 + 1, img.get_width())):
+			img.set_pixel(x, y, c)
+
+## kind: "minigun" | "launcher" | "radio" | "ramp"
+static func rax_weapon(kind: String) -> Texture2D:
+	var key := "raxw_" + kind
+	if _cache.has(key):
+		return _cache[key]
+	var img: Image
+	match kind:
+		"minigun":
+			# Rotierender Laufbuendel auf einem Kasten mit Munitionstrommel.
+			img = _img(40, 18)
+			_box(img, 2, 6, 10, 15, RAX_DARK)      # Trommel
+			_box(img, 3, 7, 9, 14, RAX_MID)
+			_box(img, 4, 8, 6, 12, RAX_GLOW)       # Sichtfenster mit Ladung
+			_box(img, 9, 4, 24, 13, RAX_DARK)      # Gehaeuse
+			_box(img, 10, 5, 23, 12, RAX_MID)
+			_box(img, 10, 5, 23, 6, RAX_LIT)       # Lichtkante
+			for i in 3:                            # drei Laeufe
+				var y := 5 + i * 3
+				_box(img, 24, y, 38, y + 1, RAX_DARK)
+				_box(img, 24, y, 37, y, RAX_LIT if i == 1 else RAX_MID)
+			_box(img, 12, 13, 18, 17, RAX_DARK)    # Griff
+			_box(img, 13, 13, 17, 16, RAX_MID)
+		"launcher":
+			# Schulterrohr mit Zielbuegel und geladener Rakete.
+			img = _img(40, 16)
+			_box(img, 4, 3, 34, 11, RAX_DARK)      # Rohr
+			_box(img, 5, 4, 33, 10, RAX_MID)
+			_box(img, 5, 4, 33, 5, RAX_LIT)
+			_box(img, 30, 4, 33, 10, RAX_WARN)     # geladener Sprengkopf
+			_box(img, 0, 5, 5, 9, RAX_DARK)        # Ruecktrieb
+			_box(img, 12, 0, 20, 3, RAX_DARK)      # Zielbuegel
+			_box(img, 13, 1, 19, 2, RAX_GLOW)
+			_box(img, 14, 11, 20, 15, RAX_DARK)    # Griff
+			_box(img, 15, 11, 19, 14, RAX_MID)
+		"radio":
+			# Funkgeraet mit Antenne — damit ruft er den Orbitalschlag ab.
+			img = _img(16, 26)
+			_box(img, 4, 8, 13, 25, RAX_DARK)      # Gehaeuse
+			_box(img, 5, 9, 12, 24, RAX_MID)
+			_box(img, 6, 11, 11, 15, RAX_GLOW)     # Anzeige
+			_box(img, 6, 17, 7, 18, RAX_WARN)      # Tasten
+			_box(img, 9, 17, 10, 18, RAX_WARN)
+			_box(img, 6, 20, 7, 21, RAX_LIT)
+			_box(img, 9, 20, 10, 21, RAX_LIT)
+			_box(img, 5, 0, 6, 8, RAX_DARK)        # Antenne
+			_box(img, 5, 0, 5, 8, RAX_LIT)
+			_box(img, 4, 0, 7, 1, RAX_GLOW)        # Antennenspitze
+		"ramp":
+			# Aufgebaute Startrampe: schraege Schiene auf zwei Stuetzen.
+			img = _img(38, 26)
+			_box(img, 2, 21, 35, 25, RAX_DARK)     # Grundplatte
+			_box(img, 3, 22, 34, 24, RAX_MID)
+			_box(img, 8, 12, 12, 21, RAX_DARK)     # hintere Stuetze
+			_box(img, 22, 6, 26, 21, RAX_DARK)     # vordere Stuetze
+			# Schiene: steigt von links unten nach rechts oben
+			for i in 30:
+				var x := 3 + i
+				var y := 20 - int(i * 0.55)
+				_box(img, x, y, x + 1, y + 2, RAX_MID)
+				img.set_pixel(x, y, RAX_LIT)
+			_box(img, 28, 2, 34, 6, RAX_WARN)      # Warnleuchte oben
+			_box(img, 29, 3, 33, 5, RAX_GLOW)
+		_:
+			img = _img(8, 8, RAX_MID)
+	var t := _tex(img)
+	_cache[key] = t
+	return t
+
 static func bullet() -> Texture2D:
 	var key := "bullet"
 	if _cache.has(key):

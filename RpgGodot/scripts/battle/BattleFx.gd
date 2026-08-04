@@ -258,6 +258,51 @@ func _star_sparks(pos: Vector2) -> void:
 func _cannon_muzzle(s: Sprite2D) -> Vector2:
 	return s.position + Vector2(-52, -6)
 
+## Wally holt fuer jede Aktion ein eigenes Geraet hervor (siehe
+## SpriteFactory.rax_weapon). Das Sprite haengt frei in der Szene — nicht als
+## Kind der Figur, denn die wird gespiegelt und mitgestaucht, was die Waffe
+## verzerren wuerde. Zurueck kommt es samt Meta "muzzle": dort tritt das
+## Geschoss aus, damit Muendungsfeuer und Bahn nicht mehr geraten sind.
+func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
+	var s: Sprite2D = h["sprite"]
+	var w := Sprite2D.new()
+	w.texture = SpriteFactory.rax_weapon(kind)
+	w.flip_h = true          # die Geraete zeigen nativ nach rechts
+	w.scale = Vector2(2.0, 2.0)
+	w.z_index = 3
+	var hold: Vector2 = at if at != Vector2.ZERO else Vector2(-30, 2)
+	w.position = s.position + hold
+	add_child(w)
+	# Muendung aus der Texturkoordinate in Weltkoordinaten umrechnen. Das Sprite
+	# ist zentriert und gespiegelt, deshalb die x-Achse umdrehen.
+	var tex := w.texture
+	var m: Vector2 = SpriteFactory.RAX_MUZZLE.get(kind, Vector2(tex.get_width(), tex.get_height() * 0.5))
+	var local := Vector2(-(m.x - tex.get_width() * 0.5), m.y - tex.get_height() * 0.5)
+	w.set_meta("muzzle", local * w.scale.x)
+	# Hervorholen: kurz aufblitzen und einrasten.
+	w.modulate = Color(1.6, 1.6, 1.6, 0.0)
+	var tw := create_tween()
+	tw.tween_property(w, "modulate", Color.WHITE, 0.18)
+	tw.parallel().tween_property(w, "position", w.position + Vector2(0, -2), 0.18) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	AudioManager.play_sfx("charge")
+	return w
+
+## Weltposition der Muendung eines hervorgeholten Geraets.
+func _rax_muzzle(w: Sprite2D) -> Vector2:
+	if w == null or not is_instance_valid(w):
+		return Vector2.ZERO
+	return w.position + (w.get_meta("muzzle", Vector2.ZERO) as Vector2)
+
+## Geraet wieder wegstecken.
+func _rax_stow(w: Sprite2D) -> void:
+	if w == null or not is_instance_valid(w):
+		return
+	var tw := create_tween()
+	tw.tween_property(w, "modulate:a", 0.0, 0.16)
+	tw.parallel().tween_property(w, "scale", w.scale * 0.7, 0.16)
+	tw.tween_callback(w.queue_free)
+
 ## Leuchtender Energiestrahl von A nach B (additiv, kurzer Auf-/Abblendimpuls).
 func _beam(from: Vector2, to: Vector2, color: Color, width: float, hold: float) -> void:
 	var seg := Node2D.new()
