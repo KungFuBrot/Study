@@ -42,8 +42,10 @@ const HERO_ANIM := {
 	"down":    {"sheet": "hurt", "cols": 6, "row": 0, "hold": 5},
 }
 
-## Welche unserer Helden schon ein LPC-Blatt haben.
-const HERO_FILES := {"serena": "serena", "milo": "milo"}
+## Welche unserer Helden ein LPC-Blatt haben. Wally hat im LPC keine Entsprechung
+## (es gibt dort keinen Roboter) — er ist aus Plattenpanzer, Schulterstuecken und
+## geschlossenem Helm gebaut, alles auf kaltes Metall umgefaerbt, auch die Haut.
+const HERO_FILES := {"serena": "serena", "milo": "milo", "rax": "rax"}
 
 ## Monster: eigene Zellgroessen, weil jedes Blatt anders geschnitten ist.
 const MON_SHEETS := {
