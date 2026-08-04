@@ -168,7 +168,7 @@ var debug_mode := false  # schaltet alle Fähigkeiten und Dungeons frei — Stan
 ## Vorschau auf den geplanten LPC-Grafikstil (siehe docs/lpc-umstellung-plan.md).
 ## Als Schalter im Menü, damit man sie auch auf dem Handy ansehen kann — im
 ## Web-Export gibt es keine Umgebungsvariablen.
-var lpc_preview := false
+var lpc_preview := true
 
 func _ready() -> void:
 	_load_settings()
@@ -179,7 +179,7 @@ func _load_settings() -> void:
 	if cfg.load("user://settings.cfg") == OK:
 		touch_pad = cfg.get_value("input", "touch_pad", true)
 		debug_mode = cfg.get_value("debug", "enabled", false)
-		lpc_preview = cfg.get_value("style", "lpc_preview", false)
+		lpc_preview = cfg.get_value("style", "lpc_preview", true)
 
 func _save_settings() -> void:
 	var cfg := ConfigFile.new()

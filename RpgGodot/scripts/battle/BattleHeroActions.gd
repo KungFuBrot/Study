@@ -129,7 +129,34 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		st.parallel().tween_property(spark, "scale", Vector2(0.3, 0.3), 0.24)
 		st.tween_callback(spark.queue_free)
+	# Wucht: die Figur stemmt sich hoch, der Boden gibt einen Ring ab, die
+	# Kamera zieht an und hält kurz die Luft an. Ohne das wirkte selbst die
+	# Ultimate wie ein gewöhnlicher Schlag.
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var rise := create_tween()
+	rise.tween_property(s, "position:y", s.position.y - 16.0, 0.30) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	rise.parallel().tween_property(s, "scale", base * Vector2(0.92, 1.12), 0.30) \
+		.set_trans(Tween.TRANS_SINE)
+	rise.tween_property(s, "position:y", s.position.y, 0.16) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	rise.parallel().tween_property(s, "scale", base, 0.16)
+	var ring := Sprite2D.new()
+	ring.texture = SpriteFactory.particle("circle_05")
+	ring.material = mat
+	ring.modulate = Color(color, 0.85)
+	ring.position = s.position + Vector2(0, 40)
+	ring.scale = Vector2(0.05, 0.02)
+	add_child(ring)
+	var rt := create_tween()
+	rt.tween_property(ring, "scale", Vector2(0.9, 0.34), 0.45) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	rt.parallel().tween_property(ring, "modulate:a", 0.0, 0.45)
+	rt.tween_callback(ring.queue_free)
+	_shake_camera(1.6)
+	_punch_zoom(0.08, s.position)
 	await get_tree().create_timer(0.55).timeout
+	await _hitstop(0.06)
 
 func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]

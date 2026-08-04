@@ -44,6 +44,23 @@ const HERO_ANIM := {
 	"down":    {"sheet": "hurt", "cols": 6, "row": 0, "hold": 5},
 }
 
+## Abweichungen je Figur. Helen fuehrt ein Langschwert: ihre beiden Schwuenge
+## liegen auf DOPPELT so grossen Blaettern (Zelle 256 statt 128), weil die
+## Klinge weit ueber die Figur hinausreicht. Die Figur bleibt dabei in der
+## Zellmitte, springt beim Posenwechsel also nicht.
+## Wally holt zum Angriff eine Armbrust hervor — im Stand traegt er keine.
+const HERO_OVERRIDE := {
+	"serena": {
+		"attack":  {"sheet": "slash", "cols": 6, "row": ROW, "hold": -1, "cell": 256},
+		"attack2": {"sheet": "halfslash", "cols": 6, "row": ROW, "hold": -1, "cell": 256},
+	},
+	"rax": {
+		"attack":  {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
+		"attack2": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
+		"aim":     {"sheet": "thrust", "cols": 8, "row": ROW, "hold": 5},
+	},
+}
+
 ## Welche unserer Helden ein LPC-Blatt haben. Wally hat im LPC keine Entsprechung
 ## (es gibt dort keinen Roboter) — er ist aus Plattenpanzer, Schulterstuecken und
 ## geschlossenem Helm gebaut, alles auf kaltes Metall umgefaerbt, auch die Haut.
@@ -114,13 +131,15 @@ static func hero(id: String, frame: int, anim: String) -> Texture2D:
 	var f: String = HERO_FILES.get(id, "")
 	if f == "":
 		return null
-	var d: Dictionary = HERO_ANIM.get(anim, {})
+	var over: Dictionary = HERO_OVERRIDE.get(id, {})
+	var d: Dictionary = over.get(anim, HERO_ANIM.get(anim, {}))
 	if d.is_empty():
 		return null
 	var cols: int = d["cols"]
 	var hold: int = d["hold"]
+	var cell: int = int(d.get("cell", CELL))
 	var col: int = frame % cols if hold < 0 else mini(hold, cols - 1)
-	return _cut("heroes/%s_%s.png" % [f, d["sheet"]], col * CELL, int(d["row"]) * CELL, CELL, CELL)
+	return _cut("heroes/%s_%s.png" % [f, d["sheet"]], col * cell, int(d["row"]) * cell, cell, cell)
 
 ## Gegner im Kampf (nur Leerlauf; Angriff, Treffer und Zusammenbruch macht
 ## weiterhin die Verformung in BattleFx — dafuer liefern die Pakete keine
