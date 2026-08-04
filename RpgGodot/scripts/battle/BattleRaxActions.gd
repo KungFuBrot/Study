@@ -20,7 +20,7 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 	var fire_pos: Vector2 = h["home"] + Vector2(-58, 6)
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
-	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	_hero_tex(h, "aim")
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var snap := create_tween()
 	snap.tween_property(s, "scale", base * Vector2(1.06, 0.94), 0.06)
@@ -53,7 +53,7 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 		await _damage_enemy(e, total)
 	# Zurück in die Reihe.
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	_hero_tex(h, "idle")
 	s.position = fire_pos
 	await _sprint(h, h["home"], 0.2)
 
@@ -66,7 +66,7 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var fire_pos: Vector2 = h["home"] + Vector2(-64, 6)
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
-	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	_hero_tex(h, "aim")
 	var base: Vector2 = s.get_meta("base_scale", s.scale)
 	var snap := create_tween()
 	snap.tween_property(s, "scale", base * Vector2(1.06, 0.94), 0.06)
@@ -125,7 +125,7 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await _damage_enemy(e, maxi(dmg, 1))
 	# 4) Zurück in die Reihe.
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	_hero_tex(h, "idle")
 	await _sprint(h, h["home"], 0.2)
 
 ## Eine einzelne Rakete: steigt erst steil aus dem Rohr, kippt dann entlang
@@ -223,7 +223,7 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.6, 0.2))
 	h["anim"] = "aim"
-	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	_hero_tex(h, "aim")
 	AudioManager.play_sfx("charge")
 	await get_tree().create_timer(0.4).timeout
 	var alive := []
@@ -242,7 +242,7 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	# Warten, bis auch die langsamen Raketen eingeschlagen sind.
 	await get_tree().create_timer(0.8).timeout
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	_hero_tex(h, "idle")
 	for e in alive:
 		if e["alive"]:
 			var dmg: int = int((ab["power"] + d["mag"] * 0.7) * randf_range(0.9, 1.1)) - e["def"] / 2
@@ -259,7 +259,7 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	# Vortreten und den Uplink aufbauen (Schützenstand, Antenne dauerrot).
 	await _sprint(h, h["home"] + Vector2(-58, 6), 0.2)
 	h["anim"] = "aim"
-	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	_hero_tex(h, "aim")
 	var alive := []
 	for e in enemies:
 		if e["alive"]:
@@ -329,7 +329,7 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 			var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.95, 1.15)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	_hero_tex(h, "idle")
 	await _sprint(h, h["home"], 0.2)
 
 ## Kino-Sequenz vor dem Nuke-Einschlag: eine eigene, NICHT vom Ambiente
@@ -734,7 +734,7 @@ func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var fire_pos: Vector2 = h["home"] + Vector2(-64, 6)
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
-	s.texture = SpriteFactory.robot_battle_pose("aim", 0)
+	_hero_tex(h, "aim")
 	var muzzle: Vector2 = _cannon_muzzle(s)
 	var target: Vector2 = e["sprite"].position
 	var mat := CanvasItemMaterial.new()
@@ -786,7 +786,7 @@ func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.robot_battle_pose("idle", 0)
+	_hero_tex(h, "idle")
 	await _sprint(h, h["home"], 0.2)
 
 ## Violette Nachbild-Spur der fliegenden Plasmalanze.

@@ -43,7 +43,7 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 	frames.tween_interval(0.06)
 	frames.tween_callback(func():
 		h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"], h["data"]["id"])
-		s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "run"))
+		_hero_tex(h, "run", h["frame"]))
 	_ghost_trail(s, dur)
 	# In Laufrichtung lehnen, am Ziel aufrichten und abfedern.
 	var lean := create_tween()
@@ -62,7 +62,7 @@ func _sprint(h: Dictionary, to: Vector2, dur: float) -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_step_dust(to + Vector2(0, foot_y))
 	h["anim"] = "idle"
-	s.texture = SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle")
+	_hero_tex(h, "idle", h["frame"])
 	if to.is_equal_approx(h["home"]):
 		s.z_index = 0
 
@@ -384,15 +384,25 @@ func _pose(h: Dictionary, name: String, dur := 0.30) -> void:
 	if h.is_empty() or not is_instance_valid(h["sprite"]):
 		return
 	h["anim"] = name
-	(h["sprite"] as Sprite2D).texture = \
-		SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], name)
+	_hero_tex(h, name, h["frame"])
 	var t := get_tree().create_timer(dur)
 	t.timeout.connect(func():
 		if h.get("anim", "") != name or not is_instance_valid(h["sprite"]):
 			return
 		h["anim"] = "idle"
-		(h["sprite"] as Sprite2D).texture = \
-			SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], "idle"))
+		_hero_tex(h, "idle", h["frame"]))
+
+## Setzt das Bild einer Heldenfigur — immer über diesen Weg, denn die
+## Bodenspiegelung ist ein eigenes Sprite mit eigener Textur und bliebe sonst
+## beim ersten Atembild stehen, während die Figur darüber rennt und zuschlägt.
+func _hero_tex(h: Dictionary, anim: String, frame := 0) -> void:
+	if h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	var tex := SpriteFactory.hero_battle_frame(h["data"]["id"], frame, anim)
+	(h["sprite"] as Sprite2D).texture = tex
+	var r: Variant = h.get("refl")
+	if r != null and is_instance_valid(r):
+		(r as Sprite2D).texture = tex
 
 ## Spielt eine Heldenpose EINMAL durch; das letzte Bild bleibt stehen.
 ## Für den Zusammenbruch gedacht: der Idle-Ticker rührt Gefallene nicht mehr an,
@@ -410,8 +420,7 @@ func _play_once_step(f: float, h: Dictionary, name: String, n: int) -> void:
 		return
 	var i: int = clampi(int(round(f)), 0, n - 1)
 	h["frame"] = i
-	(h["sprite"] as Sprite2D).texture = \
-		SpriteFactory.hero_battle_frame(h["data"]["id"], i, name)
+	_hero_tex(h, name, i)
 
 ## Dasselbe für Gegner. Sie haben kein Skelett, ihre Animation läuft über
 ## Stauchen, Vorschnellen und Kippen (siehe RigFactory.MON_ANIMS).

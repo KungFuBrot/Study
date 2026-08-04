@@ -348,12 +348,15 @@ func _build_scene() -> void:
 		var foot_h: float = s.texture.get_height() * 0.5 - 1.0
 		_attach_shadow(s, 9, 3, foot_h)
 		_attach_glow_pool(s, foot_h, pal["pool_hero"])
-		_attach_reflection(s, foot_h, 0.09)
+		# Die Spiegelung führt eine eigene Textur — sie muss bei jedem Posenwechsel
+		# mitgezogen werden (siehe _hero_tex), sonst atmet unten weiter, was oben
+		# längst rennt oder zusammengebrochen ist.
+		var hrefl := _attach_reflection(s, foot_h, 0.09)
 		# Die Rig-Figuren tragen ihre Waffe selbst — kein DTII-Overlay darüber.
 		var wp: Sprite2D = null
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false,
-			"frame": 0, "weapon": wp, "anim": "idle"})
+			"frame": 0, "weapon": wp, "anim": "idle", "refl": hrefl})
 
 	# Gegner-Skalierung: Am Anfang sind alle Dungeons gleich schwer — die höheren
 	# Grundwerte der späteren Dungeons werden über ihre `tier`-Stufe aufs
@@ -913,8 +916,7 @@ func _start_idle_animations() -> void:
 		_unit_ticker(randf_range(0.13, 0.19), func():
 			if h["data"]["hp"] > 0:
 				h["frame"] = (h["frame"] + 1) % RigFactory.anim_frames(h["anim"], h["data"]["id"])
-				(h["sprite"] as Sprite2D).texture = \
-					SpriteFactory.hero_battle_frame(h["data"]["id"], h["frame"], h["anim"]))
+				_hero_tex(h, h["anim"], h["frame"]))
 	# Drohgebärde: alle paar Sekunden richtet sich eine wartende Kreatur auf
 	# und lehnt sich vor. Sonst steht die Gegnerseite zwischen den Zügen nur
 	# atmend herum.
@@ -979,7 +981,7 @@ func _restore_if_revived(hero: Dictionary) -> void:
 		# Aus der Zusammenbruch-Pose zurück auf die Beine.
 		hero["anim"] = "idle"
 		hero["frame"] = 0
-		s.texture = SpriteFactory.hero_battle_frame(hero["data"]["id"], 0, "idle")
+		_hero_tex(hero, "idle")
 	if absf(s.rotation) > 0.01 or s.modulate.a < 0.95:
 		var tw := create_tween()
 		tw.tween_property(s, "rotation", 0.0, 0.35) \
