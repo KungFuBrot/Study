@@ -20,19 +20,24 @@ const ROW_LEFT := 1
 ## (Werkzeug siehe docs/lpc-umstellung-plan.md): Koerper, Beine, Oberteil, KOPF
 ## (eigene Ebene!) und Haare. Dateien liegen als heroes/<id>_<anim>.png.
 ##
-## "cols" = Spalten des Blattes, "row" = Zeile (1 = nach links, wie unsere
-## Blickrichtung); "hurt" hat nur EINE Zeile, deshalb row 0. "hold" haelt ein
-## festes Bild, -1 laesst die Folge laufen.
+## "cols" = Spalten des Blattes, "row" = Zeile im LPC-Raster
+## (0 hoch, 1 links, 2 runter, 3 rechts). WICHTIG: Die Kampfszene spiegelt jede
+## Heldenfigur (`s.flip_h = true` in BattleStage, Erbe der DTII-Zeit). Wir
+## nehmen deshalb die RECHTS-Zeile — gespiegelt blickt sie nach links, also zu
+## den Gegnern. Mit Zeile 1 schauten alle vom Feind weg.
+## "hurt" hat nur EINE Zeile, deshalb row 0. "hold" haelt ein festes Bild,
+## -1 laesst die Folge laufen.
+const ROW := 3
 const HERO_ANIM := {
-	"idle":    {"sheet": "idle", "cols": 2, "row": 1, "hold": -1},
-	"walk":    {"sheet": "walk", "cols": 9, "row": 1, "hold": -1},
-	"run":     {"sheet": "run", "cols": 8, "row": 1, "hold": -1},
-	"attack":  {"sheet": "slash", "cols": 6, "row": 1, "hold": -1},
-	"attack2": {"sheet": "thrust", "cols": 8, "row": 1, "hold": -1},
-	"cast":    {"sheet": "spellcast", "cols": 7, "row": 1, "hold": -1},
-	"aim":     {"sheet": "spellcast", "cols": 7, "row": 1, "hold": 4},
-	"block":   {"sheet": "combat_idle", "cols": 2, "row": 1, "hold": -1},
-	"cheer":   {"sheet": "spellcast", "cols": 7, "row": 1, "hold": 2},
+	"idle":    {"sheet": "idle", "cols": 2, "row": ROW, "hold": -1},
+	"walk":    {"sheet": "walk", "cols": 9, "row": ROW, "hold": -1},
+	"run":     {"sheet": "run", "cols": 8, "row": ROW, "hold": -1},
+	"attack":  {"sheet": "slash", "cols": 6, "row": ROW, "hold": -1},
+	"attack2": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
+	"cast":    {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": -1},
+	"aim":     {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 4},
+	"block":   {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": -1},
+	"cheer":   {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 2},
 	"hit":     {"sheet": "hurt", "cols": 6, "row": 0, "hold": -1},
 	"down":    {"sheet": "hurt", "cols": 6, "row": 0, "hold": 5},
 }
