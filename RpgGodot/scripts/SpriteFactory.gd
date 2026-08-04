@@ -648,19 +648,14 @@ static func enemy_has_anim(id: String) -> bool:
 ## die Helden, dieselbe Pixelgröße auf dem Bildschirm.
 ## anim: "idle" | "attack" | "hit" | "down".
 static func enemy_frame(id: String, frame: int, anim := "idle") -> Texture2D:
-	# Nur mit LPCMOCK=1: drei Gegner zum Vergleich aus den LPC-Blaettern.
+	# Vorschau: Gegner kommen aus den gebackenen LPC-Streifen. Sie haben nur
+	# Leerlaufbilder — Angriff, Treffer und Sturz laufen weiter ueber die
+	# Verformung, deshalb wird "anim" hier nicht gebraucht.
 	if LpcMock.active():
-		var m: String = LPC_MOCK_MAP.get(id, "")
-		if m != "":
-			var l := LpcMock.monster(m, frame)
-			if l != null:
-				return l
+		var l := LpcMock.monster(id, frame)
+		if l != null:
+			return l
 	return RigFactory.monster(id, frame % RigFactory.mon_frames(anim, id), anim)
-
-## Nur fuer den Mock: welche unserer Kreaturen welches LPC-Monster leiht.
-const LPC_MOCK_MAP := {
-	"schlammschleim": "slime", "qualmgeist": "ghost", "muellgnom": "pumpking",
-}
 
 ## Ist dieser Gegner ein großes Boss-Sprite (32x36 statt 16x16)?
 static func enemy_is_big(id: String) -> bool:

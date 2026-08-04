@@ -52,6 +52,19 @@ CREDITS.csv dokumentiert; massgeblich sind auch dort Stephen Challener
 (Redshrike) und die uebrigen LPC-Beitragenden.
 
 
+Dritte Quelle: Bosses and Monsters (Ars Notoria)
+------------------------------------------------
+
+Fuer die Bosse und einige Gegner:
+https://opengameart.org/content/bosses-and-monsters-spritesheets-ars-notoria
+
+Urheber: Stephen Challener (Redshrike), Lizenz CC-BY 3.0, mit Dank an
+OpenGameArt.org. ACHTUNG, zwei Sprites weichen ab: der Schatten geht auf Clint
+Bellanger zurueck, die gehoernte Magiergestalt auf Ben "Cookiez" Potter, beide
+CC-BY-SA 3.0. Wir nutzen die gehoernte Gestalt (als "The Divider"), also gilt
+fuer sie zusaetzlich die Weitergabe unter gleichen Bedingungen.
+
+
 Vorgenommene Aenderungen
 ------------------------
 
@@ -66,6 +79,13 @@ Stand 2026-08-04:
   Oberteil per Multiplikation (die Vorlagen sind weiss), Haare ueber eine
   Helligkeitsrampe auf Blond umgesetzt (Multiplikation kann nur abdunkeln, die
   Vorlage ist rot). Als abgeleitete Werke stehen sie unter CC-BY-SA 3.0.
+
+- assets/lpc/enemies/*.png: BEARBEITET. Fuer jeden Gegner ein Streifen aus
+  Einzelbildern der drei Quellen. Bearbeitungen: Einzelbilder herausgeschnitten,
+  beim Kampfblatt der weisse Hintergrund per Flutfuellung vom Rand entfernt,
+  ganzzahlig vergroessert (Nearest Neighbor), zwei Gegner umgefaerbt — der
+  Wutgeist glueht rot, die Kreaturen der Leere sind entsaettigt und kuehl
+  abgetoent. Abgeleitete Werke, daher CC-BY-SA 3.0.
 
 Jede weitere Bearbeitung ist hier zu vermerken.
 

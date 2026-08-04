@@ -12,8 +12,10 @@ extends RefCounted
 ## Gegner links stehen — dieselbe Blickrichtung wie beim bisherigen Rig.
 
 const DIR := "res://assets/lpc/"
-const CELL := 64          # Heldenraster
-const ROW_LEFT := 1
+## Heldenraster. LPC zeichnet auf 64x64; die Blaetter liegen doppelt so gross
+## im Projekt, weil das Rig seine Figuren ebenfalls doppelt aufloest (Held
+## 32x56 x BAKE 2) und der Kampf danach nicht mehr skaliert.
+const CELL := 128
 
 ## Blatt, Spaltenzahl und ob die Bildfolge laeuft oder auf dem letzten Bild haelt.
 ## Helden-Blaetter, aus den Generator-Ebenen zusammengesetzt und umgefaerbt
@@ -47,11 +49,17 @@ const HERO_ANIM := {
 ## geschlossenem Helm gebaut, alles auf kaltes Metall umgefaerbt, auch die Haut.
 const HERO_FILES := {"serena": "serena", "milo": "milo", "rax": "rax"}
 
-## Monster: eigene Zellgroessen, weil jedes Blatt anders geschnitten ist.
-const MON_SHEETS := {
-	"slime":    {"file": "monsters/slime.png", "cols": 3, "w": 32, "h": 32},
-	"ghost":    {"file": "monsters/ghost.png", "cols": 3, "w": 40, "h": 46},
-	"pumpking": {"file": "monsters/pumpking.png", "cols": 3, "w": 46, "h": 46},
+## Gegner: fertig gebackene Streifen in enemies/<id>.png, ein Bild neben dem
+## anderen. Die Zellbreite ergibt sich aus Breite/Bilderzahl, die Hoehe ist die
+## Bildhoehe — deshalb genuegt hier die Bilderzahl. Wer nur ein Bild hat, kommt
+## aus dem Kampfblatt (unbewegte Seitenansicht); die Bewegung macht dort wie
+## gehabt die Verformung in BattleFx.
+const ENEMY_FRAMES := {
+	"schlammschleim": 3, "qualmgeist": 3, "muellgnom": 3, "gierschlund": 3,
+	"paragraphengeist": 1, "zinshund": 1, "hetzer": 4, "wutgeist": 3,
+	"schlaeger": 1, "hassprediger": 1, "hohlgaenger": 1, "grauschemen": 3,
+	"namenlose": 1,
+	"boss": 8, "boss2": 4, "boss3": 5, "boss4": 4,
 }
 
 static var _cache := {}
@@ -103,12 +111,21 @@ static func hero(id: String, frame: int, anim: String) -> Texture2D:
 	var col: int = frame % cols if hold < 0 else mini(hold, cols - 1)
 	return _cut("heroes/%s_%s.png" % [f, d["sheet"]], col * CELL, int(d["row"]) * CELL, CELL, CELL)
 
-## Monster im Kampf (nur Leerlauf; Angriff/Treffer/Sturz macht weiterhin die
-## Verformung in BattleFx, LPC liefert dafuer keine Bilder).
-static func monster(name: String, frame: int) -> Texture2D:
-	var d: Dictionary = MON_SHEETS.get(name, {})
-	if d.is_empty():
+## Gegner im Kampf (nur Leerlauf; Angriff, Treffer und Zusammenbruch macht
+## weiterhin die Verformung in BattleFx — dafuer liefern die Pakete keine
+## Bilder). null, wenn der Gegner nicht umgestellt ist.
+static func monster(id: String, frame: int) -> Texture2D:
+	if not ENEMY_FRAMES.has(id):
 		return null
-	var w: int = d["w"]
-	var h: int = d["h"]
-	return _cut(d["file"], (frame % int(d["cols"])) * w, ROW_LEFT * h, w, h)
+	var file := "enemies/%s.png" % id
+	var sheet := _sheet(file)
+	if sheet == null:
+		return null
+	var n: int = maxi(int(ENEMY_FRAMES[id]), 1)
+	var w: int = int(sheet.get_width() / n)
+	var h: int = sheet.get_height()
+	return _cut(file, (frame % n) * w, 0, w, h)
+
+## Bilderzahl des Streifens (0, wenn der Gegner nicht umgestellt ist).
+static func monster_frames(id: String) -> int:
+	return int(ENEMY_FRAMES.get(id, 0))
