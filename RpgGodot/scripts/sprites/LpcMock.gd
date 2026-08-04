@@ -141,16 +141,23 @@ static func hero(id: String, frame: int, anim: String) -> Texture2D:
 	var col: int = frame % cols if hold < 0 else mini(hold, cols - 1)
 	return _cut("heroes/%s_%s.png" % [f, d["sheet"]], col * cell, int(d["row"]) * cell, cell, cell)
 
-## Gegner im Kampf (nur Leerlauf; Angriff, Treffer und Zusammenbruch macht
-## weiterhin die Verformung in BattleFx — dafuer liefern die Pakete keine
-## Bilder). null, wenn der Gegner nicht umgestellt ist.
-static func monster(id: String, frame: int) -> Texture2D:
+## Gegner im Kampf. Die Bosse bringen mehr als Atmen mit — ihre Blaetter haben
+## mehrere Zeilen, aus denen Angriff und Aufbaeumen gebacken sind (enemies/
+## <id>_attack.png bzw. _roar.png). Fuer alles andere (Treffer, Zusammenbruch)
+## und fuer die normalen Gegner bleibt es bei der Verformung in BattleFx.
+static func monster(id: String, frame: int, anim := "idle") -> Texture2D:
 	if not ENEMY_FRAMES.has(id):
 		return null
 	var file := "enemies/%s.png" % id
+	if anim == "attack" or anim == "roar":
+		var extra := "enemies/%s_%s.png" % [id, anim]
+		if _sheet(extra) != null:
+			file = extra
 	var sheet := _sheet(file)
 	if sheet == null:
 		return null
+	# Die Zusatzblaetter stammen aus demselben Raster und haben dieselbe
+	# Bilderzahl wie der Leerlauf.
 	var n: int = maxi(int(ENEMY_FRAMES[id]), 1)
 	var w: int = int(sheet.get_width() / n)
 	var h: int = sheet.get_height()

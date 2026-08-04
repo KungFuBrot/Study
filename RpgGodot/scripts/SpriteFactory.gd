@@ -652,7 +652,7 @@ static func enemy_frame(id: String, frame: int, anim := "idle") -> Texture2D:
 	# Leerlaufbilder — Angriff, Treffer und Sturz laufen weiter ueber die
 	# Verformung, deshalb wird "anim" hier nicht gebraucht.
 	if LpcMock.active():
-		var l := LpcMock.monster(id, frame)
+		var l := LpcMock.monster(id, frame, anim)
 		if l != null:
 			return l
 	return RigFactory.monster(id, frame % RigFactory.mon_frames(anim, id), anim)
