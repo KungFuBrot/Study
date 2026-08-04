@@ -1,0 +1,58 @@
+Liberated Pixel Cup (LPC) — Basis-Assets
+========================================
+
+Lizenz: CC-BY-SA 3.0 UND GPL 3.0 (Doppellizenz, beide erlauben die Weitergabe).
+Die Grafiken in diesem Ordner bleiben unter CC-BY-SA 3.0; bearbeitete Fassungen
+ebenfalls. Der Spielcode ist davon nicht betroffen (Code und Medien gelten als
+getrennte Werke). Kein DRM auf diese Dateien.
+
+Quelle:
+"Liberated Pixel Cup (LPC) Base Assets (sprites & map tiles)"
+https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+
+Volle Autorenliste der Originalveroeffentlichung: CREDITS-LPC-original.txt
+
+
+Genutzte Dateien und ihre Urheber
+---------------------------------
+
+people/female_walkcycle.png   Stephen Challener (Redshrike)
+people/female_slash.png       Stephen Challener (Redshrike)
+people/female_spellcast.png   Stephen Challener (Redshrike)
+people/female_hurt.png        Stephen Challener (Redshrike)
+
+monsters/bat.png              Charles Sanchez (CharlesGabriel)
+monsters/eyeball.png          Charles Sanchez (CharlesGabriel)
+monsters/ghost.png            Charles Sanchez (CharlesGabriel)
+monsters/pumpking.png         Charles Sanchez (CharlesGabriel)
+monsters/slime.png            Charles Sanchez (CharlesGabriel)
+monsters/snake.png            Charles Sanchez (CharlesGabriel)
+
+Namensnennung im vorgeschriebenen Format:
+"Liberated Pixel Cup Base Assets" von Stephen Challener (Redshrike) und
+Charles Sanchez (CharlesGabriel), lizenziert CC-BY-SA 3.0 / GPL 3.0:
+https://opengameart.org/content/liberated-pixel-cup-lpc-base-assets-sprites-map-tiles
+mit Dank an OpenGameArt.org
+
+Hinweis: Assets von Lanea Zimmerman (Sharm) und Stephen Challener (Redshrike)
+stehen laut CREDITS-LPC-original.txt zusaetzlich unter OGA-BY 3.0 zur Verfuegung.
+
+
+Vorgenommene Aenderungen
+------------------------
+
+Stand 2026-08-04 (Mock-Stadium): keine Bildbearbeitung. Die Dateien liegen
+unveraendert im Original. Das Spiel schneidet zur Laufzeit Einzelbilder aus den
+Blaettern heraus (AtlasTexture) und skaliert sie — das veraendert die Dateien
+nicht.
+
+Jede spaetere Bearbeitung (Umfaerben, Zuschneiden, neu zusammengesetzte
+Streifen) ist hier zu vermerken.
+
+
+Noch offen
+----------
+
+Die Namensnennung muss zusaetzlich IM SPIEL sichtbar sein (geplant: eigener
+Punkt im Titelmenue). Solange das fehlt, duerfen diese Assets nicht in einem
+Web-Build veroeffentlicht werden. Siehe docs/lpc-umstellung-plan.md.

@@ -259,6 +259,11 @@ static func hero_battle(id: String) -> Texture2D:
 ## RigFactory.BATTLE_SCALE gestellt.
 ## anim: "idle" | "run" | "attack" | "aim" | "hit".
 static func hero_battle_frame(id: String, frame: int, anim := "idle") -> Texture2D:
+	# Nur mit LPCMOCK=1: Helen kommt zum Vorzeigen aus den LPC-Blaettern.
+	if id == "serena" and LpcMock.active():
+		var l := LpcMock.hero(frame, anim)
+		if l != null:
+			return l
 	return RigFactory.battle(id, frame, anim)
 
 ## Waffe eines Helden (kleines Overlay-Sprite), oder null.
