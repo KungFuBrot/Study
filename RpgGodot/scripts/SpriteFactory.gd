@@ -694,6 +694,7 @@ const RAX_MUZZLE := {
 	"ramp": Vector2(30, 4),
 	"laser": Vector2(41, 7),
 	"lance": Vector2(43, 8),
+	"staff": Vector2(7, 3),
 }
 
 ## Farbwelt aller Geraete: dunkles Gehaeuse, Lichtkante oben, cyan Energie.
@@ -801,6 +802,26 @@ static func rax_weapon(kind: String) -> Texture2D:
 				_box(img, 36 + i, y0, 36 + i, y1, Color(0.86, 0.66, 1.0))
 			_box(img, 12, 10, 18, 14, RAX_DARK)    # Griff
 			_box(img, 13, 10, 17, 13, RAX_MID)
+		"staff":
+			# Janoschs Zauberstab: knorriger Schaft mit rot glühendem Kristall
+			# oben. Der Kristall sitzt bei (7,3) — dort lädt der Zauber auf.
+			img = _img(16, 46)
+			var holz := Color(0.31, 0.20, 0.12)
+			var holz_h := Color(0.47, 0.32, 0.19)
+			var glut := Color(1.0, 0.34, 0.24)
+			var glut_h := Color(1.0, 0.76, 0.55)
+			for y in range(8, 46):          # Schaft, leicht geschlängelt
+				var x := 6 + int(sin(y * 0.22) * 1.4)
+				_box(img, x, y, x + 2, y, holz)
+				img.set_pixel(x, y, holz_h)
+			for y in [14, 24, 34]:          # Astansätze
+				var x2 := 6 + int(sin(y * 0.22) * 1.4)
+				_box(img, x2 - 1, y, x2 + 3, y, holz_h)
+			_box(img, 4, 5, 10, 9, holz)    # Fassung
+			_box(img, 5, 6, 9, 8, holz_h)
+			_box(img, 5, 1, 9, 6, glut)     # Kristall
+			_box(img, 6, 2, 8, 4, glut_h)
+			img.set_pixel(7, 0, glut_h)
 		_:
 			img = _img(8, 8, RAX_MID)
 	var t := _tex(img)

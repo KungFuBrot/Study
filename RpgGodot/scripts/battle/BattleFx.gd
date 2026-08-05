@@ -270,11 +270,14 @@ func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
 	w.flip_h = true          # die Geraete zeigen nativ nach rechts
 	w.scale = Vector2(2.0, 2.0)
 	w.z_index = 3
-	var hold: Vector2 = at if at != Vector2.ZERO else Vector2(-30, 2)
-	w.position = s.position + hold
-	add_child(w)
-	# Muendung aus der Texturkoordinate in Weltkoordinaten umrechnen. Das Sprite
-	# ist zentriert und gespiegelt, deshalb die x-Achse umdrehen.
+	# KIND der Figur, nicht Geschwister: nur so bleibt die Waffe bei jedem
+	# Schritt, Rückstoß und Zittern an der Hand. (flip_h der Figur wirkt sich
+	# nicht auf Kinder aus, deshalb spiegelt die Waffe sich selbst.)
+	var hold: Vector2 = at if at != Vector2.ZERO else Vector2(-26, 6)
+	w.position = hold
+	s.add_child(w)
+	# Muendung aus der Texturkoordinate ableiten. Das Sprite ist zentriert und
+	# gespiegelt, deshalb die x-Achse umdrehen; die Skalierung kommt oben drauf.
 	var tex := w.texture
 	var m: Vector2 = SpriteFactory.RAX_MUZZLE.get(kind, Vector2(tex.get_width(), tex.get_height() * 0.5))
 	var local := Vector2(-(m.x - tex.get_width() * 0.5), m.y - tex.get_height() * 0.5)
@@ -283,7 +286,7 @@ func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
 	# schwingt nach vorn und rastet mit einem kurzen Rückschwung ein. Erst am
 	# Ende blitzt die Energiekante auf.
 	var ziel := w.position
-	w.position = ziel + Vector2(46, 20)   # hinter der rechten Schulter
+	w.position = ziel + Vector2(30, 16)   # hinter der rechten Schulter
 	w.rotation = 1.05
 	w.scale = Vector2(1.2, 1.2)
 	w.modulate = Color(1, 1, 1, 0.0)
@@ -307,11 +310,12 @@ func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
 	AudioManager.play_sfx("charge")
 	return w
 
-## Weltposition der Muendung eines hervorgeholten Geraets.
+## Weltposition der Muendung eines hervorgeholten Geraets. Die Waffe haengt an
+## der Figur, deshalb ueber die globale Position rechnen statt ueber die lokale.
 func _rax_muzzle(w: Sprite2D) -> Vector2:
 	if w == null or not is_instance_valid(w):
 		return Vector2.ZERO
-	return w.position + (w.get_meta("muzzle", Vector2.ZERO) as Vector2)
+	return w.global_position + (w.get_meta("muzzle", Vector2.ZERO) as Vector2)
 
 ## Geraet wieder wegstecken.
 func _rax_stow(w: Sprite2D) -> void:

@@ -18,7 +18,10 @@ const FIELD_CHAR_SCALE := 0.42 / RigFactory.BAKE
 # über der Kachel sitzt, unabhängig vom Maßstab.
 const SPR_HALF_W := RigFactory.HERO_W * RigFactory.BAKE / 2.0
 const SPR_H := RigFactory.HERO_H * RigFactory.BAKE
-const CHAR_OFFSET := Vector2(6.0 / FIELD_CHAR_SCALE - SPR_HALF_W,
+## Waagerecht die KACHELMITTE (TILE/2), nicht 6 px — mit dem alten Wert stand
+## jede Figur zwei Pixel links neben der Mitte und damit sichtbar auf der
+## Kachelkante statt im Feld.
+const CHAR_OFFSET := Vector2(TILE * 0.5 / FIELD_CHAR_SCALE - SPR_HALF_W,
 	16.0 / FIELD_CHAR_SCALE - SPR_H)
 
 # Verkleinerung des thronenden Bosses auf der Karte.
@@ -931,7 +934,7 @@ func _char_offset(tex: Texture2D) -> Vector2:
 	var pad := 0.0
 	if tex.get_width() == tex.get_height():
 		pad = tex.get_height() * 0.06
-	return Vector2(6.0 / FIELD_CHAR_SCALE - tex.get_width() / 2.0,
+	return Vector2(TILE * 0.5 / FIELD_CHAR_SCALE - tex.get_width() / 2.0,
 		16.0 / FIELD_CHAR_SCALE - tex.get_height() + pad)
 
 func _dir_name(d: Vector2i) -> String:

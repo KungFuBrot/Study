@@ -287,8 +287,13 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
 	await raise.finished
-	# --- Aufladung: eine glühende Feuerkugel wächst in der Hand und pulsiert ---
-	var hand := s.position + Vector2(-44, -4)
+	# Zauberstab hervorholen — die Kugel wächst an seinem Kristall, wie beim
+	# Strahlgewehr die Ladung an der Mündung.
+	var stab := _rax_equip(h, "staff", Vector2(-22, -8))
+	# --- Aufladung: eine glühende Feuerkugel wächst am Kristall und pulsiert ---
+	var hand := _rax_muzzle(stab)
+	if hand == Vector2.ZERO:
+		hand = s.position + Vector2(-44, -4)
 	var ball := Sprite2D.new()
 	ball.texture = SpriteFactory.particle("fire_01")
 	ball.position = hand
@@ -339,6 +344,7 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	AudioManager.play_sfx("bigboom")
 	_shake_camera(2.1)
 	await _hitstop(0.11)
+	_rax_stow(stab)
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	await _sprint(h, h["home"], 0.2)

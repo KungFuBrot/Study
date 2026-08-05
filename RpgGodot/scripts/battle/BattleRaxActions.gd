@@ -28,7 +28,7 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await snap.finished
 	# Minigun hervorholen — sie liefert auch den Punkt, an dem es blitzt.
-	var gun := _rax_equip(h, "minigun", Vector2(-30, 16))
+	var gun := _rax_equip(h, "minigun", Vector2(-26, 6))
 	# Gesamtschaden wie beim Nahkampf, nur minimal stärker (Signaturangriff).
 	var rounds := 14
 	var total: int = maxi(int(d["atk"] * randf_range(1.0, 1.3)) - e["def"], rounds)
@@ -81,7 +81,7 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	snap.tween_property(s, "scale", base, 0.10) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	# Strahlgewehr hervorholen — der Strahl tritt aus seinem Fokuskristall aus.
-	var rifle := _rax_equip(h, "laser", Vector2(-36, 0))
+	var rifle := _rax_equip(h, "laser", Vector2(-28, 4))
 	await get_tree().create_timer(0.3).timeout
 	var muzzle := _rax_muzzle(rifle)
 	# 2) Aufladen: wachsende, bebende Energiekugel, Funken laufen in die
@@ -237,7 +237,7 @@ func _rocket_all(h: Dictionary, ab: Dictionary) -> void:
 	h["anim"] = "aim"
 	_hero_tex(h, "aim")
 	# Raketenwerfer schultern — aus seinem Rohr kommen die Raketen.
-	var tube := _rax_equip(h, "launcher", Vector2(-32, -2))
+	var tube := _rax_equip(h, "launcher", Vector2(-26, 2))
 	await get_tree().create_timer(0.4).timeout
 	var alive := []
 	for e in enemies:
@@ -293,7 +293,7 @@ func _nuke(h: Dictionary, ab: Dictionary) -> void:
 	center /= alive.size()
 	# Er baut eine Startrampe auf; von ihr steigt die Bombe in den Himmel, bevor
 	# sie weiter oben die Flugbahn übernimmt.
-	var ramp := _rax_equip(h, "ramp", Vector2(-40, 22))
+	var ramp := _rax_equip(h, "ramp", Vector2(-34, 30))
 	await get_tree().create_timer(0.35).timeout
 	if is_instance_valid(ramp):
 		var lift := Sprite2D.new()
@@ -726,7 +726,7 @@ func _ultimate_rax(h: Dictionary) -> void:
 			alive.append(e)
 	# Er holt ein Funkgerät hervor und spricht die Zielkoordinaten hinauf —
 	# die Anzeige blinkt im Takt, dann kommt die Antwort von oben.
-	var radio := _rax_equip(h, "radio", Vector2(-22, -6))
+	var radio := _rax_equip(h, "radio", Vector2(-16, 0))
 	if is_instance_valid(radio):
 		var blink := radio.create_tween().set_loops(4)
 		blink.tween_property(radio, "modulate", Color(1.5, 1.7, 1.8), 0.14)
@@ -784,7 +784,7 @@ func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	h["anim"] = "aim"
 	_hero_tex(h, "aim")
 	# Die Lanze wird als Gerät hervorgeholt und dann geschleudert.
-	var launcher := _rax_equip(h, "lance", Vector2(-36, 2))
+	var launcher := _rax_equip(h, "lance", Vector2(-28, 4))
 	await get_tree().create_timer(0.3).timeout
 	var muzzle: Vector2 = _rax_muzzle(launcher)
 	_rax_stow(launcher)
