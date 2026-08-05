@@ -270,25 +270,14 @@ func _next_selectable(from: int, delta: int) -> int:
 		i += delta
 	return from
 
+## Wer am Zug ist, wird nicht mehr durch einen Pfeil markiert — das übernimmt
+## jetzt die Ausgrauung aller anderen (siehe _set_spent). Die Funktion bleibt
+## als Einstiegspunkt bestehen, damit die Aufrufer unverändert bleiben.
 func _highlight_hero(h: Dictionary, on: bool) -> void:
-	var s: Sprite2D = h["sprite"]
-	s.modulate = Color(1.3, 1.3, 1.0) if on else Color.WHITE
-	if on:
-		if h.get("turn_arrow") != null:
-			return
-		var arrow := Polygon2D.new()
-		arrow.polygon = PackedVector2Array([Vector2(-13, -13), Vector2(13, -13), Vector2(0, 5)])
-		arrow.color = Color(1.0, 0.9, 0.35)
-		var base_y := s.position.y - 82.0
-		arrow.position = Vector2(s.position.x, base_y)
-		add_child(arrow)
-		h["turn_arrow"] = arrow
-		var tw := arrow.create_tween().set_loops()
-		tw.tween_property(arrow, "position:y", base_y + 9.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_property(arrow, "position:y", base_y, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	elif h.get("turn_arrow") != null:
-		(h["turn_arrow"] as Node).queue_free()
-		h["turn_arrow"] = null
+	if h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	if h["data"]["hp"] > 0 and on:
+		(h["sprite"] as Sprite2D).modulate = Color.WHITE
 
 ## Kampfbereitschaft: Wenn ein Held am Zug ist, tritt er einen Schritt vor,
 ## richtet sich auf und hebt die Waffe in Anschlag; danach entspannt er wieder.

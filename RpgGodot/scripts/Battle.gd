@@ -283,13 +283,13 @@ func _run_battle() -> void:
 		for h in heroes:
 			if h["data"]["hp"] <= 0 or not _any_enemy_alive():
 				continue
-			# Wer dran ist, tritt vor und steht in voller Farbe da.
-			_set_spent(h, false)
+			# Nur wer dran ist, steht in voller Farbe da — alle anderen sind
+			# ausgegraut. Das ersetzt den früheren Pfeil über der Figur.
+			for other in heroes:
+				_set_spent(other, other != h)
 			_ready_pose(h, true)
 			var fled: bool = await _hero_turn(h)
 			_ready_pose(h, false)
-			# Zug verbraucht: zurücktreten und leicht ausgrauen, damit man auf
-			# einen Blick sieht, wer diese Runde schon gehandelt hat.
 			_set_spent(h, true)
 			if fled:
 				finished.emit(true)

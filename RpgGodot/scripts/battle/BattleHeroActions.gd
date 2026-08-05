@@ -100,7 +100,9 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 	var add := CanvasItemMaterial.new()
 	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	# 1) Augen zu, Lippen bewegen sich — die Formel läuft.
-	_pose(h, "cast", 3.2)
+	# Arme einmal heben und OBEN halten — die laufende Zauberfolge liess ihn
+	# die Haende immer wieder senken.
+	_pose(h, "cast_hold", 6.0)
 	_chant(s, 2.0)
 	AudioManager.play_sfx("summon")
 	# 2) Lichtschacht von oben: ein schmaler Kegel, der sich über ihm öffnet.

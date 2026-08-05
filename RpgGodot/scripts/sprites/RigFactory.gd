@@ -253,7 +253,8 @@ const BAKE := 2
 const BAKED_ANIM := {
 	"idle": "idle", "walk": "walk", "run": "run", "attack": "attack",
 	# Das Rig kennt keinen dritten Schwung — es nimmt dafuer den zweiten.
-	"attack2": "attack2", "attack3": "attack2", "cast": "cast", "aim": "aim",
+	"attack2": "attack2", "attack3": "attack2", "cast": "cast", "cast_hold": "cast",
+	"aim": "aim",
 	"block": "block",
 	"hit": "hit", "down": "down", "cheer": "cheer", "roar": "roar",
 	"taunt": "taunt",

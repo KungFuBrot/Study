@@ -39,6 +39,9 @@ const HERO_ANIM := {
 	# Dritter Schwung — wer kein eigenes Blatt dafuer hat, stoesst eben nochmal.
 	"attack3": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
 	"cast":    {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": -1},
+	# Gehaltene Zauberpose: Arme oben, ohne Schleife — fuer das Ritual, in dem
+	# die Haende einmal steigen und erst am Ende wieder sinken.
+	"cast_hold": {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 5},
 	"aim":     {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 4},
 	"block":   {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": -1},
 	# Echter Jubel statt gehaltener Zauberpose: Arme hoch, drei Bilder.
