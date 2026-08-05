@@ -52,7 +52,9 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 	# Schlag 2: Rückhand — sofern der Gegner noch steht. Kurzer Rücksprung,
 	# dann reißt die Klinge in der Gegenrichtung durch.
 	if e["alive"]:
-		_pose(h, "attack2", 0.55)   # Rückhand aus der Gegenrichtung
+		# Rückhand aus der Gegenrichtung. Wer drei Schwünge hat (Helen), wechselt
+		# zufällig — sonst sieht jeder zweite Schlag gleich aus.
+		_pose(h, "attack2" if randf() < 0.5 else "attack3", 0.55)
 		var hop := create_tween()
 		hop.tween_property(s, "position:x", strike_pos.x + 26.0, 0.10) \
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

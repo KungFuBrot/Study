@@ -252,7 +252,9 @@ const BAKED := "res://assets/rig3d/"
 const BAKE := 2
 const BAKED_ANIM := {
 	"idle": "idle", "walk": "walk", "run": "run", "attack": "attack",
-	"attack2": "attack2", "cast": "cast", "aim": "aim", "block": "block",
+	# Das Rig kennt keinen dritten Schwung — es nimmt dafuer den zweiten.
+	"attack2": "attack2", "attack3": "attack2", "cast": "cast", "aim": "aim",
+	"block": "block",
 	"hit": "hit", "down": "down", "cheer": "cheer", "roar": "roar",
 	"taunt": "taunt",
 }

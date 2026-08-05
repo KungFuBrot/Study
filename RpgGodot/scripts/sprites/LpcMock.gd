@@ -36,6 +36,8 @@ const HERO_ANIM := {
 	"run":     {"sheet": "run", "cols": 8, "row": ROW, "hold": -1},
 	"attack":  {"sheet": "slash", "cols": 6, "row": ROW, "hold": -1},
 	"attack2": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
+	# Dritter Schwung — wer kein eigenes Blatt dafuer hat, stoesst eben nochmal.
+	"attack3": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
 	"cast":    {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": -1},
 	"aim":     {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 4},
 	"block":   {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": -1},
@@ -53,11 +55,15 @@ const HERO_OVERRIDE := {
 	"serena": {
 		"attack":  {"sheet": "slash", "cols": 6, "row": ROW, "hold": -1, "cell": 256},
 		"attack2": {"sheet": "halfslash", "cols": 6, "row": ROW, "hold": -1, "cell": 256},
+		# Rueckhand — der dritte Schwung, damit die Schlagfolge sich nicht
+		# wiederholt (13 Bilder, das laengste Blatt).
+		"attack3": {"sheet": "backslash", "cols": 13, "row": ROW, "hold": -1, "cell": 256},
 	},
 	"rax": {
-		"attack":  {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
-		"attack2": {"sheet": "thrust", "cols": 8, "row": ROW, "hold": -1},
-		"aim":     {"sheet": "thrust", "cols": 8, "row": ROW, "hold": 5},
+		# Echte Schussfolge statt gehaltener Pose: anlegen, feuern, nachladen.
+		"attack":  {"sheet": "shoot", "cols": 13, "row": ROW, "hold": -1},
+		"attack2": {"sheet": "shoot", "cols": 13, "row": ROW, "hold": -1},
+		"aim":     {"sheet": "shoot", "cols": 13, "row": ROW, "hold": 8},
 	},
 }
 
