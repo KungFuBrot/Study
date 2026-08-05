@@ -41,7 +41,8 @@ const HERO_ANIM := {
 	"cast":    {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": -1},
 	"aim":     {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 4},
 	"block":   {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": -1},
-	"cheer":   {"sheet": "spellcast", "cols": 7, "row": ROW, "hold": 2},
+	# Echter Jubel statt gehaltener Zauberpose: Arme hoch, drei Bilder.
+	"cheer":   {"sheet": "emote", "cols": 3, "row": ROW, "hold": -1},
 	"hit":     {"sheet": "hurt", "cols": 6, "row": 0, "hold": -1},
 	"down":    {"sheet": "hurt", "cols": 6, "row": 0, "hold": 5},
 }
