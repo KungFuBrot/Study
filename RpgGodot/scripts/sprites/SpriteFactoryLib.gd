@@ -581,9 +581,11 @@ static func _tile_color(kind: String, x: int, y: int) -> Color:
 			if y > 5 and y <= 9 and x > 1 and x < 14: return Color(0.66, 0.24, 0.20)
 			return Color(0, 0, 0, 0)
 		"bridge":
-			# Steg mit freien Rändern: der Fluss läuft sichtbar darunter durch.
-			if y < 2 or y > 13: return Color(0, 0, 0, 0)
-			if y == 2 or y == 13: return Color(0.28, 0.19, 0.10)
+			# Der Steg muss die Kachel VOLL bedecken. Früher blieben oben und
+			# unten zwei Pixel Fluss frei — genau dort stehen die Füße, und die
+			# Figuren sahen aus, als wateten sie im Wasser.
+			if y == 0 or y == 15: return Color(0.24, 0.16, 0.09)   # Randbalken
+			if y == 1 or y == 14: return Color(0.31, 0.21, 0.11)
 			if y % 3 == 0: return Color(0.45, 0.32, 0.18)
 			return Color(0.55, 0.40, 0.22)
 		"void":

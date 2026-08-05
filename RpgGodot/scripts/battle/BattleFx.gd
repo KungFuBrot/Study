@@ -273,8 +273,16 @@ func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
 	# KIND der Figur, nicht Geschwister: nur so bleibt die Waffe bei jedem
 	# Schritt, Rückstoß und Zittern an der Hand. (flip_h der Figur wirkt sich
 	# nicht auf Kinder aus, deshalb spiegelt die Waffe sich selbst.)
-	var hold: Vector2 = at if at != Vector2.ZERO else Vector2(-26, 6)
-	w.position = hold
+	# "at" ist die HAND, nicht die Bildmitte: das Sprite wird so verschoben, dass
+	# sein Griffpunkt dort landet. Die Waffe ist gespiegelt, deshalb kippt die
+	# x-Achse mit.
+	var hand: Vector2 = at if at != Vector2.ZERO else Vector2(-20, 6)
+	var t0 := w.texture
+	var grip: Vector2 = SpriteFactory.RAX_GRIP.get(kind,
+		Vector2(t0.get_width() * 0.5, t0.get_height() * 0.5))
+	var grip_off := Vector2(-(grip.x - t0.get_width() * 0.5),
+		grip.y - t0.get_height() * 0.5) * w.scale.x
+	w.position = hand - grip_off
 	s.add_child(w)
 	# Muendung aus der Texturkoordinate ableiten. Das Sprite ist zentriert und
 	# gespiegelt, deshalb die x-Achse umdrehen; die Skalierung kommt oben drauf.

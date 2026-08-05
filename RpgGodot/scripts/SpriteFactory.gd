@@ -697,6 +697,19 @@ const RAX_MUZZLE := {
 	"staff": Vector2(7, 3),
 }
 
+## Wo die Hand das Geraet fasst (Texturkoordinaten). Ohne diesen Punkt sass die
+## MITTE der Waffe in der Hand — bei einer 40 px langen Minigun liegt der Lauf
+## dann quer vor der Brust statt im Anschlag.
+const RAX_GRIP := {
+	"minigun": Vector2(15, 12),
+	"launcher": Vector2(17, 12),
+	"radio": Vector2(9, 18),
+	"ramp": Vector2(19, 22),
+	"laser": Vector2(20, 12),
+	"lance": Vector2(15, 12),
+	"staff": Vector2(7, 30),
+}
+
 ## Farbwelt aller Geraete: dunkles Gehaeuse, Lichtkante oben, cyan Energie.
 const RAX_DARK := Color(0.11, 0.13, 0.17)
 const RAX_MID := Color(0.31, 0.35, 0.42)

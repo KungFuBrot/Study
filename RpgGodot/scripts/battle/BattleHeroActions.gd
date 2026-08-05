@@ -289,7 +289,7 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await raise.finished
 	# Zauberstab hervorholen — die Kugel wächst an seinem Kristall, wie beim
 	# Strahlgewehr die Ladung an der Mündung.
-	var stab := _rax_equip(h, "staff", Vector2(-22, -8))
+	var stab := _rax_equip(h, "staff", Vector2(-20, 8))
 	# --- Aufladung: eine glühende Feuerkugel wächst am Kristall und pulsiert ---
 	var hand := _rax_muzzle(stab)
 	if hand == Vector2.ZERO:
