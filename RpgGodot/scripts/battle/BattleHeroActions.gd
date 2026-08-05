@@ -89,7 +89,97 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 ## Vorbereitungspose vor einer Fähigkeit (wie beim Roboterlaser): der Held
 ## tritt vor und sammelt sichtbar Kraft — Zauberkreis, aufglühende Aura,
 ## einlaufende Funken, Wirk-Pose, Sammelton. Erst danach folgt die Wirkung.
-func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
+## Signaturgeste je Fähigkeit — läuft NACH dem gemeinsamen Kraftsammeln, damit
+## jede Fähigkeit ihren eigenen Auftakt hat statt nur denselben Windup.
+func _signature(h: Dictionary, gesture: String, color: Color) -> void:
+	if gesture == "" or h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	var s: Sprite2D = h["sprite"]
+	var base: Vector2 = s.get_meta("base_scale", s.scale)
+	var start := s.position
+	match gesture:
+		"whirl":
+			# Vorzeichnen des Wirbels: zwei enge Kreise mit Nachbildern.
+			_ghost_trail(s, 0.5)
+			var tw := create_tween()
+			for i in 2:
+				tw.tween_property(s, "position", start + Vector2(-18, -10), 0.12) \
+					.set_trans(Tween.TRANS_SINE)
+				tw.tween_property(s, "position", start + Vector2(18, 6), 0.12) \
+					.set_trans(Tween.TRANS_SINE)
+			tw.tween_property(s, "position", start, 0.10)
+			_weapon_glint(h.get("weapon"))
+		"pierce":
+			# Zielen: tief in die Knie, Klinge waagerecht ausrichten.
+			var tw := create_tween()
+			tw.tween_property(s, "scale", base * Vector2(1.14, 0.86), 0.16) \
+				.set_trans(Tween.TRANS_QUAD)
+			tw.tween_property(s, "position:x", start.x + 14.0, 0.14) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			tw.parallel().tween_property(s, "scale", base, 0.14)
+			_beam(s.position + Vector2(-30, -4), s.position + Vector2(-260, -4),
+				Color(color, 0.35), 2.0, 0.22)
+		"dance":
+			# Pentagramm in die Luft treten: fünf kurze Versätze.
+			var tw := create_tween()
+			for i in 5:
+				var a := TAU * (i * 2) / 5.0 - PI * 0.5
+				tw.tween_property(s, "position", start + Vector2(cos(a), sin(a)) * 16.0, 0.07) \
+					.set_trans(Tween.TRANS_SINE)
+			tw.tween_property(s, "position", start, 0.08)
+			_sparkle(start, color)
+		"storm":
+			# Klinge über den Kopf reißen, Wind zieht an.
+			var tw := create_tween()
+			tw.tween_property(s, "position:y", start.y - 22.0, 0.20) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.parallel().tween_property(s, "rotation", -0.22, 0.20)
+			tw.tween_property(s, "position:y", start.y, 0.14) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.parallel().tween_property(s, "rotation", 0.0, 0.14)
+			for i in 3:
+				_burst(start + Vector2(randf_range(-40, 40), randf_range(-30, 20)),
+					color, 6, 120)
+		"sky":
+			# Zum Himmel zeigen — von dort kommt der Einschlag.
+			var tw := create_tween()
+			tw.tween_property(s, "rotation", -0.16, 0.18).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(s, "rotation", 0.0, 0.22).set_trans(Tween.TRANS_SINE)
+			_spell_light(start + Vector2(0, -70), color, 190.0, 0.7, 0.9)
+			_beam(start + Vector2(-6, -30), start + Vector2(-30, -300),
+				Color(color, 0.30), 6.0, 0.35)
+		"call":
+			# Beschwörungsformel: die Figur hebt ab, Ringe laufen nach außen.
+			var tw := create_tween()
+			tw.tween_property(s, "position:y", start.y - 16.0, 0.30) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tw.tween_property(s, "position:y", start.y, 0.22) \
+				.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+			for i in 3:
+				_impact_ring(start + Vector2(0, 34), Color(color, 0.5))
+				await get_tree().create_timer(0.09).timeout
+		"tech":
+			# Systemprüfung: Abtastlinie, dann rastet die Haltung ein.
+			var scan := Sprite2D.new()
+			scan.texture = SpriteFactory.circle(4, color)
+			scan.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			var mt := CanvasItemMaterial.new()
+			mt.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			scan.material = mt
+			scan.scale = Vector2(9.0, 0.5)
+			scan.position = start + Vector2(0, -46)
+			add_child(scan)
+			var st := create_tween()
+			st.tween_property(scan, "position:y", start.y + 40.0, 0.34)
+			st.parallel().tween_property(scan, "modulate:a", 0.0, 0.34)
+			st.tween_callback(scan.queue_free)
+			var tw := create_tween()
+			tw.tween_property(s, "scale", base * Vector2(0.94, 1.08), 0.12)
+			tw.tween_property(s, "scale", base, 0.12) \
+				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.30).timeout
+
+func _stance(h: Dictionary, color: Color, sfx := "charge", gesture := "") -> void:
 	var s: Sprite2D = h["sprite"]
 	await _sprint(h, h["home"] + Vector2(-56, 4), 0.18)
 	_cast_circle(s.position + Vector2(0, 40), color)
@@ -159,13 +249,14 @@ func _stance(h: Dictionary, color: Color, sfx := "charge") -> void:
 	_punch_zoom(0.08, s.position)
 	await get_tree().create_timer(0.55).timeout
 	await _hitstop(0.06)
+	await _signature(h, gesture, color)
 
 func _whirl_all(h: Dictionary, ab: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s unleashes %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Konzentration: vortreten, Kraft sammeln, dann erst der Wirbel.
-	await _stance(h, Color(1.0, 0.95, 0.5))
+	await _stance(h, Color(1.0, 0.95, 0.5), "charge", "whirl")
 	var tw := create_tween()
 	tw.tween_property(s, "position", Vector2(430, 260), 0.25).set_trans(Tween.TRANS_QUAD)
 	_ghost_trail(s, 0.25)
@@ -191,7 +282,7 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	_say("%s casts %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Beschwörungspose: vortreten und Kraft sammeln, dann aufsteigen.
-	await _stance(h, Color(1.0, 0.6, 0.2), "summon")
+	await _stance(h, Color(1.0, 0.6, 0.2), "summon", "sky")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.82, 0.35))
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
@@ -261,7 +352,7 @@ func _pierce(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
-	await _stance(h, Color(1.0, 0.95, 0.5))
+	await _stance(h, Color(1.0, 0.95, 0.5), "charge", "pierce")
 	var center: Vector2 = es.position
 	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
 	var passes := [
@@ -319,7 +410,7 @@ func _blade_dance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var es: Sprite2D = e["sprite"]
 	var wp: Sprite2D = h["weapon"]
-	await _stance(h, Color(0.75, 0.60, 1.0))
+	await _stance(h, Color(0.75, 0.60, 1.0), "charge", "dance")
 	var center: Vector2 = es.position
 	var grip_x: float = wp.get_meta("grip_x", -7.0) if wp != null else -7.0
 	# Fünf Schnitte: Startpunkte in Pentagramm-Reihenfolge um das Ziel,
@@ -597,7 +688,7 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	_say("%s casts %s on %s!" % [d["name"], ab["name"], td["name"]])
 	var s: Sprite2D = h["sprite"]
 	# Beschwörungspose vor dem Heilzauber.
-	await _stance(h, Color(0.45, 1.0, 0.55), "summon")
+	await _stance(h, Color(0.45, 1.0, 0.55), "summon", "call")
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 12.0, 0.2)
 	await raise.finished
@@ -683,7 +774,7 @@ func _blade_storm(h: Dictionary, ab: Dictionary) -> void:
 	var s: Sprite2D = h["sprite"]
 	var wp: Sprite2D = h.get("weapon")
 	_say("%s unleashes %s!" % [d["name"], ab["name"]])
-	await _stance(h, Color(0.75, 0.92, 1.0))
+	await _stance(h, Color(0.75, 0.92, 1.0), "charge", "storm")
 	# Klinge senkrecht hochreißen — Startsignal des Sturms.
 	var raise := create_tween()
 	raise.tween_property(s, "position:y", s.position.y - 18.0, 0.18).set_trans(Tween.TRANS_SINE)

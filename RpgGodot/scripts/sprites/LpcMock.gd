@@ -163,11 +163,15 @@ static func monster(id: String, frame: int, anim := "idle") -> Texture2D:
 	var sheet := _sheet(file)
 	if sheet == null:
 		return null
-	# Die Zusatzblaetter stammen aus demselben Raster und haben dieselbe
-	# Bilderzahl wie der Leerlauf.
-	var n: int = maxi(int(ENEMY_FRAMES[id]), 1)
-	var w: int = int(sheet.get_width() / n)
+	# Die Zellbreite steckt im LEERLAUF-Blatt (Breite / Bilderzahl). Die
+	# Zusatzblaetter nutzen dieselbe Zelle, koennen aber mehr oder weniger
+	# Bilder haben — deshalb ihre Anzahl daraus ableiten statt zu raten.
+	var idle_sheet := _sheet("enemies/%s.png" % id)
+	if idle_sheet == null:
+		return null
+	var w: int = maxi(int(idle_sheet.get_width() / maxi(int(ENEMY_FRAMES[id]), 1)), 1)
 	var h: int = sheet.get_height()
+	var n: int = maxi(int(round(float(sheet.get_width()) / float(w))), 1)
 	return _cut(file, (frame % n) * w, 0, w, h)
 
 ## Bilderzahl des Streifens (0, wenn der Gegner nicht umgestellt ist).
