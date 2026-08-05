@@ -89,6 +89,107 @@ func _hero_attack(h: Dictionary, e: Dictionary) -> void:
 ## Vorbereitungspose vor einer Fähigkeit (wie beim Roboterlaser): der Held
 ## tritt vor und sammelt sichtbar Kraft — Zauberkreis, aufglühende Aura,
 ## einlaufende Funken, Wirk-Pose, Sammelton. Erst danach folgt die Wirkung.
+## Janoschs Zauberritual. Er schließt die Augen und murmelt, ein Lichtschacht
+## fällt auf ihn, er hebt langsam ab, ein Lichtkreis legt sich um ihn und
+## Engelsflügel entfalten sich. Erst danach sammelt der Aufrufer die Energie und
+## löst den Zauber aus; `_cast_ritual_end` lässt alles wieder verklingen.
+## Rückgabe: die erzeugten Knoten, damit der Aufrufer sie zurückgeben kann.
+func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
+	var s: Sprite2D = h["sprite"]
+	var nodes := {"start_y": s.position.y}
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	# 1) Augen zu, Lippen bewegen sich — die Formel läuft.
+	_pose(h, "cast", 3.2)
+	_chant(s, 2.0)
+	AudioManager.play_sfx("summon")
+	# 2) Lichtschacht von oben: ein schmaler Kegel, der sich über ihm öffnet.
+	var shaft := Polygon2D.new()
+	shaft.polygon = PackedVector2Array([Vector2(-16, -300), Vector2(16, -300),
+		Vector2(34, 30), Vector2(-34, 30)])
+	shaft.color = Color(color.r, color.g, color.b, 0.0)
+	shaft.material = add
+	shaft.position = s.position
+	shaft.z_index = -1
+	add_child(shaft)
+	nodes["shaft"] = shaft
+	var st := create_tween()
+	st.tween_property(shaft, "color:a", 0.22, 0.55).set_trans(Tween.TRANS_SINE)
+	# 3) Lichtkreis um ihn herum, flach auf dem Boden.
+	var ring := Sprite2D.new()
+	ring.texture = SpriteFactory.particle("circle_05")
+	ring.material = add
+	ring.modulate = Color(color, 0.0)
+	ring.position = s.position + Vector2(0, 42)
+	ring.scale = Vector2(0.05, 0.02)
+	add_child(ring)
+	nodes["ring"] = ring
+	var rt := create_tween()
+	rt.tween_property(ring, "scale", Vector2(0.85, 0.30), 0.7) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	rt.parallel().tween_property(ring, "modulate:a", 0.75, 0.7)
+	# 4) Engelsflügel: je Seite drei Schwingen, die sich entfalten.
+	var wings := Node2D.new()
+	wings.position = s.position + Vector2(0, -6)
+	wings.z_index = -1
+	wings.scale = Vector2(0.1, 0.1)
+	wings.modulate = Color(1, 1, 1, 0.0)
+	add_child(wings)
+	nodes["wings"] = wings
+	# Je Seite fünf schmale Schwungfedern, gefächert und nach hinten gebogen —
+	# ein einzelnes Vieleck sah aus wie eine flache Raute.
+	for seite in [-1.0, 1.0]:
+		for i in 5:
+			var f := Polygon2D.new()
+			var laenge := 26.0 + i * 7.0
+			var neigung := -0.55 + i * 0.26      # Fächerwinkel der Feder
+			var spitze := Vector2(cos(neigung), sin(neigung)) * laenge
+			spitze.x *= seite
+			var quer := Vector2(-spitze.y, spitze.x).normalized() * (2.6 + i * 0.5)
+			f.polygon = PackedVector2Array([
+				Vector2.ZERO,
+				quer,
+				spitze * 0.62 + quer * 1.5,
+				spitze,
+				spitze * 0.55 - quer * 0.8,
+				-quer * 0.6])
+			f.color = Color(1.0, 0.98, 0.90, 0.40 - i * 0.045)
+			f.material = add
+			f.position = Vector2(seite * 7.0, -2.0 + i * 1.5)
+			wings.add_child(f)
+	var wt := create_tween()
+	wt.tween_property(wings, "modulate:a", 1.0, 0.5)
+	wt.parallel().tween_property(wings, "scale", Vector2(1.0, 1.0), 0.6) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# 5) Er hebt langsam ab; Lichtkreis und Flügel steigen mit.
+	var lift := create_tween()
+	lift.tween_property(s, "position:y", nodes["start_y"] - 24.0, 0.9) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	lift.parallel().tween_property(wings, "position:y", s.position.y - 30.0, 0.9) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await lift.finished
+	return nodes
+
+## Ende des Rituals: Augen auf, Licht und Flügel verklingen, er sinkt zurück.
+func _cast_ritual_end(h: Dictionary, nodes: Dictionary) -> void:
+	var s: Sprite2D = h["sprite"]
+	_pose(h, "idle", 0.1)
+	for key in ["shaft", "ring", "wings"]:
+		var n: Variant = nodes.get(key)
+		if n == null or not is_instance_valid(n):
+			continue
+		var t := (n as Node2D).create_tween()
+		if key == "shaft":
+			t.tween_property(n, "color:a", 0.0, 0.55)
+		else:
+			t.tween_property(n, "modulate:a", 0.0, 0.55)
+		t.parallel().tween_property(n, "scale", (n as Node2D).scale * 1.18, 0.55)
+		t.tween_callback((n as Node2D).queue_free)
+	var sink := create_tween()
+	sink.tween_property(s, "position:y", nodes.get("start_y", s.position.y), 0.7) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await sink.finished
+
 ## Signaturgeste je Fähigkeit — läuft NACH dem gemeinsamen Kraftsammeln, damit
 ## jede Fähigkeit ihren eigenen Auftakt hat statt nur denselben Windup.
 func _signature(h: Dictionary, gesture: String, color: Color) -> void:
@@ -281,12 +382,11 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	var d: Dictionary = h["data"]
 	_say("%s casts %s!" % [d["name"], ab["name"]])
 	var s: Sprite2D = h["sprite"]
-	# Beschwörungspose: vortreten und Kraft sammeln, dann aufsteigen.
-	await _stance(h, Color(1.0, 0.6, 0.2), "summon", "sky")
+	# Vortreten, dann das volle Zauberritual: Augen zu, Formel murmeln,
+	# Lichtschacht, Schweben, Lichtkreis, Engelsflügel.
+	await _sprint(h, h["home"] + Vector2(-56, 4), 0.2)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.82, 0.35))
-	var raise := create_tween()
-	raise.tween_property(s, "position:y", s.position.y - 16.0, 0.22)
-	await raise.finished
+	var ritual := await _cast_ritual(h, Color(1.0, 0.78, 0.42))
 	# --- Aufladung: die Kugel wächst am Kristall seines Stabes (er trägt ihn
 	# dauerhaft, siehe BattleStage._attach_staff) und pulsiert ---
 	var stab: Sprite2D = h.get("staff")
@@ -330,6 +430,8 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await charge.finished
 	# --- Abschuss: der große Feuerball rast zum Ziel und wächst dabei ---
 	AudioManager.play_sfx("fire")
+	# Er öffnet die Augen und verstummt — im selben Moment löst sich der Zauber.
+	_pose(h, "aim", 0.5)
 	var fly := create_tween()
 	fly.tween_property(ball, "position", e["sprite"].position, 0.34) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -348,6 +450,8 @@ func _fireball(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 		var fl := stab.create_tween()
 		fl.tween_property(stab, "modulate", Color(1.9, 1.4, 1.3), 0.08)
 		fl.tween_property(stab, "modulate", Color.WHITE, 0.22)
+	# Licht und Flügel verklingen, er sinkt zurück auf den Boden.
+	await _cast_ritual_end(h, ritual)
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	await _sprint(h, h["home"], 0.2)
