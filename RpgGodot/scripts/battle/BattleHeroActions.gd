@@ -133,7 +133,7 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 	# Schweben mitgehen und immer am Rücken sitzen. Frei in der Szene platziert
 	# trieben sie neben ihm her.
 	var wings := Node2D.new()
-	wings.position = Vector2(0, -14)
+	wings.position = Vector2(0, -4)
 	wings.z_index = -1
 	wings.scale = Vector2(0.1, 0.1)
 	wings.modulate = Color(1, 1, 1, 0.0)
@@ -148,17 +148,18 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 			var L := (58.0 if lage == 0 else 34.0)      # Spannweite
 			var Hb := (30.0 if lage == 0 else 18.0)     # Höhe des Bogens
 			var pts := PackedVector2Array()
-			# Vorderkante: schwingt vom Ansatz nach außen oben
-			for i in 10:
-				var t := i / 9.0
-				pts.append(Vector2(seite * L * t, -Hb * sin(t * PI * 0.7) - 3.0 * t))
-			# Hinterkante zurück, mit Federzacken
-			for i in range(7, -1, -1):
-				var t2 := i / 7.0
-				var p := Vector2(seite * L * t2 * 0.90, 4.0 + 20.0 * t2 * t2)
-				if i % 2 == 1:
-					p.y += 7.0            # herausstehende Schwungfeder
-					p.x -= seite * 2.0
+			# Vorderkante: ein voller, runder Bogen bis zur abgerundeten Spitze
+			for i in 14:
+				var t := i / 13.0
+				pts.append(Vector2(seite * L * sin(t * PI * 0.5),
+					-Hb * sin(t * PI * 0.9) + 2.0 * t))
+			# Hinterkante zurück: weiche Wölbung, nur angedeutete Federkanten
+			for i in range(11, -1, -1):
+				var t2 := i / 11.0
+				var p := Vector2(seite * L * sin(t2 * PI * 0.5) * 0.88,
+					6.0 + 18.0 * sin(t2 * PI * 0.55))
+				if i % 3 == 1:
+					p.y += 2.5            # nur leicht angedeutete Federkante
 				pts.append(p)
 			f.polygon = pts
 			f.color = (Color(1.0, 0.99, 0.93, 0.34) if lage == 0
