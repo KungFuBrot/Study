@@ -136,38 +136,50 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 	wings.modulate = Color(1, 1, 1, 0.0)
 	add_child(wings)
 	nodes["wings"] = wings
-	# Je Seite fünf schmale Schwungfedern, gefächert und nach hinten gebogen —
-	# ein einzelnes Vieleck sah aus wie eine flache Raute.
+	# Echte Schwingen statt Zacken: geschlossene Silhouette mit gewölbter
+	# Vorderkante und gezackter Hinterkante, davor eine hellere Deckfeder-Lage —
+	# so liest es sich wie ein großer Vogelflügel.
 	for seite in [-1.0, 1.0]:
-		for i in 5:
+		for lage in 2:
 			var f := Polygon2D.new()
-			var laenge := 26.0 + i * 7.0
-			var neigung := -0.55 + i * 0.26      # Fächerwinkel der Feder
-			var spitze := Vector2(cos(neigung), sin(neigung)) * laenge
-			spitze.x *= seite
-			var quer := Vector2(-spitze.y, spitze.x).normalized() * (2.6 + i * 0.5)
-			f.polygon = PackedVector2Array([
-				Vector2.ZERO,
-				quer,
-				spitze * 0.62 + quer * 1.5,
-				spitze,
-				spitze * 0.55 - quer * 0.8,
-				-quer * 0.6])
-			f.color = Color(1.0, 0.98, 0.90, 0.40 - i * 0.045)
+			var L := (58.0 if lage == 0 else 34.0)      # Spannweite
+			var Hb := (30.0 if lage == 0 else 18.0)     # Höhe des Bogens
+			var pts := PackedVector2Array()
+			# Vorderkante: schwingt vom Ansatz nach außen oben
+			for i in 10:
+				var t := i / 9.0
+				pts.append(Vector2(seite * L * t, -Hb * sin(t * PI * 0.7) - 3.0 * t))
+			# Hinterkante zurück, mit Federzacken
+			for i in range(7, -1, -1):
+				var t2 := i / 7.0
+				var p := Vector2(seite * L * t2 * 0.90, 4.0 + 20.0 * t2 * t2)
+				if i % 2 == 1:
+					p.y += 7.0            # herausstehende Schwungfeder
+					p.x -= seite * 2.0
+				pts.append(p)
+			f.polygon = pts
+			f.color = (Color(1.0, 0.99, 0.93, 0.34) if lage == 0
+				else Color(1.0, 1.0, 0.97, 0.30))
 			f.material = add
-			f.position = Vector2(seite * 7.0, -2.0 + i * 1.5)
+			f.position = Vector2(seite * 6.0, -4.0 + lage * 3.0)
 			wings.add_child(f)
 	var wt := create_tween()
 	wt.tween_property(wings, "modulate:a", 1.0, 0.5)
 	wt.parallel().tween_property(wings, "scale", Vector2(1.0, 1.0), 0.6) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	# 5) Er hebt langsam ab; Lichtkreis und Flügel steigen mit.
+	# 5) Er hebt deutlich ab; Lichtkreis und Flügel steigen mit.
 	var lift := create_tween()
-	lift.tween_property(s, "position:y", nodes["start_y"] - 24.0, 0.9) \
+	lift.tween_property(s, "position:y", nodes["start_y"] - 46.0, 1.0) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	lift.parallel().tween_property(wings, "position:y", s.position.y - 30.0, 0.9) \
+	lift.parallel().tween_property(wings, "position:y", s.position.y - 52.0, 1.0) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await lift.finished
+	# Ruhiger Flügelschlag — erst jetzt, sonst kämpft er gegen das Entfalten.
+	var flap := wings.create_tween().set_loops()
+	flap.tween_property(wings, "scale:y", 0.86, 0.95) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	flap.tween_property(wings, "scale:y", 1.0, 0.95) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	return nodes
 
 ## Ende des Rituals: Augen auf, Licht und Flügel verklingen, er sinkt zurück.

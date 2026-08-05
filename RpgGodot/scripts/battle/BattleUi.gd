@@ -302,7 +302,7 @@ func _set_spent(h: Dictionary, spent: bool) -> void:
 	if h["data"]["hp"] <= 0:
 		return
 	var s: Sprite2D = h["sprite"]
-	var ziel := Color(0.58, 0.60, 0.66) if spent else Color.WHITE
+	var ziel := Color(0.40, 0.42, 0.50) if spent else Color.WHITE
 	s.create_tween().tween_property(s, "modulate", ziel, 0.25) \
 		.set_trans(Tween.TRANS_SINE)
 

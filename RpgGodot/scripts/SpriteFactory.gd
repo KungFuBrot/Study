@@ -701,9 +701,11 @@ const RAX_MUZZLE := {
 ## MITTE der Waffe in der Hand — bei einer 40 px langen Minigun liegt der Lauf
 ## dann quer vor der Brust statt im Anschlag.
 const RAX_GRIP := {
-	# Der gezeichnete Griff liegt bei x 8-12, y 10-12 (siehe rax_weapon) — mit
-	# dem alten Wert 15/12 sass die Waffe zehn Pixel zu weit hinten und zu hoch.
-	"minigun": Vector2(10, 11),
+	# Die Minigun soll optisch dort sitzen, wo der Laser sitzt (der passt).
+	# Rückwärts gerechnet: Beim Laser (44x15, Griff 20/12, Hand -20/8) landet die
+	# Bildmitte bei (-24,-1). Damit die Minigun (40x18) dieselbe Mitte trifft,
+	# muss ihr Griffpunkt auf (18,13) liegen — nicht auf dem gezeichneten Griff.
+	"minigun": Vector2(18, 13),
 	"launcher": Vector2(17, 12),
 	"radio": Vector2(9, 18),
 	"ramp": Vector2(19, 22),
