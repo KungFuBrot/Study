@@ -129,12 +129,15 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	rt.parallel().tween_property(ring, "modulate:a", 0.75, 0.7)
 	# 4) Engelsflügel: je Seite drei Schwingen, die sich entfalten.
+	# Die Schwingen hängen an SEINEN Schultern: Kind der Figur, damit sie beim
+	# Schweben mitgehen und immer am Rücken sitzen. Frei in der Szene platziert
+	# trieben sie neben ihm her.
 	var wings := Node2D.new()
-	wings.position = s.position + Vector2(0, -6)
+	wings.position = Vector2(0, -14)
 	wings.z_index = -1
 	wings.scale = Vector2(0.1, 0.1)
 	wings.modulate = Color(1, 1, 1, 0.0)
-	add_child(wings)
+	s.add_child(wings)
 	nodes["wings"] = wings
 	# Echte Schwingen statt Zacken: geschlossene Silhouette mit gewölbter
 	# Vorderkante und gezackter Hinterkante, davor eine hellere Deckfeder-Lage —
@@ -170,8 +173,6 @@ func _cast_ritual(h: Dictionary, color: Color) -> Dictionary:
 	# 5) Er hebt deutlich ab; Lichtkreis und Flügel steigen mit.
 	var lift := create_tween()
 	lift.tween_property(s, "position:y", nodes["start_y"] - 46.0, 1.0) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	lift.parallel().tween_property(wings, "position:y", s.position.y - 52.0, 1.0) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await lift.finished
 	# Ruhiger Flügelschlag — erst jetzt, sonst kämpft er gegen das Entfalten.
