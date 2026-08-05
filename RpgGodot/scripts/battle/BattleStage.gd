@@ -354,11 +354,14 @@ func _build_scene() -> void:
 		var hrefl := _attach_reflection(s, foot_h, 0.09)
 		if data["id"] == "rax":
 			_attach_visor_scan(s)
+		var staff: Sprite2D = null
+		if data["id"] == "milo":
+			staff = _attach_staff(s)
 		# Die Rig-Figuren tragen ihre Waffe selbst — kein DTII-Overlay darüber.
 		var wp: Sprite2D = null
 		add_child(s)
 		heroes.append({"data": data, "sprite": s, "home": home, "ult_used": false,
-			"frame": 0, "weapon": wp, "anim": "idle", "refl": hrefl})
+			"frame": 0, "weapon": wp, "anim": "idle", "refl": hrefl, "staff": staff})
 
 	# Gegner-Skalierung: Am Anfang sind alle Dungeons gleich schwer — die höheren
 	# Grundwerte der späteren Dungeons werden über ihre `tier`-Stufe aufs
@@ -531,6 +534,33 @@ func _attach_glow_pool(s: Sprite2D, foot_y: float, color: Color) -> void:
 	breath.tween_property(pool, "modulate:a", 1.0, 1.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Gespiegeltes Abbild unter den Füßen — der „nasse Boden“-Look aus HD-2D-Spielen.
+## Janoschs Zauberstab. Er steckt NICHT in den gebackenen Blättern: dort liegt
+## er bei dieser Blickrichtung hinter dem Körper und war nie zu sehen. Als
+## eigenes Kind mit z_index über der Figur hält er sich sichtbar vor ihr, und
+## sein Kristall dient den Zaubern als Ursprung (siehe _staff_tip).
+func _attach_staff(s: Sprite2D) -> Sprite2D:
+	var st := Sprite2D.new()
+	st.texture = SpriteFactory.rax_weapon("staff")
+	st.flip_h = true
+	st.scale = Vector2(2.0, 2.0)
+	st.z_index = 2
+	var t := st.texture
+	var grip: Vector2 = SpriteFactory.RAX_GRIP["staff"]
+	var hand := Vector2(-18, 10)
+	st.position = hand - Vector2(-(grip.x - t.get_width() * 0.5),
+		grip.y - t.get_height() * 0.5) * st.scale.x
+	s.add_child(st)
+	# Der Kristall glimmt leise vor sich hin, damit der Stab lebt.
+	var glow := st.create_tween().set_loops()
+	glow.tween_property(st, "modulate", Color(1.15, 1.0, 1.0), 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	glow.tween_property(st, "modulate", Color.WHITE, 1.3) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var m: Vector2 = SpriteFactory.RAX_MUZZLE["staff"]
+	st.set_meta("muzzle", Vector2(-(m.x - t.get_width() * 0.5),
+		m.y - t.get_height() * 0.5) * st.scale.x)
+	return st
+
 ## Lauflicht im Visier: ein heller Punkt wandert endlos hin und her, wie bei
 ## einem abtastenden Sensor. Kind des Sprites, damit er jede Bewegung mitmacht;
 ## die Lage stammt aus der Leinwandmitte, nicht aus festen Pixelwerten.

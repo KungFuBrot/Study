@@ -36,7 +36,7 @@ const PAGES := [
 		"",
 		"Helen, the Blade of Light — she protects rather than conquers.",
 		"Janosch, the Master of Flames — he doubts before he burns.",
-		"Wally, the Heart of Steel — it beats, though it never had to.",
+		"Finni, the Heart of Steel — it beats, though it never had to.",
 		"",
 		"Their journey begins beneath the black chimneys of the Smokeworks ...",
 	],

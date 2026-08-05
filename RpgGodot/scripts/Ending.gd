@@ -80,7 +80,7 @@ func _build_text() -> void:
 		["The river glitters again. Pia holds the record: seven skips.", 22, Color.WHITE, 218],
 		["Helen  —  still carries the blade. She never had to draw it again.", 19, Color(0.95, 0.7, 0.7), 262],
 		["Janosch  —  teaches in Lindenhain that questions warm better than fire.", 19, Color(0.7, 0.75, 0.95), 288],
-		["Wally  —  proves it daily: compassion is not a spare part.", 19, Color(0.75, 0.9, 0.85), 314],
+		["Finni  —  proves it daily: compassion is not a spare part.", 19, Color(0.75, 0.9, 0.85), 314],
 		["Gold earned: %d — donated to the rebuilding of Lindenhain" % GameState.gold, 19, Color(1.0, 0.85, 0.3), 346],
 		["— THANK YOU FOR PLAYING —", 26, Color(1.0, 0.85, 0.3), 480],
 	]

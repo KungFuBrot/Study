@@ -67,9 +67,9 @@ const ENEMIES := {
 		"entrance_line": "Gold dust trickles from the chandeliers — the executive floor descends in person!",
 		"intro": [
 			["Monopoly Prince", "Visitors! Do you have an appointment? That costs extra. So does breathing in here, by the way."],
-			["Wally", "Calculation complete: you own 97 percent of this valley and 0 percent of its decency."],
+			["Finni", "Calculation complete: you own 97 percent of this valley and 0 percent of its decency."],
 			["Monopoly Prince", "Ownership IS decency, tin can! Even your defeat goes on my books as profit."],
-			["Wally", "Objection. This entry is now being cancelled."],
+			["Finni", "Objection. This entry is now being cancelled."],
 		],
 		"aoe_name": "Coin Hail", "ultimate_name": "Hostile Takeover",
 		"ultimate2_name": "Market Crash"},
@@ -283,7 +283,7 @@ func reset_party() -> void:
 			],
 		},
 		{
-			"id": "rax", "name": "Wally", "class": "Battle Robot",
+			"id": "rax", "name": "Finni", "class": "Battle Robot",
 			"level": 1, "xp": 0,
 			"hp": 72, "max_hp": 72, "mp": 16, "max_mp": 16,
 			"atk": 12, "mag": 12, "def": 10,
