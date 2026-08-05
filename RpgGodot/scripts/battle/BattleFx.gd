@@ -175,18 +175,23 @@ func _strike_offset(e: Dictionary) -> float:
 ## im Sprechrhythmus auf dem Gesicht des Zauberers (DTII-Sprite hat keine
 ## eigenen Gesichts-Frames). Räumt sich nach dur Sekunden selbst weg.
 func _chant(s: Sprite2D, dur: float) -> void:
+	# Lage und Größe aus der Leinwand ableiten: die alten festen Werte stammten
+	# aus dem 32x56-Rig und lagen bei den doppelt so großen Figuren mitten im
+	# Hals — der Mund war schlicht nicht zu sehen.
+	var hgt: float = s.texture.get_height() if s.texture != null else 112.0
 	var mouth := Sprite2D.new()
-	mouth.texture = SpriteFactory.circle(2, Color(0.30, 0.10, 0.10))
-	mouth.position = Vector2(-3.0, -3.2)
-	mouth.scale = Vector2(0.6, 0.4)
-	mouth.z_index = 1
+	mouth.texture = SpriteFactory.circle(3, Color(0.26, 0.07, 0.07))
+	mouth.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	mouth.position = Vector2(-hgt * 0.045, -hgt * 0.165)
+	mouth.scale = Vector2(1.1, 0.7)
+	mouth.z_index = 2
 	s.add_child(mouth)
 	var tw := mouth.create_tween().set_loops()
-	tw.tween_property(mouth, "scale", Vector2(0.5, 0.85), 0.09) \
+	tw.tween_property(mouth, "scale", Vector2(0.9, 1.7), 0.11) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(mouth, "scale", Vector2(0.65, 0.3), 0.08) \
+	tw.tween_property(mouth, "scale", Vector2(1.2, 0.5), 0.10) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(mouth, "scale", Vector2(0.55, 0.65), 0.11) \
+	tw.tween_property(mouth, "scale", Vector2(1.0, 1.2), 0.13) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	get_tree().create_timer(dur).timeout.connect(func():
 		if is_instance_valid(mouth):

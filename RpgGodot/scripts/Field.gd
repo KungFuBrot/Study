@@ -445,6 +445,14 @@ func _place_map_object(ch: String, x: int, y: int) -> void:
 	s.centered = false
 	s.position = Vector2(x * TILE, y * TILE)
 	s.z_index = 2
+	# Häuser standen auf einer einzigen Kachel und waren auf der Überlandkarte
+	# kaum als Gebäude zu erkennen. Dach und Wand wachsen deshalb nach OBEN aus
+	# ihrer Kachel heraus — die Grundfläche (und damit das Begehbare) bleibt
+	# unverändert, das Haus wirkt aber anderthalb Kacheln hoch.
+	if ch == "R" or ch == "W":
+		s.scale = Vector2(1.0, 1.7)
+		s.position.y -= TILE * 0.7
+		s.z_index = 3
 	add_child(s)
 
 ## Dungeonwände dreistufig statt überall dieselbe Ziegelfläche: die Reihe am
@@ -703,40 +711,74 @@ func _plague_war_town() -> void:
 ## Plage 1 auf der Überwelt: der Fluss führt Giftbrühe — trübes Wasser,
 ## Blasen und Schlammränder an den Ufern. Nach dem Sieg glitzert er wieder.
 func _plague_toxic_world() -> void:
+	# Deutlich sichtbar statt angedeutet: der Fluss ist braungrün gekippt, an
+	# beiden Ufern liegt Schlamm, und über der ganzen Länge steigen Blasen auf.
 	for s: Sprite2D in water_tiles:
-		s.modulate = Color(0.72, 0.68, 0.42)
-	for t: Vector2i in [Vector2i(10, 3), Vector2i(13, 7), Vector2i(10, 9), Vector2i(13, 12)]:
+		s.modulate = Color(0.60, 0.62, 0.30)
+	for t: Vector2i in [Vector2i(10, 2), Vector2i(13, 3), Vector2i(10, 5),
+			Vector2i(13, 7), Vector2i(10, 9), Vector2i(13, 10), Vector2i(10, 12),
+			Vector2i(13, 13)]:
 		_place_prop("sludge", t.x, t.y, _tile_noise(t.x, t.y))
-	_toxic_bubbles(Vector2(11 * TILE + 12, 4 * TILE))
-	_toxic_bubbles(Vector2(11 * TILE + 12, 8 * TILE))
-	_toxic_bubbles(Vector2(11 * TILE + 12, 12 * TILE))
+	for row in [2, 4, 6, 8, 10, 12, 14]:
+		_toxic_bubbles(Vector2(11 * TILE + 12, row * TILE))
+	# Kranker grüner Dunst über dem Flusslauf.
+	var haze := Fx.point_light(Color(0.55, 0.95, 0.35), 120.0, 0.55)
+	haze.position = Vector2(11 * TILE + 16, 8 * TILE)
+	add_child(haze)
+	Fx.pulse(haze, 0.55, 2.4)
 
 ## Plage 2 auf der Überwelt: die Tributstraße zum Konzernturm — Zollkisten und
 ## eingetriebene Münzhaufen säumen den Pass, goldener Schein über dem Tor.
 func _plague_greed_world() -> void:
-	_place_prop("crate", 17, 3, 0.30)
-	_place_prop("coins", 19, 3, 0.60)
-	_place_prop("coins", 16, 4, 0.25)
-	_place_prop("crate", 19, 4, 0.75)
-	_place_prop("coins", 17, 6, 0.45)
-	var l := Fx.point_light(Color(1.0, 0.85, 0.45), 52.0, 0.7)
-	l.position = Vector2(18 * TILE + 8, 3 * TILE)
-	add_child(l)
-	Fx.pulse(l, 0.7, 1.6)
+	# Der ganze Pass ist eine Tributstraße: Zollkisten, eingetriebene Münzen und
+	# ein goldener Schein, der von weitem zu sehen ist.
+	for t: Vector2i in [Vector2i(17, 3), Vector2i(19, 4), Vector2i(18, 7),
+			Vector2i(16, 8), Vector2i(19, 9)]:
+		_place_prop("crate", t.x, t.y, _tile_noise(t.x, t.y))
+	for t2: Vector2i in [Vector2i(19, 3), Vector2i(16, 4), Vector2i(17, 6),
+			Vector2i(19, 7), Vector2i(17, 9), Vector2i(18, 10)]:
+		_place_prop("coins", t2.x, t2.y, _tile_noise(t2.x, t2.y))
+	for pos: Vector2i in [Vector2i(18, 3), Vector2i(18, 8)]:
+		var l := Fx.point_light(Color(1.0, 0.85, 0.45), 84.0, 0.9)
+		l.position = Vector2(pos.x * TILE + 8, pos.y * TILE)
+		add_child(l)
+		Fx.pulse(l, 0.9, 1.6)
+	# Goldstaub über der Straße
+	var dust := CPUParticles2D.new()
+	dust.position = Vector2(18 * TILE, 6 * TILE)
+	dust.amount = 26
+	dust.lifetime = 4.0
+	dust.preprocess = 4.0
+	dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	dust.emission_rect_extents = Vector2(30, 60)
+	dust.gravity = Vector2(2, -6)
+	dust.scale_amount_min = 0.03
+	dust.scale_amount_max = 0.09
+	dust.color = Color(1.0, 0.86, 0.42, 0.55)
+	dust.texture = SpriteFactory.particle("star_07")
+	dust.z_index = 4
+	add_child(dust)
 
 ## Plage 3 auf der Überwelt: über der Hassfestung steht Kriegsrauch, Glut
 ## treibt übers Land, der Boden ringsum ist aufgerissen und voller Gebeine.
 func _plague_war_world() -> void:
-	_smoke_plume(Vector2(4 * TILE + 8, 13 * TILE + 2), Color(0.22, 0.20, 0.22, 0.8))
-	_smoke_plume(Vector2(3 * TILE + 4, 13 * TILE + 8), Color(0.30, 0.26, 0.26, 0.6))
-	var l := Fx.point_light(Color(1.0, 0.35, 0.15), 60.0, 0.8)
-	l.position = Vector2(4 * TILE + 8, 13 * TILE + 8)
-	add_child(l)
-	Fx.pulse(l, 0.8, 1.1)
-	for t: Vector2i in [Vector2i(5, 13), Vector2i(2, 12)]:
+	# Mehrere Rauchsäulen und Brandherde: die Festung soll schon von weitem
+	# als Kriegsgebiet lesbar sein.
+	for pl: Vector2i in [Vector2i(4, 13), Vector2i(3, 13), Vector2i(6, 12),
+			Vector2i(2, 14), Vector2i(5, 14)]:
+		_smoke_plume(Vector2(pl.x * TILE + 6, pl.y * TILE + 4),
+			Color(0.24, 0.21, 0.22, 0.75))
+	for pos: Vector2i in [Vector2i(4, 13), Vector2i(6, 12), Vector2i(2, 14)]:
+		var l := Fx.point_light(Color(1.0, 0.35, 0.15), 78.0, 1.0)
+		l.position = Vector2(pos.x * TILE + 8, pos.y * TILE + 8)
+		add_child(l)
+		Fx.pulse(l, 1.0, 1.1)
+	for t: Vector2i in [Vector2i(5, 13), Vector2i(2, 12), Vector2i(7, 13),
+			Vector2i(3, 11), Vector2i(6, 14)]:
 		_place_prop("crack", t.x, t.y, _tile_noise(t.x, t.y))
-	_place_prop("bones", 6, 13, 0.5)
-	_place_prop("bones", 2, 13, 0.8)
+	for b: Vector2i in [Vector2i(6, 13), Vector2i(2, 13), Vector2i(4, 11),
+			Vector2i(7, 14)]:
+		_place_prop("bones", b.x, b.y, _tile_noise(b.x, b.y))
 	# Glutflocken treiben über die Ebene vor der Festung.
 	var p := CPUParticles2D.new()
 	p.position = Vector2(4 * TILE, 12 * TILE)
@@ -881,7 +923,9 @@ func _attach_drop_shadow(s: Sprite2D) -> void:
 	sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	# Die Figur steht auf FIELD_CHAR_SCALE — Kinder erben das, also müssen
 	# Ort und Größe des Schattens gegengerechnet werden.
-	sh.position = Vector2(6, 15) / FIELD_CHAR_SCALE
+	# Mitte der Kachel, knapp unter den Füßen — der alte Wert 6/15 stammt aus der
+	# Zeit vor der zentrierten Ausrichtung und saß daneben.
+	sh.position = Vector2(TILE * 0.5, 14.0) / FIELD_CHAR_SCALE
 	sh.scale = Vector2(1.0, 1.0) / FIELD_CHAR_SCALE
 	sh.show_behind_parent = true
 	s.add_child(sh)

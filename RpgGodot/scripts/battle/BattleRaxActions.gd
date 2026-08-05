@@ -28,7 +28,10 @@ func _rax_gun(h: Dictionary, e: Dictionary) -> void:
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await snap.finished
 	# Minigun hervorholen — sie liefert auch den Punkt, an dem es blitzt.
+	# Erst wenn sie eingerastet ist, wird gefeuert (die Rausholbewegung dauert
+	# gut ein Drittel Sekunde); vorher schoss er, während er noch griff.
 	var gun := _rax_equip(h, "minigun", Vector2(-52, 13))
+	await get_tree().create_timer(0.42).timeout
 	# Gesamtschaden wie beim Nahkampf, nur minimal stärker (Signaturangriff).
 	var rounds := 14
 	var total: int = maxi(int(d["atk"] * randf_range(1.0, 1.3)) - e["def"], rounds)
