@@ -71,11 +71,8 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), org)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
 	_anim_cast(s)
-	_chant(s, 1.8)
-	s.modulate = Color(1.5, 1.2, 0.9)
-	var rise := create_tween()
-	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	# Volles Zauberritual statt bloßem Aufsteigen (siehe _cast_ritual).
+	var ritual := await _cast_ritual(h, Color(1.0, 0.62, 0.25))
 	await get_tree().create_timer(0.8).timeout
 	_ult_banner("◈ IFRIT ◈", org)
 	var gate := Vector2(455, 372)
@@ -182,6 +179,7 @@ func _summon_ifrit(h: Dictionary, sm: Dictionary) -> void:
 	out.tween_callback(ifr.queue_free)
 	s.modulate = Color.WHITE
 	_undim(dim)
+	await _cast_ritual_end(h, ritual)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -260,11 +258,8 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), blue)
 	_cast_circle(s.position + Vector2(0, 40), Color(0.7, 0.95, 1.0))
 	_anim_cast(s)
-	_chant(s, 1.8)
-	s.modulate = Color(0.9, 1.2, 1.6)
-	var rise := create_tween()
-	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	# Volles Zauberritual statt bloßem Aufsteigen (siehe _cast_ritual).
+	var ritual := await _cast_ritual(h, Color(0.55, 0.90, 1.0))
 	await get_tree().create_timer(0.8).timeout
 	_ult_banner("◈ LEVIATHAN ◈", blue)
 	_punch_zoom(0.08, Vector2(400, 330))
@@ -373,6 +368,7 @@ func _summon_leviathan(h: Dictionary, sm: Dictionary) -> void:
 	drain.tween_callback(water.queue_free)
 	s.modulate = Color.WHITE
 	_undim(dim)
+	await _cast_ritual_end(h, ritual)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -396,11 +392,8 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	_cast_circle(s.position + Vector2(0, 40), gold)
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.9, 0.6))
 	_anim_cast(s)
-	_chant(s, 1.8)
-	s.modulate = Color(1.5, 1.25, 0.9)
-	var rise := create_tween()
-	rise.tween_property(s, "position:y", s.position.y - 30.0, 0.6) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	# Volles Zauberritual statt bloßem Aufsteigen (siehe _cast_ritual).
+	var ritual := await _cast_ritual(h, Color(1.0, 0.88, 0.55))
 	await get_tree().create_timer(0.8).timeout
 	_ult_banner("◈ BAHAMUT ◈", gold)
 	_punch_zoom(0.08, Vector2(360, 300))
@@ -542,6 +535,7 @@ func _summon_bahamut(h: Dictionary, sm: Dictionary) -> void:
 	leave.tween_callback(drag.queue_free)
 	s.modulate = Color.WHITE
 	_undim(dim)
+	await _cast_ritual_end(h, ritual)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

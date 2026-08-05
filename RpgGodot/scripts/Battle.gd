@@ -283,15 +283,23 @@ func _run_battle() -> void:
 		for h in heroes:
 			if h["data"]["hp"] <= 0 or not _any_enemy_alive():
 				continue
+			# Wer dran ist, tritt vor und steht in voller Farbe da.
+			_set_spent(h, false)
 			_ready_pose(h, true)
 			var fled: bool = await _hero_turn(h)
 			_ready_pose(h, false)
+			# Zug verbraucht: zurücktreten und leicht ausgrauen, damit man auf
+			# einen Blick sieht, wer diese Runde schon gehandelt hat.
+			_set_spent(h, true)
 			if fled:
 				finished.emit(true)
 				return
 			if not _any_enemy_alive():
 				await _victory()
 				return
+		# Die Gegner sind am Zug — dann ist kein Held mehr "verbraucht".
+		for h in heroes:
+			_set_spent(h, false)
 		for e in enemies:
 			if not e["alive"]:
 				continue

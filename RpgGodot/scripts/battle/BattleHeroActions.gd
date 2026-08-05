@@ -697,12 +697,8 @@ func _meteor_rain(h: Dictionary, ab: Dictionary) -> void:
 	AudioManager.play_sfx("ult_charge")
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.55, 0.15))
 	_cast_circle(s.position + Vector2(0, 40), Color(1.0, 0.8, 0.3))
-	_chant(s, 1.3)
-	s.modulate = Color(1.5, 1.2, 1.6)
-	var rise := create_tween()
-	rise.tween_property(s, "position:y", s.position.y - 34.0, 0.6) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	await get_tree().create_timer(0.8).timeout
+	# Dasselbe Ritual wie bei den übrigen Zaubern, in Glutfarben.
+	var ritual := await _cast_ritual(h, Color(1.0, 0.62, 0.28))
 	_ult_banner("★ METEOR RAIN ★", Color(1.0, 0.55, 0.2))
 	await get_tree().create_timer(0.5).timeout
 	var alive := []
@@ -801,6 +797,7 @@ func _meteor_rain(h: Dictionary, ab: Dictionary) -> void:
 			var dmg: int = int((d["mag"] * 1.4 + ab["power"]) * randf_range(0.95, 1.1)) - e["def"] / 2
 			await _damage_enemy(e, maxi(dmg, 1))
 	_undim(dim)
+	await _cast_ritual_end(h, ritual)
 	var back := create_tween()
 	back.tween_property(s, "position", h["home"], 0.3) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -812,11 +809,9 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	var td: Dictionary = target["data"]
 	_say("%s casts %s on %s!" % [d["name"], ab["name"], td["name"]])
 	var s: Sprite2D = h["sprite"]
-	# Beschwörungspose vor dem Heilzauber.
-	await _stance(h, Color(0.45, 1.0, 0.55), "summon", "call")
-	var raise := create_tween()
-	raise.tween_property(s, "position:y", s.position.y - 12.0, 0.2)
-	await raise.finished
+	# Volles Zauberritual, in Grün.
+	await _sprint(h, h["home"] + Vector2(-56, 4), 0.2)
+	var ritual := await _cast_ritual(h, Color(0.55, 1.0, 0.65))
 	AudioManager.play_sfx("heal")
 	var ring := Sprite2D.new()
 	ring.texture = SpriteFactory.circle(30, Color(0.45, 1.0, 0.55, 0.7))
@@ -834,6 +829,7 @@ func _heal_ally(h: Dictionary, ab: Dictionary, target: Dictionary) -> void:
 	_float_text(target["sprite"].position, "+%d" % amount, Color(0.5, 1.0, 0.6))
 	_refresh_party()
 	await get_tree().create_timer(0.7).timeout
+	await _cast_ritual_end(h, ritual)
 	await _sprint(h, h["home"], 0.2)
 
 ## Sturmschnitt (Serena, Basis-Einzelziel): EIN einziger blitzschneller

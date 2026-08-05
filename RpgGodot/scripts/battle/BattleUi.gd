@@ -294,6 +294,18 @@ func _highlight_hero(h: Dictionary, on: bool) -> void:
 ## richtet sich auf und hebt die Waffe in Anschlag; danach entspannt er wieder.
 ## Umschließt den ganzen Zug (in _run_battle), damit es nicht bei jedem Untermenü
 ## zuckt. Nur Position:x/Scale/Waffenwinkel — Bob (position:y) bleibt unberührt.
+## Verbrauchter Zug: die Figur wird leicht ausgegraut, bis die Runde herum ist.
+## Gefallene bleiben unberührt — die haben ihre eigene Einfärbung.
+func _set_spent(h: Dictionary, spent: bool) -> void:
+	if h.is_empty() or not is_instance_valid(h["sprite"]):
+		return
+	if h["data"]["hp"] <= 0:
+		return
+	var s: Sprite2D = h["sprite"]
+	var ziel := Color(0.58, 0.60, 0.66) if spent else Color.WHITE
+	s.create_tween().tween_property(s, "modulate", ziel, 0.25) \
+		.set_trans(Tween.TRANS_SINE)
+
 func _ready_pose(h: Dictionary, on: bool) -> void:
 	if h["data"]["hp"] <= 0:
 		return
