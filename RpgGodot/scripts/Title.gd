@@ -13,6 +13,9 @@ const HEROES := [
 
 const MENU_ITEMS := ["New Game", "Controls", "Settings", "Credits"]
 
+## Bildhöhe der Helden am Lagerfeuer (Pixel auf dem Schirm).
+const HERO_HEIGHT := 132.0
+
 ## Namensnennung der verwendeten Grafiken und Klänge. Für die LPC-Grafiken ist
 ## das keine Höflichkeit, sondern Lizenzpflicht (CC-BY-SA 3.0 verlangt die
 ## Nennung jedes Beitragenden dort, wo das Werk verbreitet wird); die CC0-Packs
@@ -160,8 +163,13 @@ func _build_scene() -> void:
 	add_child(hill)
 	for def in HEROES:
 		var s := Sprite2D.new()
-		s.texture = SpriteFactory.field_char(def["id"], false, 0)
-		s.scale = Vector2(5, 5)
+		var tex := SpriteFactory.field_char(def["id"], false, 0)
+		s.texture = tex
+		# Feste Bildhöhe statt festem Faktor: die Figuren kommen je nach
+		# Grafikquelle auf unterschiedlich großen Leinwänden (Rig 64x112,
+		# LPC 128x128). Mit einem festen Faktor überragten sie das Lagerfeuer.
+		var sc: float = HERO_HEIGHT / maxf(tex.get_height(), 1.0)
+		s.scale = Vector2(sc, sc)
 		s.position = def["pos"]
 		s.flip_h = def["flip"]
 		add_child(s)
@@ -170,8 +178,8 @@ func _build_scene() -> void:
 		var sh := Sprite2D.new()
 		sh.texture = SpriteFactory.circle(12, Color(0, 0, 0, 0.35))
 		sh.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sh.position = def["pos"] + Vector2(0, 68)
-		sh.scale = Vector2(3.2, 1.0)
+		sh.position = def["pos"] + Vector2(0, HERO_HEIGHT * 0.44)
+		sh.scale = Vector2(2.4, 0.8)
 		sh.z_index = -1
 		add_child(sh)
 

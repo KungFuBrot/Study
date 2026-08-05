@@ -692,6 +692,8 @@ const RAX_MUZZLE := {
 	"launcher": Vector2(34, 6),
 	"radio": Vector2(6, 2),
 	"ramp": Vector2(30, 4),
+	"laser": Vector2(41, 7),
+	"lance": Vector2(43, 8),
 }
 
 ## Farbwelt aller Geraete: dunkles Gehaeuse, Lichtkante oben, cyan Energie.
@@ -768,11 +770,48 @@ static func rax_weapon(kind: String) -> Texture2D:
 				img.set_pixel(x, y, RAX_LIT)
 			_box(img, 28, 2, 34, 6, RAX_WARN)      # Warnleuchte oben
 			_box(img, 29, 3, 33, 5, RAX_GLOW)
+		"laser":
+			# Langes Strahlgewehr: Energiezelle hinten, Fokuskristall vorn.
+			img = _img(44, 15)
+			_box(img, 2, 4, 12, 11, RAX_DARK)      # Zelle
+			_box(img, 3, 5, 11, 10, RAX_MID)
+			_box(img, 4, 6, 8, 9, RAX_GLOW)        # Ladung sichtbar
+			_box(img, 12, 3, 30, 11, RAX_DARK)     # Gehaeuse
+			_box(img, 13, 4, 29, 10, RAX_MID)
+			_box(img, 13, 4, 29, 5, RAX_LIT)
+			_box(img, 16, 0, 24, 3, RAX_DARK)      # Zielschiene
+			_box(img, 17, 1, 23, 2, RAX_GLOW)
+			_box(img, 30, 5, 38, 9, RAX_DARK)      # Laufrohr
+			_box(img, 30, 6, 38, 8, RAX_MID)
+			_box(img, 38, 4, 41, 10, RAX_GLOW)     # Fokuskristall
+			_box(img, 41, 6, 43, 8, Color(0.85, 1.0, 1.0))
+			_box(img, 17, 11, 23, 14, RAX_DARK)    # Griff
+			_box(img, 18, 11, 22, 13, RAX_MID)
+		"lance":
+			# Plasmalanze: Schaft mit drei Ringen, vorn ein glühender Speerkopf.
+			img = _img(46, 16)
+			_box(img, 0, 6, 30, 10, RAX_DARK)      # Schaft
+			_box(img, 1, 7, 29, 9, RAX_MID)
+			foreach_ring(img)
+			_box(img, 30, 4, 36, 12, RAX_DARK)     # Emitterkopf
+			_box(img, 31, 5, 35, 11, Color(0.72, 0.45, 1.0))
+			for i in 8:                            # auslaufende Spitze
+				var y0 := 7 - int(i * 0.35)
+				var y1 := 9 + int(i * 0.35)
+				_box(img, 36 + i, y0, 36 + i, y1, Color(0.86, 0.66, 1.0))
+			_box(img, 12, 10, 18, 14, RAX_DARK)    # Griff
+			_box(img, 13, 10, 17, 13, RAX_MID)
 		_:
 			img = _img(8, 8, RAX_MID)
 	var t := _tex(img)
 	_cache[key] = t
 	return t
+
+## Die drei Kuehlringe der Plasmalanze — ausgelagert, damit die Zeichenfolge
+## oben lesbar bleibt.
+static func foreach_ring(img: Image) -> void:
+	for x in [8, 16, 24]:
+		_box(img, x, 5, x + 1, 11, RAX_LIT)
 
 static func bullet() -> Texture2D:
 	var key := "bullet"

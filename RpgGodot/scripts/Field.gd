@@ -115,6 +115,7 @@ func _ready() -> void:
 	_spawn_party()
 	_add_lighting()
 	_build_ui()
+	_add_exit_markers()
 	_add_barrier_shimmer()
 	_add_ambience()
 
@@ -202,6 +203,33 @@ static func _additive() -> CanvasItemMaterial:
 	return m
 
 ## Versiegelte Portale schimmern eisig, solange sie verschlossen sind.
+## Offene Ausgänge sichtbar machen. Bisher musste man die Kachel raten, auf der
+## ein Übergang liegt — ein ruhig pulsierender Fußabdruck zeigt sie jetzt an.
+func _add_exit_markers() -> void:
+	for portal in map["portals"]:
+		if portal.has("locked_until") and not GameState.is_unlocked(portal["locked_until"]):
+			continue   # verriegelte Übergänge haben ihr eigenes Flimmern
+		var p: Vector2i = portal["pos"]
+		var mark := Sprite2D.new()
+		mark.texture = SpriteFactory.circle(9, Color(1.0, 0.93, 0.62, 0.30))
+		mark.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		mark.position = Vector2(p.x * TILE + 8, p.y * TILE + 11)
+		mark.scale = Vector2(1.0, 0.5)
+		mark.z_index = 1          # über dem Boden, unter den Figuren
+		var m := CanvasItemMaterial.new()
+		m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		mark.material = m
+		add_child(mark)
+		var tw := mark.create_tween().set_loops()
+		tw.tween_property(mark, "scale", Vector2(1.25, 0.62), 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.parallel().tween_property(mark, "modulate:a", 0.55, 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(mark, "scale", Vector2(1.0, 0.5), 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.parallel().tween_property(mark, "modulate:a", 1.0, 1.1) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
 func _add_barrier_shimmer() -> void:
 	for portal in map["portals"]:
 		if not portal.has("locked_until") or GameState.is_unlocked(portal["locked_until"]):
@@ -897,8 +925,14 @@ func _step_squash(s: Sprite2D) -> void:
 func _char_offset(tex: Texture2D) -> Vector2:
 	if tex == null:
 		return CHAR_OFFSET
+	# Leerraum unter den Fuessen abziehen: die LPC-Zelle ist quadratisch und
+	# laesst unten Platz, wodurch die Figur ueber ihrer Kachel zu schweben
+	# schien — man traf die Ausgaenge dadurch schwerer, als es aussah.
+	var pad := 0.0
+	if tex.get_width() == tex.get_height():
+		pad = tex.get_height() * 0.06
 	return Vector2(6.0 / FIELD_CHAR_SCALE - tex.get_width() / 2.0,
-		16.0 / FIELD_CHAR_SCALE - tex.get_height())
+		16.0 / FIELD_CHAR_SCALE - tex.get_height() + pad)
 
 func _dir_name(d: Vector2i) -> String:
 	if d.y > 0: return "down"

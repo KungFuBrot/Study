@@ -80,7 +80,10 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	snap.tween_property(s, "scale", base * Vector2(1.06, 0.94), 0.06)
 	snap.tween_property(s, "scale", base, 0.10) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	var muzzle := _cannon_muzzle(s)
+	# Strahlgewehr hervorholen — der Strahl tritt aus seinem Fokuskristall aus.
+	var rifle := _rax_equip(h, "laser", Vector2(-36, 0))
+	await get_tree().create_timer(0.3).timeout
+	var muzzle := _rax_muzzle(rifle)
 	# 2) Aufladen: wachsende, bebende Energiekugel, Funken laufen in die
 	# Mündung, dazu Licht und steigender Ladeton.
 	var chg := Sprite2D.new()
@@ -129,6 +132,7 @@ func _laser(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	_flash_screen(Color(0.4, 0.85, 1.0, 0.20))
 	_shake_camera(1.7)
 	await _hitstop(0.10)
+	_rax_stow(rifle)
 	var dmg: int = int((ab["power"] + d["mag"]) * randf_range(0.9, 1.15)) - e["def"] / 2
 	await _damage_enemy(e, maxi(dmg, 1))
 	# 4) Zurück in die Reihe.
@@ -779,7 +783,11 @@ func _plasma_lance(h: Dictionary, ab: Dictionary, e: Dictionary) -> void:
 	await _sprint(h, fire_pos, 0.2)
 	h["anim"] = "aim"
 	_hero_tex(h, "aim")
-	var muzzle: Vector2 = _cannon_muzzle(s)
+	# Die Lanze wird als Gerät hervorgeholt und dann geschleudert.
+	var launcher := _rax_equip(h, "lance", Vector2(-36, 2))
+	await get_tree().create_timer(0.3).timeout
+	var muzzle: Vector2 = _rax_muzzle(launcher)
+	_rax_stow(launcher)
 	var target: Vector2 = e["sprite"].position
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD

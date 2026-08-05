@@ -279,12 +279,31 @@ func _rax_equip(h: Dictionary, kind: String, at := Vector2.ZERO) -> Sprite2D:
 	var m: Vector2 = SpriteFactory.RAX_MUZZLE.get(kind, Vector2(tex.get_width(), tex.get_height() * 0.5))
 	var local := Vector2(-(m.x - tex.get_width() * 0.5), m.y - tex.get_height() * 0.5)
 	w.set_meta("muzzle", local * w.scale.x)
-	# Hervorholen: kurz aufblitzen und einrasten.
-	w.modulate = Color(1.6, 1.6, 1.6, 0.0)
+	# Rausholen statt Aufpoppen: Das Gerät kommt hinter dem Rücken hervor,
+	# schwingt nach vorn und rastet mit einem kurzen Rückschwung ein. Erst am
+	# Ende blitzt die Energiekante auf.
+	var ziel := w.position
+	w.position = ziel + Vector2(46, 20)   # hinter der rechten Schulter
+	w.rotation = 1.05
+	w.scale = Vector2(1.2, 1.2)
+	w.modulate = Color(1, 1, 1, 0.0)
 	var tw := create_tween()
-	tw.tween_property(w, "modulate", Color.WHITE, 0.18)
-	tw.parallel().tween_property(w, "position", w.position + Vector2(0, -2), 0.18) \
+	tw.tween_property(w, "modulate:a", 1.0, 0.10)
+	tw.parallel().tween_property(w, "position", ziel + Vector2(-8, -3), 0.22) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(w, "rotation", -0.14, 0.22) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(w, "scale", Vector2(2.1, 2.1), 0.22)
+	tw.tween_property(w, "position", ziel, 0.12) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(w, "rotation", 0.0, 0.12) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(w, "scale", Vector2(2.0, 2.0), 0.12)
+	tw.tween_callback(func():
+		if is_instance_valid(w):
+			var fl := w.create_tween()
+			fl.tween_property(w, "modulate", Color(1.7, 1.8, 1.9), 0.06)
+			fl.tween_property(w, "modulate", Color.WHITE, 0.14))
 	AudioManager.play_sfx("charge")
 	return w
 
