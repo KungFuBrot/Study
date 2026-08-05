@@ -352,6 +352,8 @@ func _build_scene() -> void:
 		# mitgezogen werden (siehe _hero_tex), sonst atmet unten weiter, was oben
 		# längst rennt oder zusammengebrochen ist.
 		var hrefl := _attach_reflection(s, foot_h, 0.09)
+		if data["id"] == "rax":
+			_attach_visor_scan(s)
 		# Die Rig-Figuren tragen ihre Waffe selbst — kein DTII-Overlay darüber.
 		var wp: Sprite2D = null
 		add_child(s)
@@ -529,6 +531,30 @@ func _attach_glow_pool(s: Sprite2D, foot_y: float, color: Color) -> void:
 	breath.tween_property(pool, "modulate:a", 1.0, 1.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 ## Gespiegeltes Abbild unter den Füßen — der „nasse Boden“-Look aus HD-2D-Spielen.
+## Lauflicht im Visier: ein heller Punkt wandert endlos hin und her, wie bei
+## einem abtastenden Sensor. Kind des Sprites, damit er jede Bewegung mitmacht;
+## die Lage stammt aus der Leinwandmitte, nicht aus festen Pixelwerten.
+func _attach_visor_scan(s: Sprite2D) -> void:
+	var dot := Sprite2D.new()
+	dot.texture = SpriteFactory.circle(3, Color(0.85, 1.0, 1.0))
+	dot.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	dot.material = m
+	dot.scale = Vector2(0.9, 0.55)
+	dot.z_index = 1
+	var h := s.texture.get_height()
+	var eye_y := -h * 0.145      # Höhe des Sehschlitzes in der Leinwand
+	dot.position = Vector2(-5, eye_y)
+	s.add_child(dot)
+	var tw := dot.create_tween().set_loops()
+	tw.tween_property(dot, "position:x", 5.0, 0.9) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(dot, "modulate:a", 0.45, 0.9)
+	tw.tween_property(dot, "position:x", -5.0, 0.9) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.parallel().tween_property(dot, "modulate:a", 1.0, 0.9)
+
 func _attach_reflection(s: Sprite2D, foot_y: float, alpha := 0.15) -> Sprite2D:
 	var r := Sprite2D.new()
 	r.texture = s.texture

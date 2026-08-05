@@ -59,6 +59,12 @@ const HERO_OVERRIDE := {
 		# Rueckhand — der dritte Schwung, damit die Schlagfolge sich nicht
 		# wiederholt (13 Bilder, das laengste Blatt).
 		"attack3": {"sheet": "backslash", "cols": 13, "row": ROW, "hold": -1, "cell": 256},
+		# Helen ist Kaempferin, keine Zauberin: fuer Vorbereitung und Deckung
+		# die Kampfhaltung MIT Schwert statt der Zauberpose — auf dem
+		# Zauberblatt gibt es keine Waffenebene, dort fehlte die Klinge.
+		"cast":  {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": -1},
+		"aim":   {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": 1},
+		"block": {"sheet": "combat_idle", "cols": 2, "row": ROW, "hold": 0},
 	},
 	"rax": {
 		# Echte Schussfolge statt gehaltener Pose: anlegen, feuern, nachladen.

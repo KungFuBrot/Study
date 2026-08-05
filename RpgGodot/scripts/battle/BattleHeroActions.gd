@@ -508,7 +508,16 @@ func _ultimate_serena(h: Dictionary) -> void:
 		var from := es.position + Vector2(side * randf_range(160, 240), randf_range(-70, 70))
 		var to := es.position + Vector2(-side * randf_range(160, 240), randf_range(-70, 70))
 		dash.tween_property(s, "position", from, 0.0)
+		# Blickrichtung und Klingenhaltung wechseln mit jedem Durchgang: sie
+		# schaut dorthin, wo sie hinstürmt, und führt das Schwert jedes Mal
+		# anders — vorher glitt immer dieselbe Pose seitwärts durchs Bild.
+		var pose: String = ["attack", "attack3", "attack2"][i % 3]
+		var nach_links := to.x < from.x
 		dash.tween_callback(func():
+			# Die Kampfszene spiegelt die Helden ohnehin (flip_h = true), also
+			# ist "nach links laufen" der ungespiegelte Normalfall.
+			s.flip_h = nach_links
+			_pose(h, pose, 0.16)
 			AudioManager.play_sfx("slash")
 			_slash_arc(es.position + Vector2(randf_range(-24, 24), randf_range(-24, 24)))
 			_burst(es.position, Color(1.0, 0.95, 0.6), 7, 130)
@@ -516,7 +525,10 @@ func _ultimate_serena(h: Dictionary) -> void:
 		dash.tween_property(s, "position", to, 0.09)
 		dash.tween_interval(0.04)
 	await dash.finished
-	# Finale: riesiger Kreuzschnitt über dem Schlachtfeld
+	# Finale: riesiger Kreuzschnitt über dem Schlachtfeld — sie stellt sich
+	# dafür wieder normal (die Sturmläufe haben die Spiegelung verstellt).
+	s.flip_h = true
+	_pose(h, "attack2", 0.7)
 	s.position = Vector2(300, 120)
 	for rot in [0.8, -0.8]:
 		var arc := Polygon2D.new()

@@ -12,7 +12,7 @@ const STEP_TIME := 0.18
 # jetzt etwas größer, gut anderthalb Kacheln hoch wie in klassischen JRPGs.
 # Der Versatz wird aus dem Maßstab abgeleitet, damit die Füße unabhängig davon
 # auf dem Kachelboden stehen und die Figur mittig über der Kachel sitzt.
-const FIELD_CHAR_SCALE := 0.62 / RigFactory.BAKE
+const FIELD_CHAR_SCALE := 0.42 / RigFactory.BAKE
 # Halbe Sprite-Breite und volle Höhe der gebackenen Figur — daraus ergibt sich
 # der Versatz, damit die Füße auf dem Kachelboden stehen und die Figur mittig
 # über der Kachel sitzt, unabhängig vom Maßstab.
