@@ -1,0 +1,2263 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hauskauf-Planer 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens: Seekarte (kühles Papier, Tinte, Magenta für Anmerkungen) + Excel-Gelb für Eingaben ---------- */
+:root{
+  --bg:#EDF2F4; --surface:#FFFFFF; --ink:#12212B; --ink2:#4A5B66; --line:#C6D2D9; --line2:#E2E9ED;
+  --cell:#FFF3C4; --cell-line:#CFAE2E; --accent:#A3195B;
+  --n:#1B6A8F; --m:#9C6410; --h:#A83C2C;
+  --n-soft:#CFE3EE; --m-soft:#F1E0BB; --h-soft:#F0D2CB;
+  --c1:#8196A3; --c2:#2C6B7D; --c3:#D0A92B; --c4:#8E3B68; --c4b:#BA7399; --c4c:#DFB6CD;
+  --hatch:#B8C5CD;
+  --font:"Barlow","DIN Alternate","Bahnschrift","Segoe UI",system-ui,-apple-system,sans-serif;
+  --cond:"Barlow Condensed","DIN Condensed","Bahnschrift","Arial Narrow","Roboto Condensed",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D171E; --surface:#14222C; --ink:#E8EFF3; --ink2:#9CB0BC; --line:#2D404C; --line2:#21323D;
+    --cell:#3B3512; --cell-line:#C2A233; --accent:#F48ABD;
+    --n:#6FBBDF; --m:#E4B15B; --h:#EA8F7D;
+    --n-soft:#1B3A4B; --m-soft:#45371B; --h-soft:#4C2B25;
+    --hatch:#3A4E5A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D171E; --surface:#14222C; --ink:#E8EFF3; --ink2:#9CB0BC; --line:#2D404C; --line2:#21323D;
+  --cell:#3B3512; --cell-line:#C2A233; --accent:#F48ABD;
+  --n:#6FBBDF; --m:#E4B15B; --h:#EA8F7D;
+  --n-soft:#1B3A4B; --m-soft:#45371B; --h-soft:#4C2B25;
+  --hatch:#3A4E5A;
+}
+
+/* ---------- Basis ---------- */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.5;
+  font-variant-numeric:tabular-nums lining-nums;overflow-x:hidden}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+h1{font-family:var(--cond);font-weight:600;font-size:clamp(2.5rem,6.2vw,4.4rem);line-height:1;letter-spacing:-.005em;margin:0 0 .35em}
+h2{font-family:var(--cond);font-weight:600;font-size:clamp(1.7rem,3.2vw,2.25rem);line-height:1.08;margin:0}
+h3{font-size:1rem;font-weight:600;margin:1.6em 0 .5em}
+p{margin:0 0 .9em;max-width:64ch}
+a{color:var(--accent)}
+.small{font-size:.86rem;color:var(--ink2)}
+.lead{font-size:1.12rem;max-width:60ch}
+.cellmark{background:var(--cell);border-bottom:2px solid var(--cell-line);padding:0 .3em;border-radius:2px 2px 0 0;white-space:nowrap}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Feste Ergebnisleiste ---------- */
+.stick{position:fixed;top:0;left:0;right:0;z-index:30;background:var(--surface);border-bottom:1px solid var(--line);
+  transform:translateY(-105%);transition:transform .18s ease;visibility:hidden}
+.stick.on{transform:none;visibility:visible}
+.stick-in{display:flex;flex-wrap:wrap;gap:2px 22px;align-items:baseline;padding-top:8px;padding-bottom:8px;font-size:.92rem}
+.stick-t{color:var(--ink2)}
+.stick-v b{font-family:var(--cond);font-size:1.25rem;font-weight:600;margin-left:.25em}
+.dot{display:inline-block;width:.62em;height:.62em;border-radius:50%;margin-right:.4em;background:var(--c)}
+.n{--c:var(--n)} .m{--c:var(--m)} .h{--c:var(--h)} .c4{--c:var(--accent)}
+@media (prefers-reduced-motion: reduce){.stick{transition:none}}
+
+/* ---------- Hero ---------- */
+.hero{padding:46px 0 34px}
+.controls{display:flex;flex-wrap:wrap;gap:16px 34px;align-items:flex-end;margin:26px 0 18px}
+.field .flabel,.field label{display:block;font-size:.88rem;color:var(--ink2);margin-bottom:5px}
+.field .in{width:11.5em;font-size:1.05rem}
+.seg-ctl{display:inline-flex;border:1.5px solid var(--ink);border-radius:3px;overflow:hidden;flex-wrap:wrap}
+.seg-ctl button{font-weight:500;padding:.42rem .85rem;border:0;background:transparent;cursor:pointer}
+.seg-ctl button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.gauge{width:100%;min-height:150px;margin-top:6px}
+.gauge svg{display:block;width:100%;height:auto;overflow:visible}
+.gauge text{font-family:var(--font);fill:var(--ink)}
+.wunsch-text{min-height:1.5em;margin:4px 0 18px;max-width:none}
+.wunsch-text b{font-weight:600}
+
+.szs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--surface);border:1px solid var(--line)}
+.sz{padding:18px 22px 22px;border-top:7px solid var(--c)}
+.sz + .sz{border-left:1px solid var(--line)}
+.sz h3{margin:0;font-size:1.02rem;color:var(--c)}
+.sz .tag{font-size:.9rem;color:var(--ink2);margin:.2em 0 0;min-height:4.2em}
+.sz .plabel{font-size:.86rem;color:var(--ink2);margin:14px 0 0}
+.sz .price{font-family:var(--cond);font-weight:600;font-size:clamp(2.3rem,4.6vw,3.5rem);line-height:1;margin:.05em 0 .25em;white-space:nowrap}
+.sz .price.none{font-size:1.5rem;line-height:1.2;white-space:normal}
+.sz dl{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:12px 0 0;font-size:.95rem;border-top:1px solid var(--line2);padding-top:12px}
+.sz dt{color:var(--ink2)} .sz dd{margin:0;text-align:right;font-weight:500;white-space:nowrap}
+.sz .limit{margin:12px 0 0;font-size:.92rem}
+@media (max-width:860px){
+  .szs{grid-template-columns:1fr}
+  .sz + .sz{border-left:0}
+  .sz .tag{min-height:0}
+}
+.hero-foot{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;margin-top:16px;font-size:.9rem;color:var(--ink2)}
+.btn{border:1.5px solid var(--ink);background:transparent;border-radius:3px;padding:.35rem .8rem;cursor:pointer;font-weight:500;color:var(--ink)}
+.btn:hover{background:var(--ink);color:var(--surface)}
+.btn.ghost{border-color:var(--line);color:var(--ink2);font-weight:400}
+.btn.ghost:hover{border-color:var(--ink);background:transparent;color:var(--ink)}
+
+/* ---------- Rechenschritte ---------- */
+.step{padding:46px 0 50px;border-top:1px solid var(--line)}
+.step-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:20px}
+.num{font-family:var(--cond);font-weight:700;font-size:3.6rem;line-height:.78;color:var(--accent);min-width:.9em}
+.step-body{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:30px 52px;align-items:start}
+.step-body.wide{grid-template-columns:minmax(0,4fr) minmax(0,8fr)}
+@media (max-width:980px){.step-body,.step-body.wide{grid-template-columns:minmax(0,1fr)}}
+.prose,.work{min-width:0}
+.lead-2{max-width:64ch;color:var(--ink2);font-size:.95rem;margin:-6px 0 0}
+.prose p{font-size:1rem}
+.formula{font-family:var(--cond);font-size:1.28rem;font-weight:500;line-height:1.25;padding:.55em 0 .55em .8em;border-left:4px solid var(--accent);margin:1em 0;max-width:none}
+.example{background:var(--surface);border:1px solid var(--line);padding:.7em .9em;font-size:.95rem}
+.note{font-size:.9rem;color:var(--ink2);border-left:3px solid var(--line);padding-left:.8em}
+.work > * + *{margin-top:18px}
+.inline-field{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:.98rem}
+.inline-field .in{width:6.2em}
+.chart-title{font-weight:600;font-size:.98rem;margin:0 0 2px}
+.chart-sub{font-size:.86rem;color:var(--ink2);margin:0 0 8px;max-width:none}
+
+/* ---------- Tabellen ---------- */
+.tbl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{padding:7px 10px;text-align:right;vertical-align:middle;border-bottom:1px solid var(--line2)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-weight:600;font-size:.86rem;color:var(--ink2);border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:bottom}
+thead th.n,thead th.m,thead th.h{color:var(--c)}
+tbody tr:last-child > *{border-bottom:0}
+.tape tbody th{font-weight:400;min-width:11em}
+.tape td{white-space:nowrap;min-width:5.6em}
+.tape .op{display:inline-block;width:1.15em;font-weight:600;color:var(--ink2)}
+.tape tr.res > *{font-weight:600;border-top:2px solid var(--ink)}
+.tape tr.big > *{font-weight:600;border-top:2px solid var(--ink);font-size:1.08rem;background:var(--line2)}
+.tape tr.sub > *{color:var(--ink2);font-size:.87rem}
+.tape tr.inp th{color:var(--ink)}
+.tape.single td{min-width:7em}
+.neg{color:var(--h)}
+.list td{padding:5px 6px}
+.list td:first-child{min-width:13.5em}
+.list .w-eur{width:7.2em} .list .w-pct{width:4.6em} .list .w-sel{width:7.6em}
+#tbl-income td:first-child{min-width:8.4em}
+#tbl-income .w-sel{width:7.3em}
+#tbl-income .w-eur{width:6.6em}
+.list tfoot th,.list tfoot td{font-weight:600;border-top:2px solid var(--ink);border-bottom:0;padding:8px 10px}
+.list tfoot td{white-space:nowrap}
+.list tfoot tr.sub > *{font-weight:400;border-top:1px solid var(--line2)}
+.rownote{display:block;font-size:.8rem;color:var(--ink2);padding:2px 6px 0}
+.chk{width:1.15rem;height:1.15rem;accent-color:var(--accent);cursor:pointer}
+.del{border:0;background:transparent;color:var(--ink2);cursor:pointer;font-size:1.1rem;line-height:1;padding:4px 6px;border-radius:3px}
+.del:hover{color:var(--h);background:var(--line2)}
+.addrow{margin-top:10px}
+details.fold > summary{cursor:pointer;font-weight:500;padding:10px 12px;background:var(--surface);border:1px solid var(--line);list-style-position:inside}
+details.fold[open] > summary{border-bottom:0}
+details.fold > .tbl-wrap{margin-top:0}
+details.opt{background:var(--surface);border:1px solid var(--line);padding:0 14px}
+details.opt > summary{cursor:pointer;font-weight:500;padding:10px 0}
+details.opt > div{padding:0 0 14px}
+
+/* ---------- Eingabefelder (gelb wie Eingabezellen in Excel) ---------- */
+.in{width:100%;min-width:3.4em;font:inherit;font-variant-numeric:tabular-nums lining-nums;color:var(--ink);background:var(--cell);
+  border:0;border-bottom:2px solid var(--cell-line);border-radius:2px 2px 0 0;padding:4px 7px;text-align:right}
+.in.txt{text-align:left}
+select.in{text-align:left;padding:4px 2px 4px 5px;cursor:pointer}
+.in:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.in.bad{border-bottom-color:var(--h);outline:1px solid var(--h)}
+.in::placeholder{color:var(--ink2);opacity:.8}
+
+/* ---------- Balken ---------- */
+.bars{display:grid;gap:9px}
+.bar-row{display:grid;grid-template-columns:4.4rem minmax(0,1fr);gap:10px;align-items:center}
+.bar-row .lab{font-size:.88rem;font-weight:600;color:var(--c)}
+.bar-stack{display:grid;gap:3px}
+.bar{display:flex;height:27px;background:transparent;overflow:hidden}
+.bar.thin{height:18px}
+.seg{display:block;height:100%;min-width:0;flex:0 0 auto;font-size:.76rem;line-height:27px;text-align:center;white-space:nowrap;overflow:hidden;color:#fff;
+  transition:width .2s ease}
+.bar.thin .seg{line-height:18px;font-size:.72rem}
+@media (prefers-reduced-motion: reduce){.seg{transition:none}}
+.f-ink{background:var(--ink);color:var(--surface)} .f-c1{background:var(--c1);color:#0E1B23} .f-c2{background:var(--c2)}
+.f-c3{background:var(--c3);color:#0E1B23} .f-c4{background:var(--c4)} .f-c4b{background:var(--c4b);color:#0E1B23} .f-c4c{background:var(--c4c);color:#0E1B23}
+.f-sz{background:var(--c)} .f-sz-soft{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c);color:var(--ink)}
+.f-hatch{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 7px);color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:.84rem;color:var(--ink2);margin-top:10px}
+.legend i{display:inline-block;width:.85em;height:.85em;margin-right:.4em;vertical-align:-.08em}
+.limit-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;font-size:.84rem}
+.limit-row .val{font-weight:600;min-width:6.2em;text-align:right}
+.limit-row .val.win{color:var(--c)}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--font);fill:var(--ink2);font-size:12px}
+.panel{background:var(--surface);border:1px solid var(--line);padding:14px 16px 16px}
+
+/* ---------- Vierte Option: Schieberegler ---------- */
+.slider-step{background:var(--surface)}
+.num-4{color:var(--accent)}
+.slider-label{display:block;font-size:.86rem;color:var(--ink2);margin:18px 0 6px}
+.slider-row{display:flex;align-items:center;gap:14px}
+.slider-wrap{position:relative;flex:1 1 auto;min-width:0;display:block;padding-bottom:2px}
+.slider-wrap .slider{width:100%;display:block}
+.tick{position:absolute;top:1px;width:2px;height:24px;background:var(--ink);pointer-events:none;opacity:.55}
+.slider-note{margin:8px 0 14px;font-size:.82rem;color:var(--ink2)}
+#ch-vier .bar-row,#ch-jahre .bar-row{grid-template-columns:5.8rem minmax(0,1fr)}
+#ch-vier .lab,#ch-jahre .lab{white-space:nowrap}
+.slider-row .in{width:6.4em;flex:0 0 auto;font-size:1.05rem}
+.slider-row .unit{color:var(--ink2)}
+.slider{flex:1 1 auto;min-width:0;height:26px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+.slider:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.slider::-webkit-slider-runnable-track{height:8px;background:var(--line2);border:1px solid var(--line);border-radius:4px}
+.slider::-moz-range-track{height:8px;background:var(--line2);border:1px solid var(--line);border-radius:4px}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin-top:-8px;border-radius:50%;
+  background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent)}
+.slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent)}
+.slider-scale{display:flex;justify-content:space-between;gap:10px;margin:2px 0 0;font-size:.8rem;color:var(--ink2)}
+
+.price-4{font-family:var(--cond);font-weight:600;font-size:clamp(2.3rem,4.6vw,3.3rem);line-height:1;margin:.05em 0 .3em;white-space:nowrap;color:var(--accent)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:0;font-size:.95rem;border-top:1px solid var(--line2);padding-top:12px}
+.kv dt{color:var(--ink2)} .kv dd{margin:0;text-align:right;font-weight:500;white-space:nowrap}
+.verdict{margin:14px 0 0;font-size:.95rem;padding-left:1.1em;position:relative}
+.verdict::before{content:"";position:absolute;left:0;top:.45em;width:.6em;height:.6em;border-radius:50%;background:var(--accent)}
+.verdict.warn::before{background:var(--h)}
+.verdict.warn{color:var(--h)}
+.work > .panel + .panel{margin-top:18px}
+
+/* ---------- Schritt 10: Rente ---------- */
+.list .w-jahr{width:5.4em} .list td.ro{color:var(--ink2);white-space:nowrap}
+.chk-label{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:500}
+.jahre-bars{position:relative}
+.rentenlinie{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.6;pointer-events:none}
+.rentenlinie::after{content:"";position:absolute;top:-6px;left:-3px;width:8px;height:8px;border-radius:50%;background:var(--ink)}
+.limit-row .val.warn{color:var(--h)}
+.limit-row .val.win{color:var(--c)}
+
+/* ---------- Schritt 11 und nächste Schritte ---------- */
+.checks{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:9px}
+.checks label{display:flex;align-items:flex-start;gap:9px;cursor:pointer;font-size:.95rem;line-height:1.4}
+.checks .chk{margin-top:.2em;flex:0 0 auto}
+.hint{color:var(--ink2)}
+.checks label > *{min-width:0}
+.todo{margin:0;padding:0 0 0 1.3em;display:grid;gap:16px}
+.todo li{padding-left:.2em}
+.todo li::marker{font-family:var(--cond);font-weight:600;color:var(--accent)}
+.todo-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.todo-t{font-weight:600}
+.todo-w{font-family:var(--cond);font-weight:600;color:var(--accent);white-space:nowrap}
+.todo-w.risk{color:var(--h)}
+.todo p{margin:3px 0 0;font-size:.93rem;color:var(--ink2);max-width:62ch}
+.todo-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.btn.mini{padding:.3rem .7rem;font-size:.82rem}
+.version{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-variant-numeric:tabular-nums}
+.todo-fix{margin:0;padding:0 0 0 1.1em;display:grid;gap:10px;font-size:.93rem}
+.todo-fix li{max-width:62ch}
+
+/* ---------- Daten sichern ---------- */
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+
+/* ---------- Sprungnavigation in der Leiste ---------- */
+.stick-nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--line2);
+  padding:0 max(22px,calc(50% - 560px));-webkit-overflow-scrolling:touch}
+.stick-nav::-webkit-scrollbar{display:none}
+.stick-nav a{flex:0 0 auto;padding:7px 11px;font-size:.84rem;color:var(--ink2);text-decoration:none;
+  border-bottom:2px solid transparent;white-space:nowrap}
+.stick-nav a:hover{color:var(--ink)}
+.stick-nav a.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.stick-c{display:none}
+.stick-c.show{display:inline}
+
+/* ---------- Kapitel ---------- */
+.chapter{border-top:3px solid var(--ink);padding:34px 0 8px}
+.chapter h2{font-family:var(--cond);font-size:clamp(1.5rem,3vw,2rem);margin:0 0 6px}
+.chapter p{margin:0;color:var(--ink2);max-width:62ch}
+.chapter .btn{margin-top:14px}
+
+/* ---------- Schnellschalter ---------- */
+.whatif{margin-top:26px}
+.whatif-t{margin:0 0 9px;font-size:.86rem;color:var(--ink2)}
+.whatif-h{opacity:.8}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:baseline;gap:8px;padding:7px 13px;border:1.5px solid var(--line);
+  background:var(--surface);border-radius:999px;cursor:pointer;font:inherit;font-size:.88rem;color:var(--ink);
+  transition:border-color .12s,background .12s}
+.chip:hover{border-color:var(--ink2)}
+.chip .d{font-family:var(--cond);font-weight:600;color:var(--accent);white-space:nowrap}
+.chip .d i{font-style:normal;font-family:var(--font);font-weight:400;font-size:.78rem;opacity:.75;margin-left:.3em}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip[aria-pressed="true"] .d{color:#fff;opacity:.85}
+@media (prefers-reduced-motion: reduce){.chip{transition:none}}
+
+/* ---------- Einklappbare Schritte ---------- */
+.step.folded{padding:22px 0 0}
+.step.folded.open{padding-top:34px}
+.step.folded .step-head{margin-bottom:0;cursor:pointer}
+.step.folded .step-head h2{font-size:clamp(1.3rem,2.6vw,1.8rem)}
+.step.folded.open .step-head h2{font-size:clamp(1.5rem,3.2vw,2.15rem)}
+.step.folded .step-head .num{font-size:clamp(1.8rem,3.4vw,2.4rem)}
+.step.folded.open .step-head .num{font-size:clamp(2.1rem,4vw,3rem)}
+.step-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.step-toggle{display:flex;align-items:center;gap:14px;width:100%;margin:10px 0 0;padding:13px 0;
+  background:none;border:0;border-top:1px solid var(--line2);cursor:pointer;text-align:left;font:inherit;color:inherit}
+.step.open .step-toggle{border-bottom:1px solid var(--line2)}
+.step-sum-lab{color:var(--ink2);font-size:.9rem;flex:0 0 auto}
+.step-sum{display:flex;flex-wrap:wrap;gap:4px 18px;margin-left:auto;align-items:baseline}
+.sum-v{display:inline-flex;align-items:baseline;gap:6px;color:var(--c)}
+.sum-v i{font-style:normal;font-size:.78rem;opacity:.85}
+.sum-v b,.sum-one{font-family:var(--cond);font-size:1.15rem;font-weight:600}
+.chev{flex:0 0 auto;width:11px;height:11px;border-right:2px solid var(--ink2);border-bottom:2px solid var(--ink2);
+  transform:rotate(45deg);margin:-4px 2px 0 6px;transition:transform .15s}
+.step.open .chev{transform:rotate(225deg);margin-top:2px}
+@media (prefers-reduced-motion: reduce){.chev{transition:none}}
+[hidden]{display:none !important}
+.step.folded .step-body{padding-top:22px;padding-bottom:40px}
+@media (max-width:700px){
+  .step-toggle{flex-wrap:wrap;gap:6px 12px}
+  .step-sum{margin-left:0;width:100%}
+  .chev{margin-left:auto}
+}
+.slider-row.slim{margin-top:6px}
+.slider-row.slim + .slider-scale{margin-bottom:14px}
+textarea.ta{width:100%;min-width:0;text-align:left;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8rem;line-height:1.4;resize:vertical}
+
+/* ---------- Listen, Fuß ---------- */
+.verdicts{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.verdicts li{padding-left:1.1em;position:relative;font-size:.96rem;max-width:70ch}
+.verdicts li::before{content:"";position:absolute;left:0;top:.5em;width:.6em;height:.6em;border-radius:50%;background:var(--c)}
+footer{border-top:1px solid var(--line);padding:40px 0 70px;font-size:.93rem}
+footer h2{font-size:1.5rem;margin-bottom:.5em}
+footer ul{margin:0 0 1.2em;padding-left:1.2em;max-width:78ch}
+footer li{margin:.3em 0}
+.foot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 52px}
+@media (max-width:860px){.foot-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="stick" id="stick" aria-hidden="true">
+  <div class="wrap stick-in">
+    <span class="stick-t">Maximaler Kaufpreis</span>
+    <span class="stick-v n"><span class="dot"></span>niedrig<b data-out="s.0.preisRund" data-fmt="eur"></b></span>
+    <span class="stick-v m"><span class="dot"></span>mittel<b data-out="s.1.preisRund" data-fmt="eur"></b></span>
+    <span class="stick-v h"><span class="dot"></span>hoch<b data-out="s.2.preisRund" data-fmt="eur"></b></span>
+    <span class="stick-v c4 stick-c"><span class="dot"></span>eure Rate<b data-out="c.preisRund" data-fmt="eur"></b></span>
+  </div>
+  <nav class="stick-nav" id="stick-nav" aria-label="Abschnitte"></nav>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Wie teuer darf unser Haus sein?</h1>
+    <p class="lead">Drei Rechnungen mit den Zahlen aus eurem Kostenplaner 2026: einmal mit niedrigem, einmal mit mittlerem und einmal mit hohem Risiko. Jeder Schritt ist unten erklärt. Alle <span class="cellmark">gelben Felder</span> könnt ihr ändern, das Ergebnis rechnet sofort mit.</p>
+    <p class="lead-2">Gerechnet wird mit der Vorgabe, dass das Darlehen bis zum Rentenbeginn von <span id="lead-rente">Person 1</span> abbezahlt ist. Das hebt die Tilgung und senkt den möglichen Kaufpreis. In Schritt&nbsp;10 lässt sich die Vorgabe abschalten.</p>
+
+    <div class="controls">
+      <div class="field">
+        <span class="flabel" id="lbl-land">Bundesland</span>
+        <div class="seg-ctl" role="group" aria-labelledby="lbl-land">
+          <button type="button" data-land="SH">Schleswig-Holstein</button>
+          <button type="button" data-land="MV">Mecklenburg-Vorpommern</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="wunsch">Kaufpreis eines Hauses, das ihr im Blick habt (optional)</label>
+        <input id="wunsch" class="in" inputmode="decimal" autocomplete="off" data-path="wunsch" data-fmt="eur" data-empty="0" data-min="0" placeholder="z. B. 285.000">
+      </div>
+    </div>
+
+    <div id="gauge" class="gauge" role="img" aria-label="Preisskala mit den maximalen Kaufpreisen der drei Szenarien"></div>
+    <p id="wunsch-text" class="wunsch-text"></p>
+
+    <div class="szs" id="szs"></div>
+
+    <div class="whatif">
+      <p class="whatif-t">Schnell ausprobieren <span class="whatif-h">– ein Klick ändert die Rechnung, ein zweiter nimmt es zurück</span></p>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="hero-foot">
+      <button type="button" class="btn ghost" id="reset">Auf die Werte aus dem Kostenplaner zurücksetzen</button>
+      <span id="status" role="status"></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- 4. Option: Rate vorgeben -->
+<section class="step slider-step" id="option-4"><div class="wrap">
+  <div class="step-head"><h2>Vierte Option: Ihr gebt die Rate vor</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Die drei Rechnungen oben fragen: Was ist maximal drin? Diese vierte Option dreht die Frage um. Ihr sagt, was ihr im Monat zahlen wollt, und der Planer rechnet rückwärts, welcher Kaufpreis dazu passt. Wie er das macht, steht in den neun Schritten darunter.</p>
+      <p>Das ist oft die ehrlichere Frage. Eine Rate am oberen Rand ist rechnerisch tragbar, lässt aber keinen Spielraum für ein zweites Auto, eine Reise oder ein Jahr mit weniger Arbeit.</p>
+      <p class="note">Alle übrigen Annahmen kommen aus dem Szenario, das ihr als Grundlage wählt: Zins, Tilgung, Hauskosten, Notgroschen, Umzugsbudget, Mindesteigenkapital und wie viel von Einkommen und Vermögen angerechnet wird.</p>
+    </div>
+    <div class="work">
+      <div class="panel">
+        <p class="chart-title">Grundlage für alle anderen Annahmen</p>
+        <div class="seg-ctl" id="basis" role="group" aria-label="Grundlage für die vierte Option">
+          <button type="button" data-basis="0">niedrig</button><button type="button" data-basis="1">mittel</button><button type="button" data-basis="2">hoch</button>
+        </div>
+
+        <label class="slider-label" for="rate-slider">Eure Wunschrate pro Monat</label>
+        <div class="slider-row">
+          <span class="slider-wrap">
+            <input type="range" id="rate-slider" class="slider" min="0" max="2500" step="10" value="900" aria-label="Monatsrate in Euro">
+            <span class="tick" id="rate-tick" hidden></span>
+          </span>
+          <input id="rate-zahl" class="in" inputmode="decimal" data-path="custom.rate" data-fmt="eur" data-min="0" data-max="50000" aria-label="Monatsrate in Euro als Zahl">
+          <span class="unit">€</span>
+        </div>
+        <p class="slider-scale"><span>0 €</span><span id="rate-max"></span></p>
+        <p class="slider-note" id="rate-marke"></p>
+
+        <p class="plabel">Dazu passt ein Kaufpreis von rund</p>
+        <p class="price price-4" data-out="c.preisRund">–</p>
+        <dl class="kv">
+          <dt>Monatsrate, die wirklich anfällt</dt><dd data-out="c.rateEff">–</dd>
+          <dt>Rate plus laufende Hauskosten</dt><dd data-out="c.wohnNeu">–</dd>
+          <dt>Bleibt im Monat übrig</dt><dd data-out="c.uebrig">–</dd>
+          <dt>Darlehen</dt><dd data-out="c.darlehen">–</dd>
+          <dt>Eigenkapital</dt><dd data-out="c.ekEingesetzt">–</dd>
+          <dt>davon Kaufnebenkosten</dt><dd data-out="c.nk">–</dd>
+          <dt>Beleihung des Kaufpreises</dt><dd data-out="c.beleihung" data-fmt="pct1">–</dd>
+          <dt>Restschuld nach der Zinsbindung</dt><dd data-out="c.rest">–</dd>
+        </dl>
+        <p class="verdict" id="v-custom"></p>
+      </div>
+
+      <div class="panel">
+        <p class="chart-title">Die vier Rechnungen nebeneinander</p>
+        <p class="chart-sub">Maximaler Kaufpreis. Der vierte Balken folgt dem Schieberegler.</p>
+        <div id="ch-vier" class="chart"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<div class="chapter" id="kap-rechenweg"><div class="wrap">
+  <h2>Der Rechenweg in neun Schritten</h2>
+  <p>Jeder Schritt zeigt oben sein Ergebnis. Klickt auf die Zeile, um die Erklärung und die Eingabefelder zu sehen.</p>
+  <button type="button" class="btn ghost" id="fold-all">Alle Schritte öffnen</button>
+</div></div>
+
+<!-- 1 -->
+<section class="step" id="schritt-1"><div class="wrap">
+  <div class="step-head"><span class="num">1</span><h2>Welches Einkommen zählt</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Nicht jeder Euro ist gleich sicher. Gehalt und Kindergeld kommen jeden Monat. Steuererstattung, 13. Gehalt und Urlaubsgeld kommen einmal im Jahr und können schwanken; Banken rechnen sie oft gar nicht oder nur teilweise an.</p>
+      <p>Je vorsichtiger das Szenario, desto weniger davon wird für die Monatsrate verplant. Die Prozentwerte sagen, wie viel vom Betrag im jeweiligen Szenario zählt. Jährliche Beträge werden durch 12 geteilt.</p>
+      <p>Was nicht zählt, ist nicht weg: Es bleibt euch für Urlaub, Rücklagen oder Sondertilgungen.</p>
+      <p class="note">Das zweite Gehalt steht im Kostenplaner mit 0 €. Tragt ihr hier ein Nettogehalt ein, zählt es bei niedrigem Risiko gar nicht, bei mittlerem zur Hälfte und bei hohem voll. So seht ihr, wie stark die Rechnung an einem zweiten Einkommen hängt.</p>
+      <p class="note">Der Planer behandelt alle Beträge als Netto. Beim Kindergeld stehen im Kostenplaner 255 € für ein Kind; seit Januar 2026 sind es 259 € je Kind.</p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap">
+        <table class="list" id="tbl-income">
+          <thead><tr>
+            <th>Einnahme</th><th>Betrag €</th><th>Turnus</th>
+            <th class="n">niedrig %</th><th class="m">mittel %</th><th class="h">hoch %</th><th><span class="small" aria-hidden="true"></span></th>
+          </tr></thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr><th colspan="3">Anrechenbares Einkommen pro Monat</th>
+              <td data-out="s.0.eink" data-fmt="eur"></td><td data-out="s.1.eink" data-fmt="eur"></td><td data-out="s.2.eink" data-fmt="eur"></td><td></td></tr>
+            <tr class="sub"><th colspan="3">Zum Vergleich: alles zu 100 % gerechnet</th>
+              <td data-out="g.einkVoll" data-fmt="eur"></td><td data-out="g.einkVoll" data-fmt="eur"></td><td data-out="g.einkVoll" data-fmt="eur"></td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <button type="button" class="btn ghost addrow" data-add="income">Zeile hinzufügen</button>
+    </div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section class="step" id="schritt-2"><div class="wrap">
+  <div class="step-head"><span class="num">2</span><h2>Was das Leben ohne Miete kostet</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Alle monatlichen Ausgaben stammen aus eurem Kostenplaner. Die Miete und die jährliche Nebenkosten-Nachzahlung fallen nach dem Kauf weg und sind deshalb abgehakt. An ihre Stelle treten die Hauskosten (Schritt 3) und die Kreditrate (Schritt 4). Alles andere läuft weiter.</p>
+      <p>Ändert sich durch den Umzug etwas, tragt es hier ein: ein zweites Auto, längere Wege, andere Kita-Kosten, eine teurere Hausratversicherung.</p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap">
+        <table class="tape single">
+          <tbody>
+            <tr><th>Ausgaben heute pro Monat</th><td data-out="g.ausgabenHeute" data-fmt="eur"></td></tr>
+            <tr><th><span class="op">−</span>fällt nach dem Kauf weg (heutige Wohnkosten)</th><td data-out="g.entfaellt" data-fmt="eur"></td></tr>
+            <tr class="res"><th><span class="op">=</span>Lebenshaltung ohne Miete</th><td data-out="g.leben" data-fmt="eur"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="fold" id="fold-exp">
+        <summary>Alle Ausgaben ansehen und ändern (<span data-out="g.anzahlAusgaben" data-fmt="num"></span> Posten)</summary>
+        <div class="tbl-wrap">
+          <table class="list" id="tbl-expenses">
+            <thead><tr><th>Ausgabe</th><th>€ pro Monat</th><th>fällt nach Kauf weg</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn ghost addrow" data-add="expenses">Zeile hinzufügen</button>
+      </details>
+    </div>
+  </div>
+</div></section>
+
+<!-- 3 -->
+<section class="step" id="schritt-3"><div class="wrap">
+  <div class="step-head"><span class="num">3</span><h2>Was das Haus laufend kostet</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p>Was bisher in der Warmmiete steckte, zahlt ihr als Eigentümer selbst: Heizung, Wasser und Abwasser, Müll, Grundsteuer, Wohngebäudeversicherung, Schornsteinfeger, Wartung.</p>
+      <p>Als Faustregel gelten rund 4 € pro Quadratmeter und Monat, dann aber inklusive Strom und Telefon. Beides steht bei euch schon in Schritt 2, deshalb rechnet der Planer mit 2,50 bis 3,50 €.</p>
+      <p>Dazu kommt eine Rücklage für Reparaturen: mindestens 1 € pro Quadratmeter, bei älteren Häusern eher 1,50 bis 2 €. Ein unsaniertes Haus mit alter Heizung liegt schnell darüber. Fragt bei der Besichtigung nach den echten Verbrauchswerten.</p>
+    </div>
+    <div class="work">
+      <div class="inline-field"><label for="flaeche">Wohnfläche des Hauses</label><input id="flaeche" class="in" inputmode="decimal" data-path="flaeche" data-fmt="num" data-min="0"><span>m²</span></div>
+      <div class="slider-row slim"><span class="slider-wrap"><input type="range" id="flaeche-slider" class="slider" min="40" max="250" step="5" value="120" aria-label="Wohnfläche in Quadratmetern"></span></div>
+      <p class="slider-scale"><span>40 m²</span><span>250 m²</span></p>
+      <div class="tbl-wrap"><table class="tape" id="tape-3"></table></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 4 -->
+<section class="step" id="schritt-4"><div class="wrap">
+  <div class="step-head"><span class="num">4</span><h2>Wie hoch die Monatsrate sein darf</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p>Vom anrechenbaren Einkommen gehen die Lebenshaltung, die Hauskosten und ein Puffer für Unvorhergesehenes ab. Der Rest kann in die Kreditrate fließen.</p>
+      <p>Zusätzlich gilt eine Obergrenze: Verbraucherschützer und Banken nennen 35 bis 40 % des Nettoeinkommens als Maximum für die Rate. Es zählt der kleinere der beiden Werte.</p>
+      <p class="example" id="ex-wohnen"></p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap"><table class="tape" id="tape-4"></table></div>
+      <div class="panel">
+        <p class="chart-title">Wohin das Monatseinkommen fließt</p>
+        <p class="chart-sub">Jeder Balken ist euer volles Einkommen inklusive aller Sonderzahlungen, aufs Monat umgerechnet.</p>
+        <div id="ch-budget"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 5 -->
+<section class="step" id="schritt-5"><div class="wrap">
+  <div class="step-head"><span class="num">5</span><h2>Wie viel Kredit die Rate trägt</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p>Beim üblichen Annuitätendarlehen bleibt die Rate über die Zinsbindung gleich. Im ersten Jahr zahlt ihr auf die Darlehenssumme den Sollzins plus die anfängliche Tilgung. Daraus folgt:</p>
+      <p class="formula">Darlehen = Jahresrate ÷ (Zins + Tilgung)</p>
+      <p class="example" id="ex-darlehen"></p>
+      <p>Eine höhere Tilgung bedeutet weniger Kredit, dafür seid ihr schneller schuldenfrei und habt am Ende der Zinsbindung weniger Restschuld. Eine längere Zinsbindung kostet etwas mehr Zins, schützt aber länger vor steigenden Zinsen.</p>
+      <p class="note">Die Zinssätze sind Richtwerte vom 18. September 2026: 10 Jahre Zinsbindung rund 4,4 bis 4,5 %, 15 Jahre rund 4,7 %, 20 Jahre rund 4,9 %, jeweils bis 80 % Beleihung. Wer fast den ganzen Kaufpreis finanziert, zahlt einen Aufschlag, deshalb steht bei hohem Risiko ein höherer Zins. Tragt die Werte aus echten Angeboten ein, sobald ihr welche habt.</p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap"><table class="tape" id="tape-5"></table></div>
+      <details class="opt" id="opt-kfw">
+        <summary>Förderkredit einrechnen (optional, zum Beispiel KfW „Jung kauft Alt“)</summary>
+        <div>
+          <p class="small" style="max-width:70ch">Für Familien mit Kindern gibt es zinsverbilligte KfW-Kredite. Das Programm 308 „Jung kauft Alt“ fördert den Kauf älterer Häuser der Energieklassen F, G oder H: seit August 2026 mit bis zu 160.000 € bei zwei Kindern und einem Zins weit unter Marktniveau. Bedingungen sind unter anderem eine Einkommensgrenze (zu versteuerndes Haushaltseinkommen bis 90.000 € plus 10.000 € je weiterem Kind), der Antrag vor dem Kaufvertrag und eine energetische Sanierung innerhalb von viereinhalb Jahren. Diese Sanierung kostet Geld: Erhöht dann das Budget für Renovierung in Schritt 6 deutlich. Der Planer rechnet vereinfacht mit derselben Tilgung wie beim Bankdarlehen und ohne tilgungsfreie Jahre.</p>
+          <div class="inline-field">
+            <label for="kfw-b">Förderkredit</label><input id="kfw-b" class="in" inputmode="decimal" data-path="kfw.betrag" data-fmt="eur" data-min="0"><span>€ zu</span>
+            <input id="kfw-z" class="in" inputmode="decimal" data-path="kfw.zins" data-fmt="pct" data-min="0" data-max="15" aria-label="Zins des Förderkredits in Prozent"><span>% Zins</span>
+          </div>
+        </div>
+      </details>
+      <div class="panel">
+        <p class="chart-title">So baut sich die Schuld ab</p>
+        <p class="chart-sub">Restschuld in Tausend Euro für das Darlehen aus Schritt 8. Der Punkt markiert das Ende der Zinsbindung; danach (gestrichelt) gilt ein neuer Zins.</p>
+        <div id="ch-rest" class="chart"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 6 -->
+<section class="step" id="schritt-6"><div class="wrap">
+  <div class="step-head"><span class="num">6</span><h2>Wie viel Eigenkapital wirklich frei ist</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Nicht das ganze Vermögen kann in den Hauskauf fließen. Betriebsrenten sind bis zur Rente gebunden. Genossenschaftsanteile und Mietkaution kommen erst nach dem Auszug zurück. Beim ETF-Depot ist der Wert nicht sicher: Kurse schwanken und auf Gewinne fällt Steuer an, deshalb setzt die vorsichtige Rechnung nur 80 % an.</p>
+      <p>Vom angesetzten Vermögen bleiben zwei Dinge unangetastet: der Notgroschen (mehrere Monatsausgaben für Jobverlust, Krankheit oder eine kaputte Heizung) und das Geld für Umzug, Renovierung, Küche und Möbel.</p>
+      <p class="note">Hier beißt sich die Rechnung kurz in den Schwanz: Der Notgroschen richtet sich nach der Kreditrate, die Rate hängt am Kaufpreis und der Kaufpreis wiederum am Eigenkapital. Der Planer rechnet die Runde deshalb so lange durch, bis sich nichts mehr ändert. Angesetzt ist am Ende die Rate, die beim maximalen Kaufpreis wirklich anfällt, nicht die theoretisch tragbare aus Schritt 4.</p>
+      <p class="note">Das vorzeitige Erbe ist voll angesetzt. Im Kostenplaner steht es in der Familienspalte mit 0 €, in der Gesamtsumme von 103.215 € ist es aber enthalten. Ist das Geld nicht für den Kauf gedacht, setzt die drei Prozentwerte auf 0.</p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap">
+        <table class="list" id="tbl-assets">
+          <thead><tr><th>Vermögen</th><th>Betrag €</th><th class="n">niedrig %</th><th class="m">mittel %</th><th class="h">hoch %</th><th></th></tr></thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr><th>Angesetztes Vermögen</th><td data-out="g.vermGesamt" data-fmt="eur" class="small"></td>
+              <td data-out="s.0.vermAnr" data-fmt="eur"></td><td data-out="s.1.vermAnr" data-fmt="eur"></td><td data-out="s.2.vermAnr" data-fmt="eur"></td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <button type="button" class="btn ghost addrow" data-add="assets">Zeile hinzufügen</button>
+      <div class="tbl-wrap"><table class="tape" id="tape-6"></table></div>
+      <div class="panel">
+        <p class="chart-title">Was aus dem Vermögen wird</p>
+        <p class="chart-sub">Jeder Balken ist euer gesamtes Vermögen.</p>
+        <div id="ch-verm"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 7 -->
+<section class="step" id="schritt-7"><div class="wrap">
+  <div class="step-head"><span class="num">7</span><h2>Was der Kauf nebenbei kostet</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p>Zum Kaufpreis kommen Kosten, die Banken in der Regel nicht mitfinanzieren. Sie sollten aus dem Eigenkapital bezahlt werden: die Grunderwerbsteuer (Schleswig-Holstein 6,5 %, Mecklenburg-Vorpommern 6,0 %), Notar und Grundbuch mit zusammen rund 2 % und, wenn ein Makler beteiligt ist, dessen Provision. Der Käuferanteil liegt meist bei bis zu 3,57 %.</p>
+      <p>Kauft ihr ohne Makler, setzt die Provision auf 0.</p>
+      <p class="example" id="ex-nk"></p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap">
+        <table class="tape single">
+          <tbody>
+            <tr class="inp"><th>Grunderwerbsteuer in % (<span id="land-name"></span>)</th><td><input class="in" inputmode="decimal" data-path="grest" data-fmt="pct" data-min="0" data-max="15" aria-label="Grunderwerbsteuer in Prozent"></td></tr>
+            <tr class="inp"><th><span class="op">+</span>Notar und Grundbuch in %</th><td><input class="in" inputmode="decimal" data-path="notar" data-fmt="pct" data-min="0" data-max="10" aria-label="Notar und Grundbuch in Prozent"></td></tr>
+            <tr class="inp"><th><span class="op">+</span>Makler, Käuferanteil in %</th><td><input class="in" inputmode="decimal" data-path="makler" data-fmt="pct" data-min="0" data-max="10" aria-label="Maklerprovision in Prozent"></td></tr>
+            <tr class="res"><th><span class="op">=</span>Kaufnebenkosten vom Kaufpreis</th><td data-out="g.nkPct" data-fmt="pct2"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 8 -->
+<section class="step" id="schritt-8"><div class="wrap">
+  <div class="step-head"><span class="num">8</span><h2>Der maximale Kaufpreis</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p>Zwei Grenzen gelten gleichzeitig, die niedrigere entscheidet.</p>
+      <p><b>Grenze A kommt aus dem Monatsbudget.</b> Darlehen plus Eigenkapital müssen den Kaufpreis und die Nebenkosten decken.</p>
+      <p><b>Grenze B kommt aus dem Eigenkapital.</b> Es muss für die Nebenkosten reichen und zusätzlich für einen Mindestanteil am Kaufpreis. Je mehr eigenes Geld im Haus steckt, desto günstiger der Zins und desto kleiner die Gefahr, bei einem Notverkauf auf Schulden sitzen zu bleiben. 20 % gelten als solide, 10 % sind verbreitet, 0 % ist eine Vollfinanzierung des Kaufpreises.</p>
+      <ul class="verdicts" id="verdicts"></ul>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap"><table class="tape" id="tape-8"></table></div>
+      <div class="panel">
+        <p class="chart-title">Welche Grenze entscheidet</p>
+        <p class="chart-sub">Der gefüllte Balken ist der maximale Kaufpreis, der umrandete die jeweils andere Grenze.</p>
+        <div id="ch-limits"></div>
+      </div>
+      <h3>So sähe die Finanzierung beim maximalen Kaufpreis aus</h3>
+      <div class="tbl-wrap"><table class="tape" id="tape-8b"></table></div>
+      <div class="panel">
+        <p class="chart-title">Kosten oben, Geldquellen unten</p>
+        <div id="ch-fin"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 9 -->
+<section class="step" id="schritt-9"><div class="wrap">
+  <div class="step-head"><span class="num">9</span><h2>Stresstest: Was, wenn es anders kommt</h2></div>
+  <div class="step-body">
+    <div class="prose">
+      <p><b>Teurere Anschlussfinanzierung.</b> Nach der Zinsbindung wird die Restschuld zum dann gültigen Zins weiterfinanziert. Der Planer rechnet mit dem Zins, den ihr rechts eintragt, und lässt das Ende der Laufzeit unverändert.</p>
+      <p><b>Weniger Einkommen.</b> Die Zeile „Fehlbetrag“ zeigt, was jeden Monat fehlen würde, wenn nur das Einkommen käme, das die vorsichtige Rechnung in Schritt 1 zählt, also ohne Sonderzahlungen und ohne zweites Gehalt.</p>
+      <p><b>Andere Zinsen heute.</b> Das Diagramm zeigt, wie stark der maximale Kaufpreis am Zins hängt.</p>
+    </div>
+    <div class="work">
+      <div class="inline-field"><label for="anschluss">Angenommener Zins für die Anschlussfinanzierung</label><input id="anschluss" class="in" inputmode="decimal" data-path="anschluss" data-fmt="pct" data-min="0" data-max="20"><span>%</span></div>
+      <div class="tbl-wrap"><table class="tape" id="tape-9"></table></div>
+      <div class="panel">
+        <p class="chart-title">Maximaler Kaufpreis je nach Sollzins</p>
+        <p class="chart-sub">In Tausend Euro. Die Punkte zeigen den Zins, der gerade in Schritt 5 steht.</p>
+        <div id="ch-sens" class="chart"></div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<div class="chapter" id="kap-pruefung"><div class="wrap">
+  <h2>Zwei Prüfungen</h2>
+  <p>Passt die Laufzeit zu eurem Alter, und lohnt sich der Förderkredit? Beides verändert die Zahlen oben.</p>
+</div></div>
+
+<!-- 10 -->
+<section class="step" id="schritt-10"><div class="wrap">
+  <div class="step-head"><span class="num">10</span><h2>Bis wann muss das Haus bezahlt sein</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Mit dem Rentenbeginn fällt das Einkommen deutlich. Eine Kreditrate, die heute bequem ist, kann dann drücken. Banken achten darauf und wollen das Darlehen bis zur Rente getilgt sehen, spätestens aber eine Restschuld, die aus der Rente noch zu tragen ist.</p>
+      <p>Entscheidend ist, wer zuerst aufhört. Für Jahrgänge ab 1964 liegt die Regelaltersgrenze beim 67. Geburtstag. Frühestens vier Jahre davor geht es mit Abschlägen.</p>
+      <p><b>Die Vorgabe wirkt zurück auf alles andere.</b> Ist der Haken gesetzt, tilgt der Planer so schnell, dass das Darlehen zum Rentenbeginn auf null steht. Die höhere Tilgung frisst einen Teil der Rate, deshalb sinkt das mögliche Darlehen und damit der Kaufpreis. Die Tilgung aus Schritt 5 gilt dann als Untergrenze.</p>
+      <p class="note">Gerechnet wird mit dem heutigen Zins über die ganze Laufzeit. Was passiert, wenn der Anschlusszins höher liegt, steht in Schritt 9.</p>
+    </div>
+    <div class="work">
+      <div class="tbl-wrap">
+        <table class="list" id="tbl-personen">
+          <thead><tr><th>Wer</th><th>Geburtsjahr</th><th>Alter beim Kauf</th><th>Rente ab</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn ghost addrow" data-add="personen">Person hinzufügen</button>
+
+      <div class="inline-field"><label for="jahr-kauf">Jahr des Kaufs</label><input id="jahr-kauf" class="in" inputmode="numeric" data-path="jahrKauf" data-fmt="jahr" data-min="2000" data-max="2100"></div>
+      <div class="inline-field"><label for="rentenalter">Renteneintritt im Alter von</label><input id="rentenalter" class="in" inputmode="numeric" data-path="rentenalter" data-fmt="jahr" data-min="40" data-max="90"><span>Jahren</span></div>
+      <div class="inline-field"><label class="chk-label" for="bis-rente"><input type="checkbox" class="chk" id="bis-rente" data-path="bisRente"> Darlehen bis zum Rentenbeginn abbezahlen</label></div>
+
+      <div class="tbl-wrap"><table class="tape" id="tape-10"></table></div>
+
+      <div class="panel">
+        <p class="chart-title">Wie lange das Darlehen läuft</p>
+        <p class="chart-sub" id="ch-jahre-sub"></p>
+        <div id="ch-jahre" class="chart"></div>
+      </div>
+
+      <ul class="verdicts" id="verdicts-10"></ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 11 -->
+<section class="step" id="schritt-11"><div class="wrap">
+  <div class="step-head"><span class="num">11</span><h2>Wann sich „Jung kauft Alt“ lohnt</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Die KfW vergibt unter dem Namen <b>Jung kauft Alt</b> (Programm 308) zinsverbilligte Kredite an Familien, die ein altes, schlecht gedämmtes Haus kaufen und danach sanieren. Der Zins liegt deutlich unter dem Marktniveau, was die Monatsrate senkt und damit den möglichen Kaufpreis hebt.</p>
+      <p>Der Haken: Das Haus muss laut Energieausweis in Klasse F, G oder H liegen, und ihr verpflichtet euch, es innerhalb von 54 Monaten auf Effizienzhaus 85 EE zu bringen oder ein festgelegtes Paket an Einzelmaßnahmen umzusetzen. Diese Sanierung kostet Geld, das der Kredit nicht finanziert.</p>
+      <p><b>Deshalb rechnet sich das Programm nur, wenn ihr die Sanierung ohnehin vorhabt.</b> Hakt die Bedingungen unten ab und tragt eine grobe Schätzung der Sanierungskosten ein. Der Planer stellt beides gegenüber: was die Zinsersparnis bringt und was die Sanierung kostet.</p>
+      <p class="note">Der Antrag muss vor dem Kaufvertrag gestellt sein. Wer erst unterschreibt und dann fragt, bekommt nichts. Ein Energieberater sollte das Haus vor dem Kauf ansehen, sonst ist die Sanierungssumme geraten.</p>
+    </div>
+    <div class="work">
+      <div class="panel">
+        <p class="chart-title">Erfüllt ihr die Bedingungen?</p>
+        <ul class="checks" id="kfw-checks">
+          <li><label><input type="checkbox" class="chk" data-path="jka.kind"><span>Mindestens ein Kind unter 18 lebt im Haushalt</span></label></li>
+          <li><label><input type="checkbox" class="chk" data-path="jka.eink"><span>Zu versteuerndes Haushaltseinkommen unter der Grenze <span class="hint" id="jka-grenze"></span></span></label></li>
+          <li><label><input type="checkbox" class="chk" data-path="jka.kein"><span>Ihr besitzt noch keine andere Wohnimmobilie</span></label></li>
+          <li><label><input type="checkbox" class="chk" data-path="jka.klasse"><span>Das Haus liegt in Energieeffizienzklasse F, G oder H</span></label></li>
+          <li><label><input type="checkbox" class="chk" data-path="jka.san"><span>Sanierung auf Effizienzhaus 85 EE binnen 54 Monaten ist machbar</span></label></li>
+          <li><label><input type="checkbox" class="chk" data-path="jka.selbst"><span>Ihr wohnt mindestens fünf Jahre selbst darin</span></label></li>
+        </ul>
+        <div class="inline-field"><label for="jka-kinder">Kinder unter 18 im Haushalt</label><input id="jka-kinder" class="in w-jahr" inputmode="numeric" data-path="jka.kinder" data-fmt="jahr" data-min="0" data-max="9"></div>
+        <div class="inline-field"><label for="jka-san">Geschätzte Sanierungskosten</label><input id="jka-san" class="in" inputmode="decimal" data-path="jka.kosten" data-fmt="eur" data-min="0"><span>€</span></div>
+        <p class="verdict" id="v-kfw"></p>
+      </div>
+
+      <div class="tbl-wrap"><table class="tape" id="tape-11"></table></div>
+
+      <div class="panel">
+        <p class="chart-title">Mit und ohne Förderkredit</p>
+        <p class="chart-sub">Maximaler Kaufpreis je Szenario. Der helle Balken ist die Rechnung ohne Förderung.</p>
+        <div id="ch-kfw" class="chart"></div>
+      </div>
+      <p class="note" id="kfw-hinweis"></p>
+    </div>
+  </div>
+</div></section>
+
+<div class="chapter" id="kap-tun"><div class="wrap">
+  <h2>Und jetzt?</h2>
+  <p>Was am meisten bewegt, was ohnehin ansteht und wie ihr eure Eingaben sichert.</p>
+</div></div>
+
+<!-- Nächste Schritte -->
+<section class="step" id="naechste-schritte"><div class="wrap">
+  <div class="step-head"><h2>Was ihr als Nächstes tun könnt</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Die Liste rechts entsteht aus euren Zahlen und ordnet sich nach Wirkung. Ganz oben steht, was den maximalen Kaufpreis am stärksten bewegt oder das größte Risiko abstellt.</p>
+      <p>Sie ändert sich, sobald ihr oben etwas anpasst. Wenn ihr also ein zweites Gehalt eintragt oder das Umzugsbudget senkt, rutschen andere Punkte nach oben.</p>
+      <p class="note">Das sind Rechenhinweise, keine Beratung. Was davon zu eurem Leben passt, könnt nur ihr entscheiden.</p>
+    </div>
+    <div class="work">
+      <div class="panel">
+        <p class="chart-title">Größte Hebel zuerst</p>
+        <ol class="todo" id="todo"></ol>
+      </div>
+      <div class="panel">
+        <p class="chart-title">Was ohnehin ansteht</p>
+        <ul class="todo-fix">
+          <li><b>Energieausweis und Gutachter.</b> Vor jedem Kaufvertrag. Ein Gutachten kostet wenige Hundert Euro und deckt auf, was an Sanierung wirklich nötig ist.</li>
+          <li><b>Steuerbescheide 2023 und 2024 heraussuchen.</b> Sie entscheiden über die Einkommensgrenze bei „Jung kauft Alt“ und werden beim Antrag verlangt.</li>
+          <li><b>Finanzierungszusage vor der Besichtigungsrunde.</b> Mit einem Schreiben der Bank verhandelt es sich anders.</li>
+          <li><b>Drei Angebote einholen.</b> Hausbank, Vermittler und eine Direktbank. Ein Zehntel Prozentpunkt sind über die Laufzeit schnell einige Tausend Euro.</li>
+          <li><b>Sondertilgungsrecht vereinbaren.</b> Meist kostenlos, oft fünf Prozent im Jahr. Damit lässt sich die Laufzeit später verkürzen.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- Daten sichern -->
+<section class="step" id="daten"><div class="wrap">
+  <div class="step-head"><h2>Eure Daten sichern und zurückholen</h2></div>
+  <div class="step-body wide">
+    <div class="prose">
+      <p>Alles, was ihr eintragt, bleibt in diesem Browser gespeichert. Das reicht für den Alltag, geht aber verloren, wenn ihr den Browser-Speicher leert oder das Gerät wechselt.</p>
+      <p><b>Sicherung erstellen</b> lädt eine kleine Datei mit allen Eingaben herunter. <b>Sicherung einlesen</b> holt sie zurück, auch auf einem anderen Rechner. So könnt ihr auch mehrere Varianten nebeneinander aufheben: eine für das Haus in der Nähe, eine für das günstigere weiter draußen.</p>
+      <p class="note">In der Datei stehen eure Einkommen, Ausgaben und Vermögenswerte im Klartext. Behandelt sie wie einen Kontoauszug.</p>
+      <p>Namen und Anbieter sind bewusst als Platzhalter angelegt: „Person 1“, „Tagesgeld“, „Betriebsrente“. Damit lässt sich der Planer weitergeben oder als Vorlage nutzen, ohne dass Rückschlüsse möglich sind. Alle Bezeichnungen sind Textfelder, ihr könnt sie jederzeit überschreiben — dann stehen die echten Namen aber auch in der Sicherungsdatei.</p>
+    </div>
+    <div class="work">
+      <div class="panel">
+        <p class="chart-title">Sichern</p>
+        <div class="btn-row">
+          <button type="button" class="btn" id="exp-file">Sicherung als Datei laden</button>
+          <button type="button" class="btn ghost" id="exp-copy">In die Zwischenablage</button>
+        </div>
+        <p class="chart-title" style="margin-top:20px">Zurückholen</p>
+        <div class="btn-row">
+          <button type="button" class="btn" id="imp-file">Datei auswählen</button>
+          <input type="file" id="imp-input" accept="application/json,.json" hidden>
+        </div>
+        <label class="slider-label" for="imp-text">Oder Sicherungstext hier einfügen</label>
+        <textarea id="imp-text" class="in ta" rows="4" placeholder="Hier den kopierten Text einfügen"></textarea>
+        <div class="btn-row"><button type="button" class="btn ghost" id="imp-text-btn">Text übernehmen</button></div>
+        <p class="verdict" id="daten-status" hidden></p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+</main>
+
+<footer><div class="wrap">
+  <div class="foot-grid">
+    <div>
+      <h2>Was der Planer nicht weiß</h2>
+      <ul>
+        <li>Den Zustand des Hauses. Ein Gutachter vor dem Kauf kostet wenige Hundert Euro und kann Zehntausende sparen.</li>
+        <li>Künftige Veränderungen: Die Kita-Kosten fallen irgendwann weg, ein zweites Einkommen kann dazukommen, Energiepreise und Grundsteuer können steigen.</li>
+        <li>Doppelte Wohnkosten in der Übergangszeit, Bereitstellungszinsen und Gebühren der Bank.</li>
+        <li>Eure Bonität. Den tatsächlichen Zins und die Kredithöhe legt die Bank fest.</li>
+      </ul>
+      <p>Der Planer ist eine Rechenhilfe mit vereinfachten Annahmen und keine Finanzierungs-, Steuer- oder Rechtsberatung. Bevor ihr etwas unterschreibt, lohnt sich eine unabhängige Beratung, zum Beispiel bei der Verbraucherzentrale.</p>
+    </div>
+    <div>
+      <h2>Quellen und Stand</h2>
+      <ul>
+        <li>Eure Daten: Kostenplaner.xlsx, Blatt „Kostenplaner_2026“.</li>
+        <li>Bauzinsen: <a href="https://www.finanztip.de/baufinanzierung/hypothekenzinsen/" target="_blank" rel="noopener">Finanztip, aktuelle Bauzinsen</a>, Stand 18. September 2026.</li>
+        <li>Grunderwerbsteuer: <a href="https://www.steuern.de/grunderwerbsteuer" target="_blank" rel="noopener">steuern.de</a>, Stand Juli 2026.</li>
+        <li>Notar, Grundbuch, Makler: <a href="https://www.finanztip.de/baufinanzierung/nebenkosten-hauskauf/" target="_blank" rel="noopener">Finanztip, Nebenkosten beim Hauskauf</a>.</li>
+        <li>Laufende Hauskosten und Instandhaltung: <a href="https://www.ruv.de/ratgeber/bauen-wohnen/laufende-kosten-haus" target="_blank" rel="noopener">R+V Ratgeber</a>.</li>
+        <li>KfW 308 „Jung kauft Alt“: <a href="https://www.kfw.de/PDF/Download-Center/F%C3%B6rderprogramme-%28Inlandsf%C3%B6rderung%29/PDF-Dokumente/6000005152_M_308.pdf">KfW-Merkblatt</a>, Stand August 2026. Kreditbeträge seit 3. August 2026: 140.000 € bei einem Kind, 160.000 € bei zwei, 180.000 € ab drei.</li>
+        <li>Regelaltersgrenze 67 für Jahrgänge ab 1964: § 35 SGB VI.</li>
+      </ul>
+      <p class="small">Steuersätze und Zinsen ändern sich. Prüft die Werte, bevor ihr euch auf ein Ergebnis verlasst.</p>
+      <p class="small version"><span id="version">Version 1.0</span> · Beispieldaten ohne Namen</p>
+    </div>
+  </div>
+</div></footer>
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   1. Ausgangsdaten aus Kostenplaner.xlsx (Blatt Kostenplaner_2026)
+   ===================================================================== */
+const LAND = { SH:{name:'Schleswig-Holstein', grest:6.5}, MV:{name:'Mecklenburg-Vorpommern', grest:6.0} };
+const VERSION = '1.0';
+const VERSION_DATUM = '19. September 2026';
+const SCHEMA = 2;               // Aufbau der gespeicherten Daten
+
+const SZ = [ {k:'n', name:'niedrig', lang:'Risiko niedrig'}, {k:'m', name:'mittel', lang:'Risiko mittel'}, {k:'h', name:'hoch', lang:'Risiko hoch'} ];
+const TAGS = [
+  'Vorsichtig gerechnet: nur sicheres Einkommen, hohe Rücklagen, viel Eigenkapital, schnelle Tilgung, lange Zinsbindung.',
+  'Ausgewogen gerechnet: Sonderzahlungen zählen zum Teil, solide Rücklagen, etwas Eigenkapital im Kaufpreis.',
+  'Ausgereizt gerechnet: alles Einkommen verplant, kleine Rücklagen, der Kaufpreis wird fast ganz finanziert. Für Überraschungen bleibt kaum Spielraum.'
+];
+
+const DEFAULTS = {
+  v:SCHEMA, land:'SH', grest:6.5, notar:2.0, makler:3.57, flaeche:120, wunsch:0, anschluss:6.5,
+  custom:{rate:900, basis:1},
+  jahrKauf:new Date().getFullYear(), rentenalter:67, bisRente:true,
+  jka:{kind:true, eink:false, kein:true, klasse:false, san:false, selbst:true, kinder:1, kosten:60000},
+  personen:[{name:'Person 1', geb:1980},{name:'Person 2', geb:1985}],
+  kfw:{ betrag:0, zins:1.0 },
+  income:[
+    {name:'Gehalt Person 1',         betrag:4100, turnus:'m', w:[100,100,100]},
+    {name:'Gehalt Person 2',         betrag:0,    turnus:'m', w:[0,50,100]},
+    {name:'Kindergeld',              betrag:255,  turnus:'m', w:[100,100,100]},
+    {name:'Steuererstattung',        betrag:1000, turnus:'j', w:[0,50,100]},
+    {name:'13. Gehalt',              betrag:4000, turnus:'j', w:[0,50,100]},
+    {name:'Urlaubsgeld',             betrag:600,  turnus:'j', w:[0,50,100]}
+  ],
+  expenses:[
+    {name:'Wohnungsmiete inkl. Nebenkosten', betrag:1065, entfaellt:true},
+    {name:'Nebenkosten-Nachzahlung Wohnung (500 € im Jahr)', betrag:41.67, entfaellt:true},
+    {name:'Rundfunkbeitrag', betrag:17.30, entfaellt:false},
+    {name:'Gewerkschaftsbeitrag', betrag:63, entfaellt:false},
+    {name:'Berufsunfähigkeitsversicherung', betrag:36.25, entfaellt:false},
+    {name:'Hausratversicherung', betrag:8, entfaellt:false},
+    {name:'Haftpflichtversicherung', betrag:4, entfaellt:false},
+    {name:'Rechtsschutzversicherung', betrag:30, entfaellt:false},
+    {name:'Reiseversicherung', betrag:1.50, entfaellt:false},
+    {name:'Musik-Abo', betrag:12, entfaellt:false},
+    {name:'Stromkosten', betrag:85, entfaellt:false},
+    {name:'Spende', betrag:15, entfaellt:false},
+    {name:'Lotto', betrag:8, entfaellt:false},
+    {name:'Streaming-Abos', betrag:15, entfaellt:false},
+    {name:'Mobilfunk (zwei Verträge)', betrag:16.98, entfaellt:false},
+    {name:'DSL-Anschluss', betrag:39.99, entfaellt:false},
+    {name:'Familienausgaben (Essen etc.)', betrag:1100, entfaellt:false},
+    {name:'Zahnzusatzversicherung', betrag:18, entfaellt:false},
+    {name:'Autoversicherung', betrag:50, entfaellt:false},
+    {name:'Kita', betrag:318, entfaellt:false},
+    {name:'Sparplan', betrag:75, entfaellt:false},
+    {name:'Taschengeld Person 1', betrag:230, entfaellt:false},
+    {name:'Taschengeld Person 2', betrag:230, entfaellt:false},
+    {name:'Auto Reparaturen', betrag:50, entfaellt:false},
+    {name:'Auto Treibstoff', betrag:50, entfaellt:false},
+    {name:'Diverse kleine Kosten (Cloud, Drucker etc.)', betrag:40, entfaellt:false},
+    {name:'Haushaltshilfe', betrag:0, entfaellt:false}
+  ],
+  assets:[
+    {name:'Tagesgeld',                            betrag:26135, w:[100,100,100], note:'sofort verfügbar'},
+    {name:'Bargeld',                              betrag:840,   w:[100,100,100], note:''},
+    {name:'Rentenfonds',                          betrag:2500,  w:[0,50,100],    note:'nur ansetzen, wenn frei verkäuflich'},
+    {name:'Vorzeitiges Erbe',                     betrag:25600, w:[100,100,100], note:'im Kostenplaner in der Familienspalte mit 0 geführt'},
+    {name:'Betriebsrente (stillgelegt)',           betrag:10000, w:[0,0,0],       note:'bis zur Rente gebunden'},
+    {name:'Betriebsrente (aktiv)',                 betrag:6000,  w:[0,0,0],       note:'bis zur Rente gebunden'},
+    {name:'ETF-Sparplan (Stand Okt. 25)',         betrag:29000, w:[80,90,100],   note:'Kurse schwanken, auf Gewinne fällt Steuer an'},
+    {name:'Genossenschaftsanteil Carsharing',      betrag:500,   w:[0,0,0],       note:'bleibt bestehen'},
+    {name:'Genossenschaftsanteil Wohnungsbau',     betrag:1440,  w:[0,0,0],       note:'Auszahlung erst nach Kündigung'},
+    {name:'Mietkaution der Wohnung',               betrag:1200,  w:[0,0,0],       note:'kommt nach dem Auszug zurück'}
+  ],
+  sz:{
+    betrieb:[3.5,3.0,2.5], instand:[2.0,1.5,1.0], puffer:[300,150,50], quote:[30,35,40],
+    zins:[4.7,4.5,4.9], tilgung:[3.0,2.5,2.0], bindung:[15,10,10],
+    notMonate:[6,4,2], umzug:[20000,15000,10000], minEK:[20,10,0]
+  }
+};
+
+/* =====================================================================
+   2. Helfer
+   ===================================================================== */
+const $  = (s,r)=> (r||document).querySelector(s);
+const $$ = (s,r)=> Array.prototype.slice.call((r||document).querySelectorAll(s));
+const clone = o => JSON.parse(JSON.stringify(o));
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf0 = new Intl.NumberFormat('de-DE',{maximumFractionDigits:0});
+const nf2 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:0,maximumFractionDigits:2});
+const nf2f= new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const nf1 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+const nf4 = new Intl.NumberFormat('de-DE',{minimumFractionDigits:4,maximumFractionDigits:4});
+const eur = v => (typeof v==='number' && isFinite(v)) ? nf0.format(Math.round(v)||0)+' €' : '–';
+
+function fmtOut(v, kind){
+  if(kind==='text') return v==null?'':String(v);
+  if(typeof v!=='number' || isNaN(v)) return '–';
+  if(!isFinite(v)){
+    if(kind==='months') return 'dauerhaft';
+    if(kind==='jahr'||kind==='jahre'||kind==='alter') return '–';
+    return 'keine Grenze';
+  }
+  switch(kind){
+    case 'eur':    return eur(v);
+    case 'pct1':   return nf1.format(v*100)+' %';
+    case 'pct2':   return nf2f.format(v*100)+' %';
+    case 'num':    return nf2.format(v);
+    case 'factor': return nf4.format(v);
+    case 'years':  return v<=0 ? '–' : nf0.format(Math.round(v))+' Jahren';
+    case 'jahr':   return String(Math.round(v));
+    case 'jahre':  return v<=0 ? '–' : nf1.format(v)+' Jahre';
+    case 'alter':  return nf0.format(Math.round(v))+' Jahre';
+    case 'months': return v<=0 ? '–' : nf0.format(Math.floor(v))+' Monate';
+    default:       return nf2.format(v);
+  }
+}
+function fmtIn(v, kind){
+  if(typeof v!=='number' || !isFinite(v)) return '';
+  if(kind==='eur') return Number.isInteger(v) ? nf0.format(v) : nf2f.format(v);
+  if(kind==='dec') return nf2f.format(v);
+  if(kind==='jahr') return String(Math.round(v));
+  return nf2.format(v);
+}
+function parseDE(str){
+  let s = String(str).trim().replace(/[€%\s\u00a0]/g,'');
+  if(s==='') return NaN;
+  if(s.indexOf(',')>=0) s = s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g,'');
+  const v = Number(s);
+  return isFinite(v) ? v : NaN;
+}
+function getPath(o, path){ return path.split('.').reduce((a,k)=> a==null ? undefined : a[k], o); }
+function setPath(o, path, val){
+  const ks = path.split('.'); let a = o;
+  for(let i=0;i<ks.length-1;i++){ if(a[ks[i]]==null) return; a = a[ks[i]]; }
+  a[ks[ks.length-1]] = val;
+}
+const niceCeil = (v,step)=> Math.max(step, Math.ceil(v/step)*step);
+function debounce(fn,ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn,ms); }; }
+
+/* =====================================================================
+   3. Rechenmodell
+   ===================================================================== */
+function restschuld(D, iY, A, years){
+  if(D<=0) return 0;
+  const r=iY/12, m=Math.round(years*12);
+  if(r===0) return Math.max(0, D-A*m);
+  const f=Math.pow(1+r,m);
+  return Math.max(0, D*f - A*(f-1)/r);
+}
+function laufzeitMonate(D, iY, A){
+  if(D<=0) return 0;
+  const r=iY/12;
+  if(r===0) return A>0 ? D/A : Infinity;
+  if(A<=D*r) return Infinity;
+  return Math.log(A/(A-D*r))/Math.log(1+r);
+}
+function annuitaet(D, iY, months){
+  if(D<=0 || months<=0) return 0;
+  const r=iY/12;
+  if(r===0) return D/months;
+  return D*r/(1-Math.pow(1+r,-months));
+}
+
+function calc(st, zinsAll){
+  const K  = Math.max(0, +st.kfw.betrag||0), ik = (+st.kfw.zins||0)/100;
+  const g = {};
+  g.nkPct = ((+st.grest||0)+(+st.notar||0)+(+st.makler||0))/100;
+  g.faktorNk = 1+g.nkPct;
+  g.leben = 0; g.entfaellt = 0;
+  st.expenses.forEach(e=>{ const b=+e.betrag||0; if(e.entfaellt) g.entfaellt+=b; else g.leben+=b; });
+  g.ausgabenHeute = g.leben+g.entfaellt;
+  g.anzahlAusgaben = st.expenses.length;
+  const mon = i => (+i.betrag||0)/(i.turnus==='j'?12:1);
+  g.einkVoll = st.income.reduce((a,i)=>a+mon(i),0);
+  g.vermGesamt = st.assets.reduce((a,x)=>a+(+x.betrag||0),0);
+  g.kfwAktiv = K>0;
+  const fl = +st.flaeche||0;
+  // Lebensalter und Rentenbeginn
+  g.jahrKauf = Math.round(+st.jahrKauf||new Date().getFullYear());
+  g.rentenalter = Math.round(+st.rentenalter||67);
+  g.personen = st.personen.map(x=>{
+    const geb=Math.round(+x.geb||0);
+    return {name:String(x.name||''), geb:geb, alter:g.jahrKauf-geb, renteJahr:geb+g.rentenalter, bis:geb+g.rentenalter-g.jahrKauf};
+  });
+  const erst = g.personen.slice().sort((a,b)=>a.bis-b.bis)[0] || {name:'', alter:0, bis:0, renteJahr:0};
+  g.erstName = erst.name; g.erstAlter = erst.alter; g.erstRenteJahr = erst.renteJahr;
+  g.bisRente = Math.max(0, erst.bis);
+  g.bisRenteM = Math.round(g.bisRente*12);
+  g.volltilgung = !!st.bisRente && g.bisRenteM>0;
+  // Jahresannuität in Prozent, die ein Darlehen bis zum Rentenbeginn vollständig tilgt
+  const annuBis = r => g.bisRenteM>0 ? 12*annuitaet(1, r, g.bisRenteM) : 0;
+  g.annuBisRente = annuBis;
+
+  function szenario(k, rateFix){
+    const o = {};
+    const i = ((zinsAll!=null ? zinsAll : +st.sz.zins[k])||0)/100, t = (+st.sz.tilgung[k]||0)/100;
+    // Schritt 1
+    o.eink = st.income.reduce((a,x)=>a+mon(x)*(+x.w[k]||0)/100,0);
+    // Schritt 3
+    o.betrieb = fl*(+st.sz.betrieb[k]||0);
+    o.instand = fl*(+st.sz.instand[k]||0);
+    o.haus = o.betrieb+o.instand;
+    // Schritt 4
+    o.puffer = +st.sz.puffer[k]||0;
+    o.rateBudget = o.eink-g.leben-o.haus-o.puffer;
+    o.rateCap = o.eink*(+st.sz.quote[k]||0)/100;
+    o.rateMax = Math.max(0, Math.min(o.rateBudget, o.rateCap));
+    o.rate = rateFix!=null ? Math.max(0, rateFix) : o.rateMax;
+    o.rateFix = rateFix!=null;
+    o.rateGrenze = o.rateBudget<=o.rateCap ? 'budget' : 'quote';
+    o.wohnTragbar = o.rate+o.haus;
+    // Schritt 5
+    o.rateJahr = o.rate*12;
+    // Mit der Vorgabe „bis zur Rente abbezahlt“ gilt die höhere von beiden Annuitäten.
+    const aB = g.volltilgung ? Math.max(i+t, g.annuBisRente(i)) : i+t;
+    const aK = g.volltilgung ? Math.max(ik+t, g.annuBisRente(ik)) : ik+t;
+    o.annuPct = aB; o.annuK = aK;
+    o.tilgEff = aB-i;
+    o.tilgErhoeht = g.volltilgung && aB>i+t+0.00005;
+    let kfwMax=0, bankMax=0;
+    if(aB>0){
+      if(K>0 && aK>0){
+        const kCost = K*aK;
+        if(o.rateJahr<=kCost){ kfwMax=o.rateJahr/aK; }
+        else { kfwMax=K; bankMax=(o.rateJahr-kCost)/aB; }
+      } else bankMax = o.rateJahr/aB;
+    }
+    o.kfwMax=kfwMax; o.bankMax=bankMax; o.darlehenMax=kfwMax+bankMax;
+    // Schritt 6 bis 8 hängen wechselseitig zusammen: Der Notgroschen richtet sich
+    // nach der Rate, die nach dem Kauf wirklich anfällt, und die hängt am Kaufpreis,
+    // der wiederum vom Eigenkapital abhängt. Ein paar Durchläufe genügen.
+    o.vermAnr = st.assets.reduce((a,x)=>a+(+x.betrag||0)*(+x.w[k]||0)/100,0);
+    let rateNot = o.rate;
+    for(let it=0; it<40; it++){
+    o.ausgabenNachKauf = g.leben+o.haus+rateNot;
+    o.notgroschen = (+st.sz.notMonate[k]||0)*o.ausgabenNachKauf;
+    o.umzug = +st.sz.umzug[k]||0;
+    o.ekRoh = o.vermAnr-o.notgroschen-o.umzug;
+    o.ek = Math.max(0,o.ekRoh);
+    // Schritt 8
+    const q = (+st.sz.minEK[k]||0)/100;
+    o.nkPlusQ = g.nkPct+q;
+    o.summeMittel = o.darlehenMax+o.ek;
+    o.preisA = o.summeMittel/g.faktorNk;
+    o.preisB = o.nkPlusQ>0 ? o.ek/o.nkPlusQ : Infinity;
+    o.preis = Math.max(0, Math.min(o.preisA,o.preisB));
+    o.engpass = o.preisA<=o.preisB ? 'rate' : 'ek';
+    o.engpassText = o.preis<=0 ? 'kein Kauf möglich' : (o.engpass==='rate' ? 'Monatsrate' : 'Eigenkapital');
+    o.preisRund = Math.floor(o.preis/1000)*1000;
+    if(o.engpass==='ek' && q<1){
+      const ekNoetig = o.nkPlusQ*o.darlehenMax/(1-q);
+      o.ekFehlt = Math.max(0, ekNoetig-o.ek);
+      o.preisMitEk = (o.darlehenMax+ekNoetig)/g.faktorNk;
+    } else { o.ekFehlt=0; o.preisMitEk=o.preis; }
+    // Finanzierungsplan beim maximalen Kaufpreis
+    o.grestEur = o.preis*(+st.grest||0)/100;
+    o.notarEur = o.preis*(+st.notar||0)/100;
+    o.maklerEur= o.preis*(+st.makler||0)/100;
+    o.nk = o.grestEur+o.notarEur+o.maklerEur;
+    o.gesamt = o.preis+o.nk;
+    o.ekEingesetzt = Math.min(o.ek,o.gesamt);
+    o.darlehen = Math.max(0,o.gesamt-o.ek);
+    o.kfw = Math.min(kfwMax,o.darlehen);
+    o.bank = o.darlehen-o.kfw;
+    o.rateEff = (o.kfw*aK+o.bank*aB)/12;
+    o.iBlend = o.darlehen>0 ? (o.kfw*ik+o.bank*i)/o.darlehen : i;
+    o.beleihung = o.preis>0 ? o.darlehen/o.preis : 0;
+    o.wohnNeu = o.rateEff+o.haus;
+      if(Math.abs(o.rateEff-rateNot)<0.01){ rateNot=o.rateEff; break; }
+      rateNot = (rateNot+o.rateEff)/2;
+    }
+    o.rateNot = rateNot;
+    // Schritt 9
+    const jahre = +st.sz.bindung[k]||0;
+    o.bindung = jahre;
+    o.rest = restschuld(o.darlehen,o.iBlend,o.rateEff,jahre);
+    const N = laufzeitMonate(o.darlehen,o.iBlend,o.rateEff);
+    o.laufzeitJ = N/12;
+    const restMon = N-jahre*12;
+    o.rate2 = (o.rest>0 && isFinite(restMon) && restMon>0) ? annuitaet(o.rest,(+st.anschluss||0)/100,restMon) : 0;
+    o.stressDelta = o.rest>0 ? o.rate2-o.rateEff : 0;
+    o.i=i; o.t=t;
+    return o;
+  }
+  const s = [0,1,2].map(k=>szenario(k));
+  // Vierte Option: Die Rate kommt vom Schieberegler, der Kaufpreis wird daraus zurückgerechnet.
+  const cb = Math.min(2, Math.max(0, Math.round(+st.custom.basis||0)));
+  const c = szenario(cb, Math.max(0, +st.custom.rate||0));
+  c.basis = cb;
+  c.ueberRate = c.rate-c.rateMax;
+  c.uebrig = c.eink-g.leben-c.haus-c.rateEff;
+  c.quoteIst = c.eink>0 ? c.rate/c.eink : 0;
+  const sicher = s[0].eink;
+  s.concat([c]).forEach(o=>{
+    o.fehlbetrag = o.preis>0 ? Math.max(0, g.leben+o.haus+o.rateEff-sicher) : 0;
+    o.reicht = o.fehlbetrag>0.5 ? o.notgroschen/o.fehlbetrag : Infinity;
+    // Schritt 10: Ist das Darlehen bis zum Rentenbeginn abbezahlt?
+    o.alterEnde = isFinite(o.laufzeitJ) ? g.erstAlter+o.laufzeitJ : Infinity;
+    o.jahrFertig = isFinite(o.laufzeitJ) ? g.jahrKauf+o.laufzeitJ : Infinity;
+    o.restRente = o.darlehen>0 ? restschuld(o.darlehen,o.iBlend,o.rateEff,g.bisRente) : 0;
+    o.fertigVorRente = o.darlehen<=0 || (isFinite(o.laufzeitJ) && o.laufzeitJ<=g.bisRente+0.04);
+    o.jahreDrueber = (o.darlehen>0 && isFinite(o.laufzeitJ)) ? Math.max(0,o.laufzeitJ-g.bisRente) : 0;
+    o.rateNoetig = (o.darlehen>0 && g.bisRenteM>0) ? annuitaet(o.darlehen,o.iBlend,g.bisRenteM) : 0;
+    o.rateMehr = Math.max(0, o.rateNoetig-o.rateEff);
+    o.tilgNoetig = o.darlehen>0 ? Math.max(0, o.rateNoetig*12/o.darlehen-o.iBlend) : 0;
+  });
+  return {g:g, s:s, c:c};
+}
+
+/* =====================================================================
+   4. Zustand
+   ===================================================================== */
+let state = clone(DEFAULTS);
+let R = calc(state);
+
+function num(v,d){ v=Number(v); return isFinite(v)?v:d; }
+function sanitize(got){
+  const out = clone(DEFAULTS);
+  if(!got || typeof got!=='object') return out;
+  ['grest','notar','makler','flaeche','wunsch','anschluss'].forEach(k=>{ out[k]=Math.max(0,num(got[k],out[k])); });
+  if(got.land==='SH'||got.land==='MV') out.land=got.land;
+  if(got.kfw && typeof got.kfw==='object'){ out.kfw.betrag=Math.max(0,num(got.kfw.betrag,0)); out.kfw.zins=Math.max(0,num(got.kfw.zins,1)); }
+  out.jahrKauf=Math.min(2100,Math.max(2000,Math.round(num(got.jahrKauf,out.jahrKauf))));
+  out.rentenalter=Math.min(90,Math.max(40,Math.round(num(got.rentenalter,67))));
+  if(typeof got.bisRente==='boolean') out.bisRente=got.bisRente;
+  if(got.jka && typeof got.jka==='object'){
+    ['kind','eink','kein','klasse','san','selbst'].forEach(k=>{ if(typeof got.jka[k]==='boolean') out.jka[k]=got.jka[k]; });
+    out.jka.kinder=Math.min(9,Math.max(0,Math.round(num(got.jka.kinder,1))));
+    out.jka.kosten=Math.max(0,num(got.jka.kosten,60000));
+  }
+  if(Array.isArray(got.personen)&&got.personen.length) out.personen=got.personen.slice(0,4).map(r=>({name:String(r&&r.name||''), geb:Math.min(2100,Math.max(1900,Math.round(num(r&&r.geb,1980))))}));
+  if(got.custom && typeof got.custom==='object'){
+    out.custom.rate=Math.max(0,num(got.custom.rate,900));
+    out.custom.basis=Math.min(2,Math.max(0,Math.round(num(got.custom.basis,1))));
+  }
+  const w3 = (w,d)=> (Array.isArray(w)&&w.length===3) ? w.map((x,i)=>Math.min(100,Math.max(0,num(x,d[i])))) : d.slice();
+  if(Array.isArray(got.income))   out.income   = got.income.slice(0,60).map(r=>({name:String(r&&r.name||''), betrag:num(r&&r.betrag,0), turnus:(r&&r.turnus==='j')?'j':'m', w:w3(r&&r.w,[100,100,100])}));
+  if(Array.isArray(got.expenses)) out.expenses = got.expenses.slice(0,120).map(r=>({name:String(r&&r.name||''), betrag:Math.max(0,num(r&&r.betrag,0)), entfaellt:!!(r&&r.entfaellt)}));
+  if(Array.isArray(got.assets))   out.assets   = got.assets.slice(0,60).map(r=>({name:String(r&&r.name||''), betrag:Math.max(0,num(r&&r.betrag,0)), w:w3(r&&r.w,[100,100,100]), note:String(r&&r.note||'')}));
+  if(got.sz && typeof got.sz==='object'){
+    Object.keys(out.sz).forEach(k=>{
+      const a=got.sz[k];
+      if(Array.isArray(a)&&a.length===3) out.sz[k]=a.map((x,i)=>Math.max(0,num(x,out.sz[k][i])));
+    });
+  }
+  return out;
+}
+
+/* =====================================================================
+   5. Aufbau: Listen und Rechenstreifen
+   ===================================================================== */
+function pctCells(list, idx, w){
+  return [0,1,2].map(k=>'<td><input class="in w-pct" inputmode="decimal" data-path="'+list+'.'+idx+'.w.'+k+'" data-fmt="pct" data-min="0" data-max="100" value="'+fmtIn(w[k],'pct')+'" aria-label="Anrechnung '+SZ[k].lang+' in Prozent"></td>').join('');
+}
+function renderLists(){
+  $('#tbl-income tbody').innerHTML = state.income.map((r,i)=>
+    '<tr><td><input class="in txt" data-kind="text" data-path="income.'+i+'.name" value="'+esc(r.name)+'" aria-label="Bezeichnung der Einnahme"></td>'+
+    '<td><input class="in w-eur" inputmode="decimal" data-path="income.'+i+'.betrag" data-fmt="eur" value="'+fmtIn(r.betrag,'eur')+'" aria-label="Betrag in Euro"></td>'+
+    '<td><select class="in w-sel" data-path="income.'+i+'.turnus" aria-label="Turnus"><option value="m"'+(r.turnus==='m'?' selected':'')+'>monatlich</option><option value="j"'+(r.turnus==='j'?' selected':'')+'>jährlich</option></select></td>'+
+    pctCells('income',i,r.w)+
+    '<td><button type="button" class="del" data-del="income.'+i+'" aria-label="Zeile '+esc(r.name)+' löschen">×</button></td></tr>').join('');
+
+  $('#tbl-expenses tbody').innerHTML = state.expenses.map((r,i)=>
+    '<tr><td><input class="in txt" data-kind="text" data-path="expenses.'+i+'.name" value="'+esc(r.name)+'" aria-label="Bezeichnung der Ausgabe"></td>'+
+    '<td><input class="in w-eur" inputmode="decimal" data-path="expenses.'+i+'.betrag" data-fmt="eur" data-min="0" value="'+fmtIn(r.betrag,'eur')+'" aria-label="Betrag pro Monat in Euro"></td>'+
+    '<td style="text-align:center"><input type="checkbox" class="chk" data-path="expenses.'+i+'.entfaellt"'+(r.entfaellt?' checked':'')+' aria-label="fällt nach dem Kauf weg"></td>'+
+    '<td><button type="button" class="del" data-del="expenses.'+i+'" aria-label="Zeile '+esc(r.name)+' löschen">×</button></td></tr>').join('');
+
+  $('#tbl-assets tbody').innerHTML = state.assets.map((r,i)=>
+    '<tr><td><input class="in txt" data-kind="text" data-path="assets.'+i+'.name" value="'+esc(r.name)+'" aria-label="Bezeichnung des Vermögens">'+(r.note?'<span class="rownote">'+esc(r.note)+'</span>':'')+'</td>'+
+    '<td><input class="in w-eur" inputmode="decimal" data-path="assets.'+i+'.betrag" data-fmt="eur" data-min="0" value="'+fmtIn(r.betrag,'eur')+'" aria-label="Betrag in Euro"></td>'+
+    pctCells('assets',i,r.w)+
+    '<td><button type="button" class="del" data-del="assets.'+i+'" aria-label="Zeile '+esc(r.name)+' löschen">×</button></td></tr>').join('');
+
+  const P = $('#tbl-personen tbody');
+  const ra = Math.round(+state.rentenalter||67), jk = Math.round(+state.jahrKauf||new Date().getFullYear());
+  if(P) P.innerHTML = state.personen.map((x,i)=>{ const r={name:x.name, geb:Math.round(+x.geb||0)}; r.alter=jk-r.geb; r.renteJahr=r.geb+ra; return (
+    '<tr><td><input class="in txt" data-kind="text" data-path="personen.'+i+'.name" value="'+esc(r.name)+'" aria-label="Name"></td>'+
+    '<td><input class="in w-jahr" inputmode="numeric" data-path="personen.'+i+'.geb" data-fmt="jahr" data-min="1900" data-max="2100" value="'+r.geb+'" aria-label="Geburtsjahr von '+esc(r.name)+'"></td>'+
+    '<td class="ro">'+nf0.format(r.alter)+' Jahre</td>'+
+    '<td class="ro">'+r.renteJahr+'</td>'+
+    '<td><button type="button" class="del" data-del="personen.'+i+'" aria-label="'+esc(r.name)+' löschen">×</button></td></tr>'); }).join('');
+}
+
+const TAPES = {
+  'tape-3':[
+    {inp:'betrieb', label:'Betriebskosten in € pro m² und Monat', fmt:'dec', max:30},
+    {inp:'instand', label:'Rücklage für Instandhaltung in € pro m² und Monat', fmt:'dec', max:30},
+    {out:'betrieb', label:'Betriebskosten (× Wohnfläche)'},
+    {out:'instand', op:'+', label:'Instandhaltungsrücklage (× Wohnfläche)'},
+    {out:'haus', op:'=', label:'Laufende Hauskosten pro Monat', cls:'res'}
+  ],
+  'tape-4':[
+    {out:'eink', label:'Anrechenbares Einkommen (Schritt 1)'},
+    {g:'leben', op:'−', label:'Lebenshaltung ohne Miete (Schritt 2)'},
+    {out:'haus', op:'−', label:'Laufende Hauskosten (Schritt 3)'},
+    {inp:'puffer', op:'−', label:'Puffer für Unvorhergesehenes in €', fmt:'eur'},
+    {out:'rateBudget', op:'=', label:'Rate, die das Budget hergibt', cls:'res'},
+    {inp:'quote', label:'Obergrenze: Anteil der Rate am Einkommen in %', fmt:'pct', max:100},
+    {out:'rateCap', label:'Das sind', cls:'sub'},
+    {out:'rate', label:'Tragbare Monatsrate (kleinerer Wert)', cls:'big'}
+  ],
+  'tape-5':[
+    {out:'rateJahr', label:'Tragbare Rate × 12 = Jahresrate'},
+    {inp:'zins', label:'Sollzins in % pro Jahr', fmt:'pct', max:20},
+    {inp:'tilgung', label:'Anfängliche Tilgung in % pro Jahr', fmt:'pct', max:20},
+    {out:'annuPct', op:'÷', label:'Zins + Tilgung', fmt:'pct1'},
+    {out:'darlehenMax', op:'=', label:'Maximales Darlehen', cls:'big'},
+    {out:'kfwMax', label:'davon Förderkredit', cls:'sub', id:'row-kfw-1'},
+    {out:'bankMax', label:'davon Bankdarlehen', cls:'sub', id:'row-kfw-2'},
+    {inp:'bindung', label:'Zinsbindung in Jahren', fmt:'num', max:40}
+  ],
+  'tape-6':[
+    {out:'vermAnr', label:'Angesetztes Vermögen (Tabelle oben)'},
+    {inp:'notMonate', label:'Notgroschen: so viele Monatsausgaben bleiben liegen', fmt:'num', max:36},
+    {out:'ausgabenNachKauf', label:'Monatsausgaben nach dem Kauf (Leben + Haus + Kreditrate)', cls:'sub'},
+    {out:'notgroschen', op:'−', label:'Notgroschen'},
+    {inp:'umzug', op:'−', label:'Umzug, Renovierung, Küche, Möbel in €', fmt:'eur'},
+    {out:'ek', op:'=', label:'Eigenkapital für den Kauf', cls:'big'}
+  ],
+  'tape-8':[
+    {out:'darlehenMax', label:'Maximales Darlehen (Schritt 5)'},
+    {out:'ek', op:'+', label:'Eigenkapital (Schritt 6)'},
+    {g:'faktorNk', op:'÷', label:'1 + Kaufnebenkosten (Schritt 7)', fmt:'factor'},
+    {out:'preisA', op:'=', label:'Grenze A: Was das Monatsbudget trägt', cls:'res'},
+    {inp:'minEK', label:'Mindestanteil Eigenkapital am Kaufpreis in %', fmt:'pct', max:100},
+    {out:'nkPlusQ', label:'Eigenkapital ÷ (Nebenkosten + Mindestanteil)', fmt:'pct2', cls:'sub'},
+    {out:'preisB', op:'=', label:'Grenze B: Wofür das Eigenkapital reicht', cls:'res'},
+    {out:'preis', label:'Maximaler Kaufpreis (kleinerer Wert)', cls:'big'},
+    {out:'engpassText', label:'Begrenzt durch', fmt:'text', cls:'sub'}
+  ],
+  'tape-8b':[
+    {out:'preis', label:'Kaufpreis'},
+    {out:'grestEur', op:'+', label:'Grunderwerbsteuer'},
+    {out:'notarEur', op:'+', label:'Notar und Grundbuch'},
+    {out:'maklerEur', op:'+', label:'Makler'},
+    {out:'gesamt', op:'=', label:'Gesamtkosten', cls:'res'},
+    {out:'ekEingesetzt', op:'−', label:'Eigenkapital'},
+    {out:'darlehen', op:'=', label:'Darlehen', cls:'res'},
+    {out:'rateEff', label:'Monatsrate dafür'},
+    {out:'wohnNeu', label:'Rate plus Hauskosten'},
+    {g:'entfaellt', label:'Zum Vergleich: Wohnkosten heute', cls:'sub'},
+    {out:'beleihung', label:'Beleihung (Darlehen ÷ Kaufpreis)', fmt:'pct1'}
+  ],
+  'tape-9':[
+    {out:'rateEff', label:'Monatsrate heute'},
+    {out:'laufzeitJ', label:'Schuldenfrei nach rund', fmt:'years'},
+    {out:'rest', label:'Restschuld am Ende der Zinsbindung'},
+    {out:'rate2', label:'Rate danach beim angenommenen Zins'},
+    {out:'stressDelta', label:'Mehrbelastung pro Monat', cls:'res'},
+    {out:'fehlbetrag', label:'Fehlbetrag pro Monat, wenn nur das sichere Einkommen kommt'},
+    {out:'reicht', label:'So lange deckt der Notgroschen diesen Fehlbetrag', fmt:'months', cls:'sub'}
+  ],
+  'tape-10':[
+    {out:'darlehen', label:'Darlehen beim maximalen Kaufpreis'},
+    {out:'rateEff', label:'Monatsrate'},
+    {out:'laufzeitJ', label:'Laufzeit bis zur letzten Rate', fmt:'jahre'},
+    {out:'jahrFertig', label:'Schuldenfrei im Jahr', fmt:'jahr'},
+    {out:'alterEnde', label:'Alter bei der letzten Rate', fmt:'alter', cls:'res'},
+    {out:'restRente', label:'Restschuld beim Rentenbeginn'},
+    {out:'rateNoetig', label:'Rate für volle Tilgung bis zur Rente', cls:'sub'},
+    {out:'tilgNoetig', label:'Dafür nötige Anfangstilgung', fmt:'pct1', cls:'sub'}
+  ]
+};
+function buildTapes(){
+  Object.keys(TAPES).forEach(id=>{
+    const head = '<thead><tr><th>Risiko</th>'+SZ.map(z=>'<th class="'+z.k+'">'+z.name+'</th>').join('')+'</tr></thead>';
+    const body = TAPES[id].map(r=>{
+      const op = r.op ? '<span class="op">'+r.op+'</span>' : '';
+      let cells;
+      if(r.inp) cells = [0,1,2].map(k=>'<td><input class="in" inputmode="decimal" data-path="sz.'+r.inp+'.'+k+'" data-fmt="'+(r.fmt||'num')+'" data-min="0"'+(r.max?' data-max="'+r.max+'"':'')+' aria-label="'+esc(r.label)+', '+SZ[k].lang+'"></td>').join('');
+      else if(r.g) cells = [0,1,2].map(()=>'<td data-out="g.'+r.g+'" data-fmt="'+(r.fmt||'eur')+'"></td>').join('');
+      else cells = [0,1,2].map(k=>'<td data-out="s.'+k+'.'+r.out+'" data-fmt="'+(r.fmt||'eur')+'"></td>').join('');
+      const cls = [r.cls||'', r.inp?'inp':''].join(' ').trim();
+      return '<tr'+(cls?' class="'+cls+'"':'')+(r.id?' id="'+r.id+'"':'')+'><th>'+op+esc(r.label)+'</th>'+cells+'</tr>';
+    }).join('');
+    $('#'+id).innerHTML = head+'<tbody>'+body+'</tbody>';
+  });
+}
+function setInputsFromState(){
+  $$('input[data-path], select[data-path]').forEach(el=>{
+    const v = getPath(state, el.dataset.path);
+    if(el.type==='checkbox') el.checked = !!v;
+    else if(el.dataset.kind==='text' || el.tagName==='SELECT') el.value = v;
+    else el.value = (el.dataset.empty!=null && !v) ? '' : fmtIn(v, el.dataset.fmt);
+    el.classList.remove('bad');
+  });
+  $$('[data-land]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.land===state.land)));
+  $$('[data-basis]').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.basis===state.custom.basis)));
+  $('#land-name').textContent = LAND[state.land].name;
+  const fs=$('#flaeche-slider');
+  if(fs){ const v=Math.min(+fs.max, Math.max(+fs.min, state.flaeche)); if(String(fs.value)!==String(v)) fs.value=String(v); }
+}
+function updateStickC(){
+  const el=$('.stick-c'); if(!el) return;
+  el.classList.toggle('show', Math.abs(R.c.preis-R.s[1].preis)>1000);
+}
+function updateLead(){
+  const el=$('#lead-rente'); if(!el) return;
+  const p=$('.lead-2');
+  if(R.g.volltilgung){ if(p) p.hidden=false; el.textContent=R.g.erstName || 'der ersten Person'; }
+  else if(p) p.hidden=true;
+}
+
+function updatePersonen(){
+  const rows=$$('#tbl-personen tbody tr');
+  rows.forEach((tr,i)=>{
+    const p=R.g.personen[i]; if(!p) return;
+    const ro=$$('.ro',tr);
+    if(ro[0]) ro[0].textContent=nf0.format(p.alter)+' Jahre';
+    if(ro[1]) ro[1].textContent=String(p.renteJahr);
+  });
+}
+
+
+/* =====================================================================
+   Schritt 11: Jung kauft Alt
+   ===================================================================== */
+const JKA_BETRAG = [140000,160000,180000];   // 1 / 2 / 3+ Kinder, seit 3.8.2026
+const JKA_GRENZE = [90000,100000,110000];    // zu versteuerndes Haushaltseinkommen
+function jkaMax(){ const k=Math.max(1,Math.round(+state.jka.kinder||1)); return JKA_BETRAG[Math.min(2,k-1)]; }
+function jkaGrenze(){ const k=Math.max(1,Math.round(+state.jka.kinder||1)); return JKA_GRENZE[Math.min(2,k-1)]; }
+function jkaOffen(){
+  const j=state.jka, L=[];
+  if(!j.kind)   L.push('ein Kind unter 18 im Haushalt');
+  if(!j.eink)   L.push('die Einkommensgrenze von '+eur(jkaGrenze())+' zu versteuerndem Einkommen');
+  if(!j.kein)   L.push('kein bisheriges Wohneigentum');
+  if(!j.klasse) L.push('Energieeffizienzklasse F, G oder H');
+  if(!j.san)    L.push('die Sanierung binnen 54 Monaten');
+  if(!j.selbst) L.push('fünf Jahre Selbstnutzung');
+  return L;
+}
+function variante(mut){ const st=clone(state); mut(st); return calc(st); }
+
+function renderKfw(){
+  const g=$('#jka-grenze'); if(!g) return;
+  const max=jkaMax(), offen=jkaOffen(), erfuellt=offen.length===0;
+  g.textContent='(derzeit '+eur(jkaGrenze())+')';
+
+  const mit  = variante(st=>{ st.kfw.betrag=max; });
+  const ohne = variante(st=>{ st.kfw.betrag=0; });
+  const aktiv = (+state.kfw.betrag||0)>0;
+
+  // Rechenstreifen
+  const tb=$('#tape-11');
+  if(tb){
+    const head='<thead><tr><th>Risiko</th>'+SZ.map(z=>'<th class="'+z.k+'">'+z.name+'</th>').join('')+'</tr></thead>';
+    const row=(label,vals,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'><th>'+esc(label)+'</th>'+vals.map(v=>'<td>'+v+'</td>').join('')+'</tr>';
+    const kb = ohne.s.map(o=>Math.min(max,o.darlehen));
+    const spar = ohne.s.map((o,k)=>kb[k]*(o.annuPct-o.annuK)/12);
+    const jahre = ohne.s.map(o=>R.g.volltilgung ? R.g.bisRente : (isFinite(o.laufzeitJ)?o.laufzeitJ:0));
+    const body =
+      row('Kaufpreis ohne Förderkredit', ohne.s.map(o=>eur(o.preis))) +
+      row('Kaufpreis mit Förderkredit',  mit.s.map(o=>eur(o.preis))) +
+      row('Unterschied', mit.s.map((o,k)=>eur(o.preis-ohne.s[k].preis)), 'res') +
+      row('Förderkredit im Finanzierungsplan', mit.s.map(o=>eur(o.kfw)), 'sub') +
+      row('Ersparnis pro Monat bei gleicher Schuld', spar.map(v=>eur(v)), 'sub') +
+      row('Ersparnis über die Laufzeit', spar.map((v,k)=>eur(v*12*jahre[k])), 'big');
+    tb.innerHTML=head+'<tbody>'+body+'</tbody>';
+  }
+
+  // Balken mit und ohne
+  const el=$('#ch-kfw');
+  if(el){
+    const scale=Math.max.apply(null, mit.s.map(o=>o.preis).concat(ohne.s.map(o=>o.preis)).concat([1]));
+    el.innerHTML='<div class="bars">'+R.s.map((o,k)=>
+      '<div class="bar-row '+SZ[k].k+'"><span class="lab">'+SZ[k].name+'</span><div class="bar-stack">'+
+      '<div class="limit-row"><div class="bar thin"><span class="seg f-sz-soft" style="width:'+(ohne.s[k].preis/scale*100).toFixed(2)+'%">ohne</span></div><span class="val">'+eur(ohne.s[k].preis)+'</span></div>'+
+      '<div class="limit-row"><div class="bar thin"><span class="seg f-sz" style="width:'+(mit.s[k].preis/scale*100).toFixed(2)+'%">mit</span></div><span class="val win">'+eur(mit.s[k].preis)+'</span></div>'+
+      '</div></div>').join('')+'</div>';
+  }
+
+  // Urteil
+  const v=$('#v-kfw');
+  if(v){
+    const plus = mit.s[1].preis-ohne.s[1].preis;
+    const kb1  = Math.min(max, ohne.s[1].darlehen);
+    const sparG = kb1*(ohne.s[1].annuPct-ohne.s[1].annuK)/12*12*(R.g.volltilgung?R.g.bisRente:(isFinite(ohne.s[1].laufzeitJ)?ohne.s[1].laufzeitJ:0));
+    const san = +state.jka.kosten||0;
+    let t;
+    if(!erfuellt){
+      t='Noch offen: '+offen.join('; ')+'. Solange eine Bedingung fehlt, gibt es den Kredit nicht.';
+    } else if(sparG>san){
+      t='Alle Bedingungen erfüllt. Über die Laufzeit spart der Förderkredit rund '+eur(sparG)+', die geschätzte Sanierung kostet '+eur(san)+
+        '. Rechnerisch bleibt ein Vorteil von '+eur(sparG-san)+', und der mittlere Kaufpreis steigt um '+eur(plus)+'.';
+    } else {
+      t='Alle Bedingungen erfüllt, aber die Rechnung trägt sich knapp: Die Zinsersparnis von rund '+eur(sparG)+' liegt unter den geschätzten Sanierungskosten von '+eur(san)+
+        '. Das lohnt nur, wenn ihr ohnehin sanieren wollt, denn die Sanierung steigert auch den Wert des Hauses.';
+    }
+    v.textContent=t;
+    v.classList.toggle('warn', !erfuellt);
+  }
+  const h=$('#kfw-hinweis');
+  if(h) h.textContent = aktiv
+    ? 'Der Förderkredit ist in Schritt 5 gerade mit '+eur(+state.kfw.betrag||0)+' angesetzt und steckt damit in allen Zahlen dieser Seite.'
+    : 'In Schritt 5 ist derzeit kein Förderkredit angesetzt. Tragt dort '+eur(max)+' ein, wenn ihr mit der Förderung rechnen wollt.';
+}
+
+/* =====================================================================
+   Nächste Schritte
+   ===================================================================== */
+function renderTodo(){
+  const el=$('#todo'); if(!el) return;
+  const basis=R.s[1], preis0=basis.preis, hoch0=R.s[2].preis, g=R.g;
+  const ekBegrenzt = basis.engpass==='ek';
+  const items=[];
+  // Wirkung einer Änderung auf die mittlere und auf die ausgereizte Rechnung
+  const wirkung = mut => { const v=variante(mut); return {v:v, dM:v.s[1].preis-preis0, dH:v.s[2].preis-hoch0}; };
+  const auchHoch = w => (w.dH>w.dM+500) ? ' In der ausgereizten Rechnung sind es sogar '+eur(w.dH)+'.' : '';
+
+  // 1. Eigenkapital
+  if(ekBegrenzt && basis.ekFehlt>0){
+    const ueber = g.einkVoll-g.ausgabenHeute;
+    const monate = ueber>0 ? basis.ekFehlt/ueber : Infinity;
+    items.push({w:basis.preisMitEk-preis0, t:'Eigenkapital aufbauen',
+      ziel:'schritt-6',
+      d:'Das Eigenkapital ist der Engpass, nicht die Rate. Mit '+eur(basis.ekFehlt)+' mehr wären '+eur(basis.preisMitEk)+' möglich statt '+eur(preis0)+'. '+
+        (isFinite(monate) ? 'Bei eurem heutigen Überschuss von '+eur(ueber)+' im Monat dauert das gut '+nf0.format(Math.ceil(monate))+' Monate.' : 'Dafür müsste erst ein Überschuss entstehen.')});
+  }
+  // 2. Zweites Einkommen
+  const zweite = state.income.findIndex(x=>(+x.betrag||0)===0 && x.turnus==='m');
+  if(zweite>=0){
+    const w=wirkung(st=>{ st.income[zweite].betrag=1000; });
+    const name=state.income[zweite].name||'die zweite Zeile';
+    let d;
+    if(w.dM<500 && ekBegrenzt){
+      const ueber=g.einkVoll-g.ausgabenHeute;
+      const m0=ueber>0?basis.ekFehlt/ueber:Infinity, m1=(ueber+1000)>0?basis.ekFehlt/(ueber+1000):Infinity;
+      d='1.000 € netto bei „'+name+'“ heben den mittleren Kaufpreis nicht sofort, weil dort das Eigenkapital begrenzt. Sie wirken über die Zeit: Der Überschuss stiege von '+eur(ueber)+' auf '+eur(ueber+1000)+' im Monat, die Lücke von '+eur(basis.ekFehlt)+' wäre statt in '+
+        (isFinite(m0)?nf0.format(Math.ceil(m0)):'vielen')+' schon in '+(isFinite(m1)?nf0.format(Math.ceil(m1)):'wenigen')+' Monaten geschlossen.'+auchHoch(w);
+    } else {
+      d='Kämen bei „'+name+'“ 1.000 € netto im Monat dazu, läge der mittlere Kaufpreis bei '+eur(w.v.s[1].preis)+'.'+auchHoch(w);
+    }
+    items.push({w:Math.max(w.dM,w.dH), t:'Zweites Einkommen', d:d, chip:'luisa'});
+  }
+  // 3. Ohne Makler
+  if((+state.makler||0)>0){
+    const w=wirkung(st=>{ st.makler=0; });
+    items.push({chip:'makler', w:Math.max(w.dM,w.dH), t:'Ohne Makler kaufen',
+      d:'Die Provision von '+nf2.format(+state.makler)+' % muss aus dem Eigenkapital kommen und fehlt dann beim Kaufpreis. Ohne Makler wären '+eur(w.v.s[1].preis)+' möglich. Privatverkäufe findet ihr über Zeitungen, Gemeinden und Nachfragen vor Ort.'});
+  }
+  // 4. Förderkredit
+  if((+state.kfw.betrag||0)===0){
+    const max=jkaMax();
+    const w=wirkung(st=>{ st.kfw.betrag=max; });
+    const offen=jkaOffen();
+    items.push({chip:'kfw', ziel:'schritt-11', w:Math.max(w.dM,w.dH), t:'Förderkredit „Jung kauft Alt“ prüfen',
+      d:'Mit '+eur(max)+' Förderkredit läge der mittlere Kaufpreis bei '+eur(w.v.s[1].preis)+'.'+auchHoch(w)+' '+
+        (offen.length? 'Offen ist in Schritt 11 noch: '+offen.join('; ')+'.' : 'Alle Bedingungen habt ihr abgehakt. Der Antrag muss vor dem Kaufvertrag gestellt werden.')});
+  }
+  // 5. Ausgaben senken
+  const wAus=wirkung(st=>{ const i=st.expenses.findIndex(x=>!x.entfaellt && (+x.betrag||0)>=100); if(i>=0) st.expenses[i].betrag=Math.max(0,st.expenses[i].betrag-100); });
+  items.push({ziel:'schritt-2', w:Math.max(wAus.dM,wAus.dH), t:'Feste Ausgaben senken',
+    d:'100 € weniger im Monat bringen '+eur(Math.max(0,wAus.dM))+' mehr Kaufpreis.'+auchHoch(wAus)+' Versicherungen, Verträge und Abos sind der schnellste Ort dafür, weil sie ohne Verzicht auskommen.'});
+  // 6. Bundesland
+  if(state.land==='SH'){
+    const w=wirkung(st=>{ st.land='MV'; st.grest=LAND.MV.grest; });
+    items.push({chip:'land', w:Math.max(w.dM,w.dH), t:'Mecklenburg-Vorpommern mitdenken',
+      d:'Dort liegt die Grunderwerbsteuer bei '+nf1.format(LAND.MV.grest)+' % statt '+nf1.format(LAND.SH.grest)+' %. Allein das hebt den mittleren Kaufpreis auf '+eur(w.v.s[1].preis)+', und die Immobilienpreise sind vielerorts niedriger.'});
+  }
+  // 7. Laufzeit über die Rente hinaus
+  const spaet=R.s.filter(o=>o.preis>0 && !o.fertigVorRente);
+  if(spaet.length){
+    items.push({risk:true, ziel:'schritt-10', w:0, t:'Laufzeit bis zur Rente klären',
+      d:(spaet.length===1?'In einem Szenario':'In '+spaet.length+' Szenarien')+' läuft das Darlehen über den Rentenbeginn von '+g.erstName+' hinaus. Schritt 10 zeigt, welche Tilgung nötig wäre; der Haken dort rechnet alles mit voller Tilgung bis zur Rente.'});
+  }
+  // 8. Notgroschen
+  if(basis.notgroschen>0 && ekBegrenzt){
+    const w=wirkung(st=>{ st.sz.notMonate[1]=Math.max(0,(+st.sz.notMonate[1]||0)-1); });
+    items.push({ziel:'schritt-6', w:Math.max(0,w.dM), t:'Notgroschen bewusst festlegen',
+      d:'Ein Monat weniger Rücklage bringt '+eur(Math.max(0,w.dM))+' mehr Kaufpreis. Das ist der unangenehmste Hebel der Liste, denn die Rücklage ist genau das, was euch bei Jobverlust oder kaputter Heizung rettet. Kürzt hier zuletzt.'});
+  }
+
+  items.sort((a,b)=> (b.risk?1e12:b.w)-(a.risk?1e12:a.w));
+  el.innerHTML=items.slice(0,7).map(it=>{
+    const akt=[];
+    if(it.chip){ const w=whatifById(it.chip); if(w && !w.an()) akt.push('<button type="button" class="btn mini" data-chip="'+it.chip+'">Ausprobieren</button>'); }
+    if(it.ziel) akt.push('<button type="button" class="btn mini ghost" data-goto="'+it.ziel+'">Dorthin springen</button>');
+    return '<li><div class="todo-h"><span class="todo-t">'+esc(it.t)+'</span>'+
+      (it.risk ? '<span class="todo-w risk">Risiko</span>' : (it.w>500 ? '<span class="todo-w">+'+eur(it.w)+'</span>' : ''))+
+      '</div><p>'+esc(it.d)+'</p>'+(akt.length?'<div class="todo-a">'+akt.join('')+'</div>':'')+'</li>';
+  }).join('');
+}
+
+/* ---- Vierte Option: Schieberegler, Skala und Bewertung ---- */
+function syncSlider(){
+  const sl=$('#rate-slider'); if(!sl) return;
+  const c=R.c, rmax=R.s[c.basis].rateMax;
+  const cap=Math.max(3000, Math.ceil(R.s[2].rateMax*2/100)*100);
+  const top=Math.min(cap, Math.max(500, Math.ceil(Math.max(R.s[2].rateMax, rmax, state.custom.rate, 1)*1.25/100)*100));
+  sl.max=String(top);
+  if(String(sl.value)!==String(Math.min(state.custom.rate,top))) sl.value=String(Math.min(state.custom.rate,top));
+  sl.setAttribute('aria-valuetext', eur(state.custom.rate)+' pro Monat');
+  $('#rate-max').textContent=eur(top);
+  const tick=$('#rate-tick');
+  if(rmax>0 && rmax<=top){
+    tick.hidden=false;
+    tick.style.left='calc(11px + (100% - 22px) * '+(rmax/top).toFixed(4)+')';
+    $('#rate-marke').textContent='Die Markierung zeigt '+eur(rmax)+': So viel trägt das Budget im Szenario „'+SZ[c.basis].lang+'“.';
+  } else {
+    tick.hidden=true;
+    $('#rate-marke').textContent='';
+  }
+}
+function renderCustom(){
+  const c=R.c, el=$('#v-custom'); if(!el) return;
+  const name=SZ[c.basis].lang;
+  let t, warn=false;
+  if(c.preis<=0){
+    t='So reicht es nicht: Nach Notgroschen und Umzugsbudget bleibt kein Eigenkapital für einen Kauf übrig.'; warn=true;
+  } else if(c.engpass==='ek'){
+    t='Ab hier bringt eine höhere Rate nichts mehr. Das Eigenkapital begrenzt den Kaufpreis auf '+eur(c.preis)+
+      ', und dafür genügt eine Rate von '+eur(c.rateEff)+'. Den Rest könnt ihr sparen oder als Sondertilgung vereinbaren.';
+  } else {
+    t='Die Rate bestimmt den Kaufpreis. Mit Hauskosten kostet das Wohnen dann '+eur(c.wohnNeu)+' im Monat, heute sind es '+eur(R.g.entfaellt)+'.';
+  }
+  if(c.ueberRate>1){
+    t+=' Achtung: Die Rate liegt '+eur(c.ueberRate)+' über dem, was das Szenario „'+name+'“ als tragbar ansieht.'; warn=true;
+  }
+  if(c.uebrig<0){ warn=true; }
+  el.textContent=t;
+  el.classList.toggle('warn',warn);
+}
+/* ---- Schritt 10: Laufzeit gegen Rentenbeginn ---- */
+function drawJahre(){
+  const el=$('#ch-jahre'); if(!el) return;
+  const g=R.g;
+  const rows=R.s.map((o,k)=>({lab:SZ[k].name, k:SZ[k].k, o:o})).concat([{lab:'eure Rate', k:'c4', o:R.c}]);
+  const maxJ=Math.max.apply(null, rows.map(r=>isFinite(r.o.laufzeitJ)?r.o.laufzeitJ:0).concat([g.bisRente, 5]))*1.08;
+  const sub=$('#ch-jahre-sub');
+  if(sub) sub.textContent = g.bisRente>0
+    ? 'Die senkrechte Linie ist der Rentenbeginn von '+g.erstName+' im Jahr '+g.erstRenteJahr+', also in '+nf1.format(g.bisRente)+' Jahren.'
+    : 'Der Rentenbeginn liegt nicht in der Zukunft.';
+  const lp=(g.bisRente/maxJ*100).toFixed(2);
+  el.innerHTML='<div class="bars jahre-bars">'+
+    '<div class="rentenlinie" style="left:calc(5.8rem + 10px + (100% - 5.8rem - 10px - 6.2em) * '+(g.bisRente/maxJ).toFixed(4)+')"></div>'+
+    rows.map(r=>{
+      const j=isFinite(r.o.laufzeitJ)?r.o.laufzeitJ:maxJ;
+      const ok=r.o.fertigVorRente;
+      return '<div class="bar-row '+r.k+'"><span class="lab">'+r.lab+'</span><div class="bar-stack">'+
+        '<div class="limit-row"><div class="bar thin"><span class="seg '+(ok?'f-sz':'f-sz-soft')+'" style="width:'+(Math.min(j,maxJ)/maxJ*100).toFixed(2)+'%">'+
+        (isFinite(r.o.laufzeitJ)?nf1.format(r.o.laufzeitJ)+' J.':'läuft ewig')+'</span></div>'+
+        '<span class="val'+(ok?'':' warn')+'">'+(ok?'vor der Rente':'zu spät')+'</span></div></div></div>';
+    }).join('')+'</div>';
+}
+function renderVerdicts10(){
+  const el=$('#verdicts-10'); if(!el) return;
+  const g=R.g;
+  const rows=R.s.map((o,k)=>({name:SZ[k].lang, k:SZ[k].k, o:o})).concat([{name:'Eure Rate (vierte Option)', k:'c4', o:R.c}]);
+  el.innerHTML=rows.map(r=>{
+    const o=r.o; let t;
+    if(o.preis<=0) t='Kein Kauf möglich, also auch keine Laufzeit.';
+    else if(o.darlehen<=0) t='Ohne Darlehen gibt es nichts abzuzahlen.';
+    else if(o.fertigVorRente) t='Das Darlehen ist '+(isFinite(o.laufzeitJ)?'nach '+nf1.format(o.laufzeitJ)+' Jahren':'irgendwann')+' getilgt, '+
+      (g.bisRente-o.laufzeitJ>=0.5 ? nf1.format(g.bisRente-o.laufzeitJ)+' Jahre vor dem Rentenbeginn von '+g.erstName+'.' : 'knapp vor dem Rentenbeginn von '+g.erstName+'.');
+    else t='Das Darlehen läuft '+nf1.format(o.jahreDrueber)+' Jahre über den Rentenbeginn von '+g.erstName+' hinaus. Beim Rentenbeginn stünden noch '+
+      eur(o.restRente)+' offen. Für volle Tilgung bis dahin bräuchte es '+eur(o.rateNoetig)+' im Monat, also '+eur(o.rateMehr)+' mehr.';
+    return '<li class="'+r.k+'"><b>'+esc(r.name)+':</b> '+esc(t)+'</li>';
+  }).join('');
+}
+
+function drawVier(){
+  const el=$('#ch-vier'); if(!el) return;
+  const rows=R.s.map((o,k)=>({lab:SZ[k].name, k:SZ[k].k, v:o.preis})).concat([{lab:'eure Rate', k:'c4', v:R.c.preis}]);
+  const scale=Math.max.apply(null,rows.map(r=>r.v).concat([1]));
+  el.innerHTML='<div class="bars">'+rows.map(r=>
+    '<div class="bar-row '+r.k+'"><span class="lab">'+r.lab+'</span><div class="bar-stack">'+
+    '<div class="limit-row"><div class="bar thin"><span class="seg f-sz" style="width:'+(Math.max(0,r.v)/scale*100).toFixed(2)+'%"></span></div>'+
+    '<span class="val">'+eur(r.v)+'</span></div></div></div>').join('')+'</div>';
+}
+
+/* =====================================================================
+   6. Ausgabe: Zahlen, Texte, Diagramme
+   ===================================================================== */
+function updateOutputs(){
+  $$('[data-out]').forEach(el=>{
+    const v = getPath(R, el.dataset.out);
+    el.textContent = fmtOut(v, el.dataset.fmt||'eur');
+    el.classList.toggle('neg', typeof v==='number' && v<-0.5);
+  });
+  $('#row-kfw-1').hidden = !R.g.kfwAktiv;
+  $('#row-kfw-2').hidden = !R.g.kfwAktiv;
+}
+
+function renderSzs(){
+  $('#szs').innerHTML = R.s.map((o,k)=>{
+    let price, extra='';
+    if(o.preis>0){
+      price = '<p class="price">'+eur(o.preisRund)+'</p>';
+      extra = '<dl><dt>Monatsrate</dt><dd>'+eur(o.rateEff)+'</dd>'+
+              '<dt>Rate plus Hauskosten</dt><dd>'+eur(o.wohnNeu)+'</dd>'+
+              '<dt>Darlehen</dt><dd>'+eur(o.darlehen)+'</dd>'+
+              '<dt>Eigenkapital</dt><dd>'+eur(o.ekEingesetzt)+'</dd>'+
+              '<dt>davon Kaufnebenkosten</dt><dd>'+eur(o.nk)+'</dd></dl>'+
+              '<p class="limit">Begrenzt durch '+(o.engpass==='rate'?'die Monatsrate':'das Eigenkapital')+'.</p>';
+    } else {
+      price = '<p class="price none">Kein Kauf möglich</p>';
+      extra = '<p class="limit">'+(o.rate<=0 ? 'Nach Lebenshaltung und Hauskosten bleibt nichts für eine Rate.' : 'Nach Notgroschen und Umzugsbudget bleibt kein Eigenkapital.')+'</p>';
+    }
+    return '<section class="sz '+SZ[k].k+'"><h3>'+SZ[k].lang+'</h3><p class="tag">'+TAGS[k]+'</p>'+
+           '<p class="plabel">Maximaler Kaufpreis rund</p>'+price+extra+'</section>';
+  }).join('');
+}
+
+function renderTexts(){
+  const s=R.s, g=R.g, w=+state.wunsch||0;
+  // Wunschobjekt
+  let t;
+  if(!w) t = '<span class="small">Tragt oben einen Kaufpreis ein, dann zeigt die Skala, in welchem Risikobereich das Haus liegt. Heute zahlt ihr '+eur(g.entfaellt)+' im Monat fürs Wohnen.</span>';
+  else {
+    let k=-1; for(let j=0;j<3;j++){ if(s[j].preis>=w){ k=j; break; } }
+    if(k<0){
+      const top=Math.max(s[0].preis,s[1].preis,s[2].preis);
+      t = 'Ein Haus für <b>'+eur(w)+'</b> liegt über allen drei Grenzen. Die höchste liegt bei '+eur(top)+'.';
+    } else {
+      const o=s[k], ges=w*g.faktorNk, d=Math.max(0,ges-o.ek), kf=Math.min(o.kfwMax,d);
+      const rate=(kf*((+state.kfw.zins||0)/100+o.t)+(d-kf)*(o.i+o.t))/12;
+      const wo=['liegt im Bereich mit niedrigem Risiko','passt nicht mehr in die vorsichtige Rechnung, aber in die mit mittlerem Risiko','passt nur in die Rechnung mit hohem Risiko'][k];
+      t = 'Ein Haus für <b>'+eur(w)+'</b> '+wo+'. Mit Nebenkosten kostet es '+eur(ges)+'; dafür wären dort ein Darlehen von '+eur(d)+' und eine Monatsrate von '+eur(rate)+' nötig.';
+    }
+  }
+  $('#wunsch-text').innerHTML = t;
+
+  $('#ex-wohnen').innerHTML = 'Zum Vergleich: Heute zahlt ihr <b>'+eur(g.entfaellt)+'</b> für Miete und Nebenkosten. Tragbare Rate plus Hauskosten ergeben '+
+    eur(s[0].wohnTragbar)+' (niedrig), '+eur(s[1].wohnTragbar)+' (mittel) und '+eur(s[2].wohnTragbar)+' (hoch).';
+
+  const m=s[1];
+  $('#ex-darlehen').innerHTML = 'Beispiel mittleres Risiko: '+eur(m.rate)+' × 12 = '+eur(m.rateJahr)+' im Jahr. Geteilt durch '+nf1.format(m.annuPct*100)+' % ('+
+    nf2.format(m.i*100)+' % Zins + '+nf2.format(m.t*100)+' % Tilgung) ergibt das <b>'+eur(m.rateJahr/(m.annuPct||1))+'</b> Darlehen.'+
+    (g.kfwAktiv?' Mit Förderkredit trägt dieselbe Rate mehr, weil ein Teil des Geldes weniger Zins kostet; die Aufteilung steht in der Tabelle.':'');
+
+  const bsp = w>0 ? w : 250000;
+  $('#ex-nk').innerHTML = 'Bei '+eur(bsp)+' Kaufpreis sind das <b>'+eur(bsp*g.nkPct)+'</b>, die zusätzlich zum Kaufpreis fällig werden.';
+
+  $('#verdicts').innerHTML = s.map((o,k)=>{
+    let txt;
+    if(o.preis<=0) txt = 'Hier ist kein Kauf möglich, weil '+(o.rate<=0?'keine Monatsrate übrig bleibt':'kein Eigenkapital übrig bleibt')+'.';
+    else if(o.engpass==='ek') txt = 'Das Eigenkapital begrenzt. Das Monatsbudget würde '+eur(o.preisA)+' tragen. Mit '+eur(o.ekFehlt)+' mehr Eigenkapital wären '+eur(o.preisMitEk)+' erreichbar.';
+    else txt = 'Die Monatsrate begrenzt. '+(isFinite(o.preisB)?'Das Eigenkapital würde auch für '+eur(o.preisB)+' reichen.':'Das Eigenkapital ist hier nicht der Engpass.');
+    return '<li class="'+SZ[k].k+'"><b>'+SZ[k].lang+':</b> '+txt+'</li>';
+  }).join('');
+}
+
+/* ---- Balken ---- */
+function seg(v,total,widthPx,cls,label,title){
+  if(!(v>0) || !(total>0)) return '';
+  const w=v/total*100, px=widthPx*w/100;
+  return '<span class="seg '+cls+'" style="width:'+w.toFixed(3)+'%" title="'+esc(title+': '+eur(v))+'">'+(px>=50?esc(label):'')+'</span>';
+}
+function legend(items){ return '<div class="legend">'+items.map(i=>'<span><i class="'+i[0]+'"></i>'+esc(i[1])+'</span>').join('')+'</div>'; }
+function barWidth(el){ return Math.max(160,(el.clientWidth||600)-82); }
+
+function drawBudget(){
+  const el=$('#ch-budget'), W=barWidth(el), g=R.g;
+  el.innerHTML = '<div class="bars">'+R.s.map((o,k)=>{
+    const used=g.leben+o.haus+o.rate+o.puffer, total=Math.max(g.einkVoll,used), frei=Math.max(0,total-used);
+    return '<div class="bar-row '+SZ[k].k+'"><span class="lab">'+SZ[k].name+'</span><div class="bar">'+
+      seg(g.leben,total,W,'f-c1',nf0.format(g.leben),'Lebenshaltung')+
+      seg(o.haus,total,W,'f-c2',nf0.format(o.haus),'Hauskosten')+
+      seg(o.rate,total,W,'f-ink',nf0.format(o.rate),'Tragbare Kreditrate')+
+      seg(o.puffer,total,W,'f-c3',nf0.format(o.puffer),'Puffer')+
+      seg(frei,total,W,'f-hatch',nf0.format(frei),'Nicht verplant')+'</div></div>';
+  }).join('')+'</div>'+legend([['f-c1','Lebenshaltung'],['f-c2','Hauskosten'],['f-ink','Kreditrate'],['f-c3','Puffer'],['f-hatch','nicht verplant']]);
+}
+function drawVerm(){
+  const el=$('#ch-verm'), W=barWidth(el), g=R.g;
+  el.innerHTML = '<div class="bars">'+R.s.map((o,k)=>{
+    const nk=Math.min(o.nk,o.ekEingesetzt), imPreis=Math.max(0,o.ekEingesetzt-nk);
+    const not=Math.min(o.notgroschen,o.vermAnr), umz=Math.min(o.umzug,Math.max(0,o.vermAnr-not));
+    const rest=Math.max(0,g.vermGesamt-nk-imPreis-not-umz), total=Math.max(g.vermGesamt,1);
+    return '<div class="bar-row '+SZ[k].k+'"><span class="lab">'+SZ[k].name+'</span><div class="bar">'+
+      seg(imPreis,total,W,'f-ink',nf0.format(imPreis),'Fließt in den Kaufpreis')+
+      seg(nk,total,W,'f-c4',nf0.format(nk),'Bezahlt die Kaufnebenkosten')+
+      seg(not,total,W,'f-c3',nf0.format(not),'Notgroschen')+
+      seg(umz,total,W,'f-c2',nf0.format(umz),'Umzug und Renovierung')+
+      seg(rest,total,W,'f-hatch',nf0.format(rest),'Gebunden, nicht angesetzt oder übrig')+'</div></div>';
+  }).join('')+'</div>'+legend([['f-ink','fließt in den Kaufpreis'],['f-c4','Kaufnebenkosten'],['f-c3','Notgroschen'],['f-c2','Umzug und Renovierung'],['f-hatch','gebunden, nicht angesetzt oder übrig']]);
+}
+function drawLimits(){
+  const el=$('#ch-limits');
+  const maxA=Math.max.apply(null,R.s.map(o=>o.preisA).concat([1]));
+  const cap=maxA*1.5;
+  const scale=Math.max.apply(null,R.s.map(o=>Math.min(isFinite(o.preisB)?o.preisB:cap,cap)).concat([maxA]));
+  el.innerHTML = '<div class="bars">'+R.s.map((o,k)=>{
+    const row=(name,v,win)=>{
+      const vv=Math.max(0,Math.min(isFinite(v)?v:cap,scale)), over=(!isFinite(v)||v>scale);
+      return '<div class="limit-row"><div class="bar thin"><span class="seg '+(win?'f-sz':'f-sz-soft')+'" style="width:'+(vv/scale*100).toFixed(2)+'%">'+name+(over?' ›':'')+'</span></div>'+
+             '<span class="val'+(win?' win':'')+'">'+(isFinite(v)?eur(v):'keine Grenze')+'</span></div>';
+    };
+    const aWin=o.engpass==='rate';
+    return '<div class="bar-row '+SZ[k].k+'"><span class="lab">'+SZ[k].name+'</span><div class="bar-stack">'+row('A',o.preisA,aWin)+row('B',o.preisB,!aWin)+'</div></div>';
+  }).join('')+'</div><div class="legend"><span>A = Grenze aus dem Monatsbudget</span><span>B = Grenze aus dem Eigenkapital</span></div>';
+}
+function drawFin(){
+  const el=$('#ch-fin'), W=barWidth(el);
+  const total=Math.max.apply(null,R.s.map(o=>o.gesamt).concat([1]));
+  el.innerHTML = '<div class="bars">'+R.s.map((o,k)=>{
+    return '<div class="bar-row '+SZ[k].k+'"><span class="lab">'+SZ[k].name+'</span><div class="bar-stack"><div class="bar thin">'+
+      seg(o.preis,total,W,'f-ink',nf0.format(o.preis),'Kaufpreis')+
+      seg(o.grestEur,total,W,'f-c4',nf0.format(o.grestEur),'Grunderwerbsteuer')+
+      seg(o.notarEur,total,W,'f-c4b',nf0.format(o.notarEur),'Notar und Grundbuch')+
+      seg(o.maklerEur,total,W,'f-c4c',nf0.format(o.maklerEur),'Makler')+'</div><div class="bar thin">'+
+      seg(o.ekEingesetzt,total,W,'f-c3',nf0.format(o.ekEingesetzt),'Eigenkapital')+
+      seg(o.kfw,total,W,'f-c2',nf0.format(o.kfw),'Förderkredit')+
+      seg(o.bank,total,W,'f-c1',nf0.format(o.bank),'Bankdarlehen')+'</div></div></div>';
+  }).join('')+'</div>'+legend([['f-ink','Kaufpreis'],['f-c4','Grunderwerbsteuer'],['f-c4b','Notar und Grundbuch'],['f-c4c','Makler'],['f-c3','Eigenkapital']].concat(R.g.kfwAktiv?[['f-c2','Förderkredit']]:[]).concat([['f-c1','Bankdarlehen']]));
+}
+
+/* ---- Liniendiagramme (SVG, in echten Pixeln gezeichnet) ---- */
+function lineChart(el, cfg){
+  const W=Math.max(260, el.clientWidth||600), H=cfg.h||250, m={l:44,r:12,t:10,b:38};
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const X=v=>m.l+iw*(v-cfg.x0)/(cfg.x1-cfg.x0), Y=v=>m.t+ih*(1-(v-cfg.y0)/(cfg.y1-cfg.y0));
+  let out='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="'+esc(cfg.label)+'">';
+  cfg.yTicks.forEach(v=>{ out+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" style="stroke:var(--line2)"/><text x="'+(m.l-7)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+nf0.format(v/1000)+'</text>'; });
+  cfg.xTicks.forEach(v=>{ out+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+(H-m.b)+'" y2="'+(H-m.b+5)+'" style="stroke:var(--ink2)"/><text x="'+X(v)+'" y="'+(H-m.b+18)+'" text-anchor="middle">'+cfg.xFmt(v)+'</text>'; });
+  out+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+(H-m.b)+'" y2="'+(H-m.b)+'" style="stroke:var(--ink2)"/>';
+  out+='<text x="'+(W-m.r)+'" y="'+(H-4)+'" text-anchor="end">'+esc(cfg.xTitle)+'</text>';
+  cfg.series.forEach(sr=>{
+    const path=pts=>pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join(' ');
+    if(sr.solid && sr.solid.length>1) out+='<path d="'+path(sr.solid)+'" fill="none" style="stroke:var(--'+sr.k+');stroke-width:2.6"/>';
+    if(sr.dashed && sr.dashed.length>1) out+='<path d="'+path(sr.dashed)+'" fill="none" style="stroke:var(--'+sr.k+');stroke-width:2;stroke-dasharray:5 5"/>';
+    if(sr.dot) out+='<circle cx="'+X(sr.dot[0])+'" cy="'+Y(sr.dot[1])+'" r="5" style="fill:var(--'+sr.k+');stroke:var(--surface);stroke-width:2"><title>'+esc(sr.dotTitle||'')+'</title></circle>';
+  });
+  out+='</svg>';
+  el.innerHTML = out + '<div class="legend">'+SZ.map(z=>'<span><i style="background:var(--'+z.k+')"></i>'+z.name+'</span>').join('')+'</div>';
+}
+function ticks(max, step){ const a=[]; for(let v=0; v<=max+1e-9; v+=step) a.push(v); return a; }
+
+function drawRest(){
+  const el=$('#ch-rest');
+  let maxD=0, maxJ=10;
+  const series=R.s.map((o,k)=>{
+    const sr={k:SZ[k].k, solid:[], dashed:[]};
+    if(o.darlehen<=0) return sr;
+    const J=Math.min(45, isFinite(o.laufzeitJ)?Math.ceil(o.laufzeitJ):45);
+    maxD=Math.max(maxD,o.darlehen); maxJ=Math.max(maxJ,J);
+    for(let y=0;y<=J;y++){
+      const v=restschuld(o.darlehen,o.iBlend,o.rateEff,y);
+      if(y<=o.bindung) sr.solid.push([y,v]);
+      if(y>=o.bindung) sr.dashed.push([y,v]);
+    }
+    if(o.bindung<=J){ sr.dot=[o.bindung,o.rest]; sr.dotTitle=SZ[k].lang+': '+eur(o.rest)+' Restschuld nach '+o.bindung+' Jahren'; }
+    return sr;
+  });
+  if(maxD<=0){ el.innerHTML='<p class="small">Kein Darlehen in den aktuellen Rechnungen.</p>'; return; }
+  const y1=niceCeil(maxD, maxD>200000?100000:50000), x1=niceCeil(maxJ,5);
+  lineChart(el,{label:'Restschuld über die Jahre für die drei Szenarien', x0:0,x1:x1,y0:0,y1:y1,
+    yTicks:ticks(y1, y1>300000?100000:50000), xTicks:ticks(x1,5), xFmt:v=>String(v), xTitle:'Jahre seit Kauf', series:series});
+}
+function drawSens(){
+  const el=$('#ch-sens');
+  const xs=[]; for(let z=2; z<=7.0001; z+=0.25) xs.push(z);
+  const runs=xs.map(z=>calc(state,z));
+  let maxP=0;
+  const series=SZ.map((zz,k)=>{
+    const pts=xs.map((z,i)=>{ const p=runs[i].s[k].preis; maxP=Math.max(maxP,p); return [z,p]; });
+    const cur=Math.min(7,Math.max(2,+state.sz.zins[k]||0));
+    return {k:zz.k, solid:pts, dot:[cur,R.s[k].preis], dotTitle:zz.lang+': '+eur(R.s[k].preis)+' bei '+nf2.format(+state.sz.zins[k])+' % Zins'};
+  });
+  const y1=niceCeil(Math.max(maxP,50000), maxP>300000?100000:50000);
+  lineChart(el,{label:'Maximaler Kaufpreis in Abhängigkeit vom Sollzins', x0:2,x1:7,y0:0,y1:y1,
+    yTicks:ticks(y1, y1>300000?100000:50000), xTicks:[2,3,4,5,6,7], xFmt:v=>v+' %', xTitle:'Sollzins pro Jahr', series:series});
+}
+
+/* ---- Preisskala im Kopf (Pegellatte) ---- */
+function drawGauge(){
+  const el=$('#gauge'), W=Math.max(280, el.clientWidth||900);
+  const s=R.s, w=+state.wunsch||0, padL=12, padR=12, iw=W-padL-padR;
+  const wide=W>=640, fs=wide?14:12.5;
+  const top=Math.max(s[0].preis,s[1].preis,s[2].preis,w);
+  const maxV=niceCeil(Math.max(top*1.3,200000),50000);
+  const X=v=>padL+iw*Math.min(Math.max(v,0),maxV)/maxV;
+  const bandY=66, bandH=30, H=150;
+  const b1=s[0].preis, b2=Math.max(b1,s[1].preis), b3=Math.max(b2,s[2].preis);
+  let o='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" aria-hidden="true">'+
+    '<defs><pattern id="gh" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="7" style="fill:var(--hatch)"/></pattern></defs>';
+  const zone=(a,b,style)=>{ if(b>a) o+='<rect x="'+X(a)+'" y="'+bandY+'" width="'+(X(b)-X(a))+'" height="'+bandH+'" style="'+style+'"/>'; };
+  zone(0,b1,'fill:var(--n-soft)'); zone(b1,b2,'fill:var(--m-soft)'); zone(b2,b3,'fill:var(--h-soft)'); zone(b3,maxV,'fill:url(#gh)');
+  // Pegellatten-Raster: 10.000-€-Blöcke im Wechsel
+  for(let v=0, j=0; v<maxV; v+=10000, j++){ if(j%2===0) o+='<rect x="'+X(v)+'" y="'+bandY+'" width="'+(X(v+10000)-X(v))+'" height="6" style="fill:var(--ink)"/>'; }
+  o+='<rect x="'+padL+'" y="'+bandY+'" width="'+iw+'" height="'+bandH+'" fill="none" style="stroke:var(--ink);stroke-width:1.2"/>';
+  const step=wide?50000:100000;
+  for(let v=0; v<=maxV; v+=step){
+    o+='<line x1="'+X(v)+'" x2="'+X(v)+'" y1="'+(bandY+bandH)+'" y2="'+(bandY+bandH+6)+'" style="stroke:var(--ink)"/>';
+    const anchor = v===0?'start':(v===maxV?'end':'middle');
+    o+='<text x="'+X(v)+'" y="'+(bandY+bandH+20)+'" text-anchor="'+anchor+'" style="font-size:'+(wide?12.5:11)+'px;fill:var(--ink2)">'+(v===0?'0 €':nf0.format(v))+'</text>';
+  }
+  // Marken: die am weitesten links stehende Marke bekommt die oberste Textzeile
+  const order=[0,1,2].sort((a,b)=>s[a].preis-s[b].preis);
+  order.forEach((k,row)=>{
+    const x=X(s[k].preis), y=14+row*20;
+    const label=(wide?SZ[k].name+' ':'')+eur(s[k].preisRund);
+    const tw=label.length*fs*0.56, end=(x+8+tw>W-2);
+    o+='<line x1="'+x+'" x2="'+x+'" y1="'+(y-11)+'" y2="'+(bandY+bandH)+'" style="stroke:var(--'+SZ[k].k+');stroke-width:2.6"/>'+
+       '<circle cx="'+x+'" cy="'+(bandY+3)+'" r="5" style="fill:var(--'+SZ[k].k+');stroke:var(--surface);stroke-width:2"/>'+
+       '<text x="'+(end?x-8:x+8)+'" y="'+y+'" text-anchor="'+(end?'end':'start')+'" style="font-size:'+fs+'px;font-weight:600;fill:var(--'+SZ[k].k+')">'+esc(label)+'</text>';
+  });
+  if(w>0){
+    const x=X(w), y=bandY+bandH+38, label=(wide?'Euer Haus ':'')+eur(w), tw=label.length*fs*0.56, end=(x+10+tw>W-2);
+    o+='<line x1="'+x+'" x2="'+x+'" y1="'+bandY+'" y2="'+(y-6)+'" style="stroke:var(--accent);stroke-width:2"/>'+
+       '<rect x="'+(x-5)+'" y="'+(y-5)+'" width="10" height="10" transform="rotate(45 '+x+' '+y+')" style="fill:var(--accent)"/>'+
+       '<text x="'+(end?x-11:x+11)+'" y="'+(y+5)+'" text-anchor="'+(end?'end':'start')+'" style="font-size:'+fs+'px;font-weight:600;fill:var(--accent)">'+esc(label)+'</text>';
+  }
+  el.innerHTML=o+'</svg>';
+  el.setAttribute('aria-label','Preisskala: maximaler Kaufpreis bei niedrigem Risiko '+eur(s[0].preisRund)+', bei mittlerem '+eur(s[1].preisRund)+', bei hohem '+eur(s[2].preisRund)+(w>0?'. Euer Haus: '+eur(w):'')+'.');
+}
+
+function drawCharts(){ drawGauge(); drawBudget(); drawRest(); drawVerm(); drawLimits(); drawFin(); drawSens(); drawVier(); drawJahre(); }
+
+/* Die drei Szenariospalten auf gleiche Zeilenhöhe bringen */
+function equalize(){
+  ['.sz .tag','.sz .price','.sz .limit'].forEach(function(sel){
+    const els=Array.prototype.slice.call(document.querySelectorAll(sel));
+    if(els.length<2) return;
+    els.forEach(function(e){ e.style.minHeight=''; });
+    if(window.innerWidth<=860) return;
+    let max=0; els.forEach(function(e){ max=Math.max(max,e.getBoundingClientRect().height); });
+    els.forEach(function(e){ e.style.minHeight=Math.ceil(max)+'px'; });
+  });
+}
+function refresh(){ R=calc(state); updateOutputs(); renderSzs(); renderTexts(); syncSlider(); renderCustom(); updatePersonen(); updateLead(); renderVerdicts10(); renderKfw(); renderTodo(); renderChips(); updateStickC(); drawCharts(); equalize(); }
+
+/* =====================================================================
+   7. Ereignisse
+   ===================================================================== */
+function onEdit(el){
+  const path=el.dataset.path; let v;
+  if(el.type==='checkbox') v=el.checked;
+  else if(el.dataset.kind==='text' || el.tagName==='SELECT') v=el.value;
+  else {
+    if(el.value.trim()==='' && el.dataset.empty!=null) v=Number(el.dataset.empty);
+    else {
+      v=parseDE(el.value);
+      if(isNaN(v)){ el.classList.add('bad'); return; }
+      if(el.dataset.min!=null) v=Math.max(Number(el.dataset.min),v);
+      if(el.dataset.max!=null) v=Math.min(Number(el.dataset.max),v);
+    }
+    el.classList.remove('bad');
+  }
+  setPath(state,path,v);
+  touched=true;
+  refresh(); scheduleSave();
+}
+document.addEventListener('input', e=>{ const el=e.target; if(el && el.dataset && el.dataset.path && el.type!=='checkbox' && el.tagName!=='SELECT') onEdit(el); });
+document.addEventListener('change', e=>{ const el=e.target; if(el && el.dataset && el.dataset.path && (el.type==='checkbox' || el.tagName==='SELECT')) onEdit(el); });
+document.addEventListener('focusout', e=>{
+  const el=e.target;
+  if(!el || !el.dataset || !el.dataset.path || el.type==='checkbox' || el.dataset.kind==='text' || el.tagName==='SELECT') return;
+  const v=getPath(state,el.dataset.path);
+  el.value=(el.dataset.empty!=null && !v)?'':fmtIn(v,el.dataset.fmt);
+  el.classList.remove('bad');
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target && e.target.classList && e.target.classList.contains('in') && e.target.tagName==='INPUT') e.target.blur(); });
+
+let resetArmed=null;
+document.addEventListener('click', e=>{
+  const t=e.target.closest ? e.target.closest('button') : null; if(!t) return;
+  if(t.dataset.chip){
+    chipToggle(t.dataset.chip); return;
+  }
+  if(t.dataset.goto){
+    const sec=$('#'+t.dataset.goto);
+    if(sec){ oeffne(t.dataset.goto); window.scrollTo({top:Math.max(0,sec.getBoundingClientRect().top+window.pageYOffset-76), behavior:'smooth'}); }
+    return;
+  }
+  if(t.dataset.land){
+    state.land=t.dataset.land; state.grest=LAND[state.land].grest;
+    touched=true; setInputsFromState(); refresh(); scheduleSave();
+  } else if(t.dataset.basis!=null){
+    state.custom.basis=Number(t.dataset.basis);
+    touched=true; setInputsFromState(); refresh(); scheduleSave();
+  } else if(t.dataset.del){
+    const p=t.dataset.del.split('.'); state[p[0]].splice(Number(p[1]),1);
+    touched=true; renderLists(); refresh(); scheduleSave();
+  } else if(t.dataset.add){
+    const L=t.dataset.add;
+    if(L==='income') state.income.push({name:'Neue Einnahme',betrag:0,turnus:'m',w:[100,100,100]});
+    if(L==='expenses') state.expenses.push({name:'Neue Ausgabe',betrag:0,entfaellt:false});
+    if(L==='assets') state.assets.push({name:'Neues Vermögen',betrag:0,w:[100,100,100],note:''});
+    if(L==='personen') state.personen.push({name:'Weitere Person',geb:1990});
+    touched=true; renderLists(); refresh(); scheduleSave();
+    const rows=$$('#tbl-'+L+' tbody tr'); const last=rows[rows.length-1]; if(last){ const f=$('input',last); if(f){ f.focus(); f.select(); } }
+  } else if(t.id==='reset'){
+    if(resetArmed){
+      clearTimeout(resetArmed); resetArmed=null; t.textContent='Auf die Werte aus dem Kostenplaner zurücksetzen';
+      state=clone(DEFAULTS); touched=true; renderLists(); setInputsFromState(); refresh(); scheduleSave();
+    } else {
+      t.textContent='Wirklich alles zurücksetzen? Zum Bestätigen noch einmal klicken';
+      resetArmed=setTimeout(()=>{ resetArmed=null; t.textContent='Auf die Werte aus dem Kostenplaner zurücksetzen'; },5000);
+    }
+  }
+});
+// Schieberegler und Zahlenfeld der vierten Option halten sich gegenseitig aktuell
+(function(){
+  const sl=$('#rate-slider'), zahl=$('#rate-zahl');
+  if(!sl) return;
+  sl.addEventListener('input', function(){
+    state.custom.rate=Number(sl.value)||0;
+    if(zahl) zahl.value=fmtIn(state.custom.rate,'eur');
+    touched=true; refresh(); scheduleSave();
+  });
+})();
+
+
+/* =====================================================================
+   Navigation, einklappbare Schritte und Schnellschalter
+   ===================================================================== */
+const NAV = [
+  {id:'option-4',        t:'Eure Rate'},
+  {id:'kap-rechenweg',   t:'Rechenweg'},
+  {id:'schritt-4',       t:'Rate'},
+  {id:'schritt-6',       t:'Eigenkapital'},
+  {id:'schritt-8',       t:'Kaufpreis'},
+  {id:'schritt-9',       t:'Stresstest'},
+  {id:'schritt-10',      t:'Rente'},
+  {id:'schritt-11',      t:'Förderung'},
+  {id:'naechste-schritte', t:'Nächste Schritte'},
+  {id:'daten',           t:'Daten sichern'}
+];
+function buildNav(){
+  const nav=$('#stick-nav'); if(!nav) return;
+  nav.innerHTML = NAV.filter(n=>$('#'+n.id)).map(n=>'<a href="#'+n.id+'" data-nav="'+n.id+'">'+esc(n.t)+'</a>').join('');
+  nav.addEventListener('click', e=>{
+    const a=e.target.closest('a[data-nav]'); if(!a) return;
+    e.preventDefault();
+    const sec=$('#'+a.dataset.nav); if(!sec) return;
+    oeffne(a.dataset.nav);
+    const y=sec.getBoundingClientRect().top+window.pageYOffset-76;
+    window.scrollTo({top:Math.max(0,y), behavior:'smooth'});
+  });
+}
+function markNav(){
+  const nav=$('#stick-nav'); if(!nav) return;
+  const mitte=window.pageYOffset+120;
+  let akt=null;
+  NAV.forEach(n=>{ const el=$('#'+n.id); if(el && el.offsetTop<=mitte) akt=n.id; });
+  $$('a[data-nav]',nav).forEach(a=>a.classList.toggle('on', a.dataset.nav===akt));
+}
+
+const FOLDS = {
+  'schritt-1' :{label:'Anrechenbares Einkommen', out:'eink'},
+  'schritt-2' :{label:'Lebenshaltung ohne Miete', g:'leben'},
+  'schritt-3' :{label:'Laufende Hauskosten', out:'haus'},
+  'schritt-4' :{label:'Tragbare Monatsrate', out:'rate'},
+  'schritt-5' :{label:'Maximales Darlehen', out:'darlehenMax'},
+  'schritt-6' :{label:'Eigenkapital für den Kauf', out:'ek'},
+  'schritt-7' :{label:'Kaufnebenkosten', g:'nkPct', fmt:'pct2'},
+  'schritt-8' :{label:'Maximaler Kaufpreis', out:'preis'},
+  'schritt-9' :{label:'Rate nach der Zinsbindung', out:'rate2'}
+};
+function buildFolds(){
+  Object.keys(FOLDS).forEach(id=>{
+    const sec=$('#'+id); if(!sec) return;
+    const head=$('.step-head',sec), body=$('.step-body',sec), f=FOLDS[id];
+    const sum = f.g
+      ? '<span class="sum-one" data-out="g.'+f.g+'" data-fmt="'+(f.fmt||'eur')+'"></span>'
+      : SZ.map((z,k)=>'<span class="sum-v '+z.k+'"><i>'+z.name+'</i><b data-out="s.'+k+'.'+f.out+'" data-fmt="'+(f.fmt||'eur')+'"></b></span>').join('');
+    const bar=document.createElement('button');
+    bar.type='button'; bar.className='step-toggle';
+    bar.setAttribute('aria-expanded','false'); bar.setAttribute('aria-controls', id+'-body');
+    bar.innerHTML='<span class="step-sum-lab">'+esc(f.label)+'</span><span class="step-sum">'+sum+'</span><span class="chev" aria-hidden="true"></span>';
+    head.parentNode.insertBefore(bar, body);
+    body.id=id+'-body'; body.hidden=true;
+    sec.classList.add('folded');
+    const um=()=>klappe(sec, !sec.classList.contains('open'));
+    bar.addEventListener('click', um);
+    head.addEventListener('click', um);
+  });
+}
+function klappe(sec, auf){
+  const bar=$('.step-toggle',sec), body=$('.step-body',sec);
+  if(!bar||!body) return;
+  sec.classList.toggle('open', auf);
+  body.hidden=!auf;
+  bar.setAttribute('aria-expanded', String(auf));
+  if(auf){ drawCharts(); equalize(); }
+  const alle=$('#fold-all');
+  if(alle){
+    const offen=Object.keys(FOLDS).filter(id=>{const e=$('#'+id); return e&&e.classList.contains('open');}).length;
+    alle.textContent = offen>=Object.keys(FOLDS).length ? 'Alle Schritte schließen' : 'Alle Schritte öffnen';
+  }
+}
+function oeffne(id){ const sec=$('#'+id); if(sec && sec.classList.contains('folded') && !sec.classList.contains('open')) klappe(sec,true); }
+
+/* ---- Schnellschalter ---- */
+function zweitesEinkommenIndex(){
+  let i=state.income.findIndex(x=>x.turnus==='m' && (+x.betrag||0)===0);
+  if(i<0) i=state.income.findIndex(x=>x.turnus==='m' && x.__whatif);
+  return i;
+}
+const WHATIF = [
+  { id:'luisa', t:'Zweites Gehalt 1.500 €',
+    an:()=>{ const i=zweitesEinkommenIndex(); return i>=0 && (+state.income[i].betrag||0)>=1500 && state.income[i].__whatif; },
+    setzen:(st,an)=>{ const i=st.income.findIndex(x=>x.turnus==='m' && (an ? (+x.betrag||0)===0 : x.__whatif));
+      if(i<0) return false;
+      if(an){ st.income[i].__whatif=true; st.income[i].betrag=1500; }
+      else { st.income[i].betrag=0; delete st.income[i].__whatif; }
+      return true; },
+    moeglich:()=>zweitesEinkommenIndex()>=0 },
+  { id:'makler', t:'Ohne Makler',
+    an:()=>(+state.makler||0)===0,
+    setzen:(st,an)=>{ if(an){ st.__maklerAlt=+st.makler||0; st.makler=0; } else { st.makler=st.__maklerAlt!=null?st.__maklerAlt:3.57; delete st.__maklerAlt; } return true; },
+    moeglich:()=>true },
+  { id:'land', t:'Mecklenburg-Vorpommern',
+    an:()=>state.land==='MV',
+    setzen:(st,an)=>{ st.land=an?'MV':'SH'; st.grest=LAND[st.land].grest; return true; },
+    moeglich:()=>true },
+  { id:'kfw', t:'Förderkredit einrechnen',
+    an:()=>(+state.kfw.betrag||0)>0,
+    setzen:(st,an)=>{ st.kfw.betrag = an ? jkaMax() : 0; return true; },
+    moeglich:()=>true },
+  { id:'rente', t:'Ohne Rentengrenze',
+    an:()=>!state.bisRente,
+    setzen:(st,an)=>{ st.bisRente=!an; return true; },
+    moeglich:()=>true }
+];
+function whatifById(id){ return WHATIF.filter(w=>w.id===id)[0]; }
+function renderChips(){
+  const box=$('#chips'); if(!box) return;
+  const preis0=R.s[1].preis;
+  box.innerHTML = WHATIF.filter(w=>w.moeglich()).map(w=>{
+    const an=w.an();
+    let d='';
+    if(!an){
+      const st=clone(state);
+      if(w.setzen(st,true)){
+        const neu=calc(st).s.map(x=>x.preis);
+        const dv=R.s.map((x,k)=>neu[k]-x.preis);
+        let best=1;                                     // die mittlere Rechnung ist der Normalfall
+        dv.forEach((x,k)=>{ if(Math.abs(x)>Math.abs(dv[best])+500) best=k; });
+        if(Math.abs(dv[best])>=500)
+          d='<span class="d">'+(dv[best]>0?'+':'')+eur(dv[best])+(best!==1?'<i>'+SZ[best].name+'</i>':'')+'</span>';
+      }
+    }
+    return '<button type="button" class="chip" data-chip="'+w.id+'" aria-pressed="'+an+'">'+esc(w.t)+d+'</button>';
+  }).join('');
+}
+function chipToggle(id){
+  const w=whatifById(id); if(!w) return;
+  const an=!w.an();
+  if(!w.setzen(state,an)) return;
+  touched=true;
+  renderLists(); setInputsFromState(); refresh(); scheduleSave();
+}
+
+/* =====================================================================
+   Daten sichern und zurückholen
+   ===================================================================== */
+function datenStatus(text, bad){
+  const el=$('#daten-status'); if(!el) return;
+  el.hidden=false; el.textContent=text; el.classList.toggle('warn', !!bad);
+}
+function exportText(){
+  return JSON.stringify({app:'hauskauf-planer', version:VERSION, schema:SCHEMA, gespeichert:new Date().toISOString(), daten:state}, null, 2);
+}
+function importText(txt){
+  let got;
+  try { got=JSON.parse(txt); } catch(e){ datenStatus('Das war keine gültige Sicherungsdatei. Der Text muss so aussehen, wie ihn der Planer ausgibt.', true); return false; }
+  const daten = (got && got.daten) ? got.daten : got;
+  if(!daten || typeof daten!=='object'){ datenStatus('In der Datei stecken keine Planerdaten.', true); return false; }
+  state = sanitize(daten);
+  touched=true;
+  renderLists(); setInputsFromState(); refresh(); scheduleSave();
+  const her = got && got.version ? got.version : null;
+  const alt = her && her!==VERSION;
+  datenStatus('Sicherung übernommen. Alle Zahlen oben sind aktualisiert.'+
+    (alt ? ' Sie stammt aus Version '+her+', ihr arbeitet mit '+VERSION+'. Neuere Felder stehen auf den Voreinstellungen.' : ''));
+  return true;
+}
+(function(){
+  const bFile=$('#exp-file'), bCopy=$('#exp-copy'), bImp=$('#imp-file'), inp=$('#imp-input'), bTxt=$('#imp-text-btn');
+  if(!bFile) return;
+  bFile.addEventListener('click', ()=>{
+    try {
+      const blob=new Blob([exportText()],{type:'application/json'});
+      const url=URL.createObjectURL(blob), a=document.createElement('a');
+      const d=new Date(), p2=n=>String(n).padStart(2,'0');
+      a.href=url; a.download='hauskauf-planer-'+VERSION+'-'+d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      datenStatus('Sicherung heruntergeladen. Legt die Datei dorthin, wo ihr sie wiederfindet.');
+    } catch(e){ datenStatus('Der Download hat nicht geklappt. Nehmt stattdessen die Zwischenablage.', true); }
+  });
+  bCopy.addEventListener('click', async ()=>{
+    const txt=exportText();
+    try {
+      if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(txt); datenStatus('In die Zwischenablage kopiert. Fügt den Text irgendwo ein, wo er sicher liegt.'); return; }
+      throw new Error('keine Zwischenablage');
+    } catch(e){
+      const ta=$('#imp-text'); if(ta){ ta.value=txt; ta.focus(); ta.select(); }
+      datenStatus('Die Zwischenablage ist hier gesperrt. Der Text steht jetzt im Feld unten und lässt sich von dort kopieren.', true);
+    }
+  });
+  bImp.addEventListener('click', ()=>inp.click());
+  inp.addEventListener('change', ()=>{
+    const f=inp.files && inp.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ importText(String(r.result||'')); inp.value=''; };
+    r.onerror=()=>{ datenStatus('Die Datei liess sich nicht lesen.', true); inp.value=''; };
+    r.readAsText(f);
+  });
+  bTxt.addEventListener('click', ()=>{
+    const ta=$('#imp-text'), t=(ta.value||'').trim();
+    if(!t){ datenStatus('Im Feld steht noch nichts.', true); return; }
+    if(importText(t)) ta.value='';
+  });
+})();
+
+window.addEventListener('resize', debounce(function(){ drawCharts(); equalize(); },120));
+$('#fold-exp').addEventListener('toggle', drawCharts);
+
+// Flächenregler
+(function(){
+  const sl=$('#flaeche-slider'), zahl=$('#flaeche');
+  if(!sl) return;
+  sl.addEventListener('input', function(){
+    state.flaeche=Number(sl.value)||0;
+    if(zahl) zahl.value=fmtIn(state.flaeche, zahl.dataset.fmt);
+    touched=true; refresh(); scheduleSave();
+  });
+})();
+
+// Alle Schritte auf- oder zuklappen
+(function(){
+  const b=$('#fold-all'); if(!b) return;
+  b.addEventListener('click', ()=>{
+    const ids=Object.keys(FOLDS);
+    const alleOffen = ids.every(id=>{const e=$('#'+id); return e&&e.classList.contains('open');});
+    ids.forEach(id=>{ const e=$('#'+id); if(e) klappe(e, !alleOffen); });
+    if(alleOffen){ const y=$('#kap-rechenweg').getBoundingClientRect().top+window.pageYOffset-76; window.scrollTo({top:Math.max(0,y)}); }
+  });
+})();
+
+// Aktiven Abschnitt in der Navigation markieren
+window.addEventListener('scroll', debounce(markNav, 90), {passive:true});
+// Sprung über die Adresszeile: Zielschritt aufklappen
+window.addEventListener('hashchange', ()=>{ if(location.hash.length>1) oeffne(location.hash.slice(1)); });
+
+// Ergebnisleiste einblenden, sobald die drei Szenario-Spalten aus dem Bild sind
+if('IntersectionObserver' in window){
+  new IntersectionObserver(entries=>{
+    const en=entries[0], on=!en.isIntersecting && en.boundingClientRect.top<0;
+    const st=$('#stick'); st.classList.toggle('on',on); st.setAttribute('aria-hidden', String(!on));
+  },{threshold:0}).observe($('#szs'));
+}
+
+/* =====================================================================
+   8. Speichern: geteilte Artefakt-Datenbank, sonst Browser-Speicher
+   ===================================================================== */
+const LS_KEY='hauskauf-planer-v1';
+let dbDoc=null, touched=false, saveTimer=null, saving=false, again=false;
+function setStatus(t){ const el=$('#status'); if(el) el.textContent=t; }
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(save,900); }
+async function save(){
+  const snap=clone(state); snap.ts=Date.now();
+  let local=false;
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(snap)); local=true; }catch(e){}
+  if(!dbDoc){ setStatus(local?'Änderungen sind in diesem Browser gespeichert.':'Änderungen können hier nicht gespeichert werden und gelten nur, solange die Seite offen ist.'); return; }
+  if(saving){ again=true; return; }
+  saving=true;
+  try{ await dbDoc.set(snap); setStatus('Änderungen gespeichert.'); }
+  catch(e){ setStatus(local?'Änderungen sind nur in diesem Browser gespeichert.':'Speichern hat nicht geklappt.'); }
+  saving=false;
+  if(again){ again=false; save(); }
+}
+// Beim Schließen oder Wechseln des Tabs nicht auf den Timer warten
+function flushSave(){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; save(); } }
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushSave(); });
+// Browser bitten, den Speicher nicht automatisch zu räumen
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+async function initStore(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ state=sanitize(JSON.parse(raw)); renderLists(); setInputsFromState(); refresh(); setStatus('Eure gespeicherten Änderungen sind geladen.'); }
+  }catch(e){}
+  try{
+    if(!(window.claude && typeof window.claude.use==='function')) return;
+    const db=await window.claude.use('db');
+    if(!db) return;
+    dbDoc=db.doc('planer/stand');
+    const snap=await dbDoc.get();
+    if(touched){ scheduleSave(); return; }            // inzwischen wurde schon getippt: der aktuelle Stand gewinnt
+    if(snap && snap.exists){
+      state=sanitize(snap.data()); renderLists(); setInputsFromState(); refresh();
+      setStatus('Eure gespeicherten Änderungen sind geladen.');
+    }
+  }catch(e){ dbDoc=null; }
+}
+
+/* =====================================================================
+   9. Start
+   ===================================================================== */
+const vEl=$('#version'); if(vEl) vEl.textContent='Version '+VERSION+' · '+VERSION_DATUM;
+buildTapes(); buildFolds(); buildNav(); renderLists(); setInputsFromState(); refresh();
+if($('#flaeche-slider')) $('#flaeche-slider').value=String(state.flaeche);
+markNav();
+if(location.hash.length>1) oeffne(location.hash.slice(1));
+initStore();
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ drawCharts(); equalize(); });
+
+// für Tests
+window.__planer = { calc:calc, DEFAULTS:DEFAULTS, get state(){ return state; }, parseDE:parseDE };
+})();
+</script>
+</body>
+</html>

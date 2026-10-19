@@ -1,0 +1,4 @@
+# Nur die veroeffentlichte Seite gehoert ins Repo; Exporte/Tabellen mit eigenen Daten bleiben lokal
+*
+!.gitignore
+!index.html
